@@ -59,10 +59,15 @@ class SuiteSchema(Schema, kw_only=True):
 
 
 class MozharnessSchema(Schema, kw_only=True):
-    # the mozharness script used to run this task
-    script: optionally_keyed_by("test-platform", str, use_msgspec=True)  # type: ignore
+    # the mozharness script used to run this task; unset for the suites that
+    # are not driven by mozharness at all
+    script: TOptional[  # type: ignore
+        optionally_keyed_by("test-platform", str, use_msgspec=True)
+    ] = None
     # the config files required for the task
-    config: optionally_keyed_by("test-platform", list[str], use_msgspec=True)  # type: ignore
+    config: TOptional[  # type: ignore
+        optionally_keyed_by("test-platform", list[str], use_msgspec=True)
+    ] = None
     # mochitest flavor for mochitest runs
     mochitest_flavor: TOptional[str] = None
     # any additional actions to pass to the mozharness command
@@ -368,6 +373,9 @@ class TestDescriptionSchema(Schema, kw_only=True):
     # Raptor / browsertime specific keys, defer validation to 'raptor.py'
     # transform.
     raptor: TOptional[object] = None
+    # enterprise-end2end specific keys, defer validation to 'enterprise.py'
+    # transform.
+    enterprise_end2end: TOptional[object] = None
     # Raptor / browsertime specific keys that need to be here since 'raptor' schema
     # is evluated *before* test_description_schema
     app: TOptional[str] = None
@@ -474,6 +482,8 @@ def set_defaults(config, tasks):
         task.setdefault("use-uv", True)
         task.setdefault("use-caches", ["checkout", "pip", "uv"])
 
+        task["mozharness"].setdefault("script", None)
+        task["mozharness"].setdefault("config", [])
         task["mozharness"].setdefault("extra-options", [])
         task["mozharness"].setdefault("requires-signed-builds", False)
         task["mozharness"].setdefault("tooltool-downloads", "public")
@@ -551,6 +561,7 @@ def run_remaining_transforms(config, tasks):
         ("confirm_failure", None),
         ("pernosco", lambda t: t["build-platform"].startswith("linux64")),
         ("os_integration", None),
+        ("enterprise", lambda t: t["suite"] == "enterprise-end2end"),
         # These transforms should run last as there is never any difference in
         # configuration from one chunk to another (other than chunk number).
         ("chunk", None),
@@ -700,9 +711,17 @@ def make_job_description(config, tasks):
             jobdesc["optimization"] = {"test": schedules}
 
         run = jobdesc["run"] = {}
-        run["using"] = "mozharness-test"
         run["clone-with"] = "hg"
-        run["test"] = task
+        if "run-command" in task:
+            # A suite that is not driven by mozharness: a per-suite transform
+            # set the command to run out of the checkout instead.
+            run["using"] = "run-task"
+            run["checkout"] = True
+            run["cwd"] = "{checkout}"
+            run["command"] = task.pop("run-command")
+        else:
+            run["using"] = "mozharness-test"
+            run["test"] = task
 
         if "workdir" in task:
             run["workdir"] = task.pop("workdir")

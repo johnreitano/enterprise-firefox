@@ -828,6 +828,7 @@ def ensure_spi_disabled_on_all_but_spi(config, tasks):
         has_no_setpref = (
             "gtest",
             "cppunit",
+            "enterprise-end2end",
             "jittest",
             "junit",
             "raptor",
@@ -1074,6 +1075,7 @@ def enable_webrender(config, tasks):
             "gtest",
             "jittest",
             "raptor",
+            "enterprise-end2end",
         ]:
             extra_options.append("--setpref=layers.d3d11.enable-blacklist=false")
 

@@ -1,0 +1,58 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+---
+# One task per console ref to exercise, each naming its ref below; the driver
+# is what resolves that name to an actual ref.
+task-defaults:
+    run-on-projects: built-projects
+    tier: default
+    attributes:
+        code-review: true
+    # Smallest worker available in the t-* category
+    worker-type: t-linux-docker-noscratch-amd
+    suite: enterprise-end2end
+    allow-software-gl-layers: false
+    max-run-time: 7200
+    # The driver script only needs the checkout and the image's python3.
+    use-python: system
+    use-uv: false
+    # Spelled out in full because the driver script defines no defaults.
+    enterprise-end2end:
+        owner: mozilla
+        repo: enterprise-console
+        workflow: test.yaml
+        affected-scopes:
+            - e2e
+        poll-interval: 30
+        # Short enough to still collect the run's logs before max-run-time.
+        timeout: 5400
+    # This suite has no manifests, but a test task with none is dropped by
+    # `filter_tests_without_manifests`, so claim a placeholder one and opt out
+    # of the manifest-driven `test` optimization it would otherwise get.
+    # Already normalized: `set_test_manifests` bails out before it would turn a
+    # bare list into this, and `split_chunks` then subscripts it regardless.
+    test-manifests:
+        active:
+            - empty.toml
+        skipped: []
+    optimization:
+        never: null
+
+enterprise-end2end-main:
+    description: Running Enterprise end-to-end tests against the console main branch
+    treeherder-symbol: E2E(main)
+    enterprise-end2end:
+        ref: main
+
+enterprise-end2end-current:
+    description: Running Enterprise end-to-end tests against the latest console release
+    treeherder-symbol: E2E(cur)
+    enterprise-end2end:
+        ref: current
+
+enterprise-end2end-minimal:
+    description: Running Enterprise end-to-end tests against the oldest supported console release
+    treeherder-symbol: E2E(min)
+    enterprise-end2end:
+        ref: minimal
