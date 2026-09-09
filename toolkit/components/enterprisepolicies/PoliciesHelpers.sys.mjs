@@ -603,6 +603,12 @@ export function runOnce(actionName, callback) {
  * If the callback that was passed is an async function, you can await on this
  * function to await for the callback.
  *
+ * The record of the last applied value is an ordinary user preference in the
+ * profile, which the user can edit before startup to make the callback look
+ * like it already ran. Only use this for a setting the user is allowed to
+ * change afterwards. A policy that enforces something must instead check the
+ * state it controls at every startup.
+ *
  * @param {string} actionName
  *        A given name which will be used to track if this callback has run.
  *        This string will be part of a pref name.
