@@ -612,11 +612,12 @@ export function runOnce(actionName, callback) {
  * @param {string} actionName
  *        A given name which will be used to track if this callback has run.
  *        This string will be part of a pref name.
- * @param {string} policyValue
- *        The current value of the policy. This will be compared to previous
- *        values given to this function to determine if the policy value has
- *        changed. Regardless of the data type of the policy, this must be a
- *        string.
+ * @param {string|boolean|number} policyValue
+ *        The current value of the policy. It is converted to a string and
+ *        compared to the previous value given to this function to determine
+ *        if the policy value has changed. Serialize objects and arrays first,
+ *        for example with JSON.stringify, since their default string form
+ *        does not reflect their contents.
  * @param {Function} callback
  *        The callback to be run when the pref value changes
  * @returns {Promise}

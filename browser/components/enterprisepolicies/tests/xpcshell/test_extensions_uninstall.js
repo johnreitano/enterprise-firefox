@@ -11,9 +11,6 @@ const { AddonManager } = ChromeUtils.importESModule(
 const { PolicyFailures } = ChromeUtils.importESModule(
   "resource://gre/modules/PoliciesHelpers.sys.mjs"
 );
-const { setTimeout } = ChromeUtils.importESModule(
-  "resource://gre/modules/Timer.sys.mjs"
-);
 
 AddonTestUtils.init(this);
 AddonTestUtils.overrideCertDB();
@@ -77,12 +74,47 @@ async function ensureAbsent() {
   }
 }
 
+function promiseInstallDone(install) {
+  const finished = [
+    AddonManager.STATE_INSTALLED,
+    AddonManager.STATE_CANCELLED,
+    AddonManager.STATE_DOWNLOAD_FAILED,
+    AddonManager.STATE_INSTALL_FAILED,
+  ];
+  if (finished.includes(install.state)) {
+    return Promise.resolve();
+  }
+  return new Promise(resolve => {
+    const listener = {};
+    for (const event of [
+      "onInstallEnded",
+      "onInstallFailed",
+      "onInstallCancelled",
+      "onDownloadFailed",
+      "onDownloadCancelled",
+    ]) {
+      listener[event] = () => {
+        install.removeListener(listener);
+        resolve();
+      };
+    }
+    install.addListener(listener);
+  });
+}
+
 // The Uninstall and Install steps of the Extensions policy keep running after
-// the engine reports the policies applied; give them time to finish.
+// the engine reports the policies applied. Once the uninstalls a task expects
+// have been awaited, what remains is promise-only: the policy's own add-on
+// lookup, the loop over its result and the chained Install step, which
+// creates its AddonInstall synchronously from getInstallForURL. A lookup
+// queued after the policy's therefore resolves after that lookup, the
+// following event-loop turn runs every continuation it left behind, and any
+// install the policy created by then is awaited to its final state.
 async function settle() {
   await AddonManager.getAddonsByIDs([ADDON_ID]);
-  // eslint-disable-next-line mozilla/no-arbitrary-setTimeout
-  await new Promise(resolve => setTimeout(resolve, 250));
+  await new Promise(executeSoon);
+  const installs = await AddonManager.getAllInstalls();
+  await Promise.all(installs.map(promiseInstallDone));
 }
 
 function watchAddonChanges() {
