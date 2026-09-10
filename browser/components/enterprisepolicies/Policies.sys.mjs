@@ -53,6 +53,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   pemToBase64: "resource://gre/modules/PoliciesHelpers.sys.mjs",
   processMIMEInfo: "resource://gre/modules/PoliciesHelpers.sys.mjs",
   replacePathVariables: "resource://gre/modules/PoliciesHelpers.sys.mjs",
+  isRunOnceModificationApplied:
+    "resource://gre/modules/PoliciesHelpers.sys.mjs",
   reportFailure: "resource://gre/modules/PoliciesHelpers.sys.mjs",
   setDefaultPermission: "resource://gre/modules/PoliciesHelpers.sys.mjs",
   runOncePerModification: "resource://gre/modules/PoliciesHelpers.sys.mjs",
@@ -78,18 +80,24 @@ ChromeUtils.defineLazyGetter(lazy, "log", () => {
 /**
  * Uninstalls the add-ons an Extensions.Uninstall list names whenever they are
  * present, so a run-once marker pre-seeded in the profile cannot keep one
- * installed. While the list is unchanged and the policy also installs add-ons,
- * an add-on that a policy installed is left alone: that is what lets an
- * administrator update an add-on by listing it in both Uninstall and Install.
+ * installed. An ID that ExtensionSettings installs is reported as a conflict
+ * and skipped, whether or not it is installed yet.
+ *
+ * While neither the Uninstall list nor the Install list has changed since it
+ * was last applied, an add-on that a policy installed is left alone. That is
+ * what lets an administrator update an add-on by listing it in both Uninstall
+ * and Install without it being downloaded again at every startup. As soon as
+ * either list changes, everything listed is uninstalled, so an add-on the
+ * Install list no longer covers does not linger.
  *
  * @param {string[]} ids
  *        The IDs of the add-ons to uninstall.
- * @param {boolean} hasInstallList
- *        Whether the policy also has a non-empty Install list.
+ * @param {string[]} [installList]
+ *        The policy's Install list, if it has one.
  * @returns {Promise<boolean>}
  *        Whether the Uninstall list changed since it was last applied.
  */
-async function uninstallListedAddons(ids, hasInstallList) {
+async function uninstallListedAddons(ids, installList = []) {
   let listChanged = false;
   lazy.runOncePerModification(
     "extensionsUninstall",
@@ -98,24 +106,31 @@ async function uninstallListedAddons(ids, hasInstallList) {
       listChanged = true;
     }
   );
-  const addons = await lazy.AddonManager.getAddonsByIDs([...new Set(ids)]);
+  const keepPolicyInstalls =
+    !listChanged &&
+    !!installList.length &&
+    lazy.isRunOnceModificationApplied(
+      "extensionsInstall",
+      JSON.stringify(installList)
+    );
+  const candidates = [...new Set(ids)].filter(id => {
+    const mode = Services.policies.getExtensionSettings(id)?.installation_mode;
+    if (mode == "force_installed" || mode == "normal_installed") {
+      lazy.reportFailure(
+        "Extensions",
+        `Not uninstalling ${id} because ExtensionSettings installs it`
+      );
+      return false;
+    }
+    return true;
+  });
+  const addons = await lazy.AddonManager.getAddonsByIDs(candidates);
   for (const addon of addons) {
     if (!addon) {
       continue;
     }
-    const mode = Services.policies.getExtensionSettings(
-      addon.id
-    )?.installation_mode;
-    if (mode == "force_installed" || mode == "normal_installed") {
-      lazy.reportFailure(
-        "Extensions",
-        `Not uninstalling ${addon.id} because ExtensionSettings installs it`
-      );
-      continue;
-    }
     if (
-      !listChanged &&
-      hasInstallList &&
+      keepPolicyInstalls &&
       addon.installTelemetryInfo?.source == "enterprise-policy"
     ) {
       continue;
@@ -1914,7 +1929,7 @@ export var Policies = {
       if ("Uninstall" in param) {
         uninstallingPromise = uninstallListedAddons(
           param.Uninstall,
-          !!param.Install?.length
+          param.Install
         );
       }
       if ("Install" in param) {

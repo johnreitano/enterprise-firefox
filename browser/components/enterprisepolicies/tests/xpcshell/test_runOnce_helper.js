@@ -3,8 +3,14 @@
 
 "use strict";
 
-let { runOnce, runOncePerModification, clearRunOnceModification } =
-  ChromeUtils.importESModule("resource://gre/modules/PoliciesHelpers.sys.mjs");
+let {
+  runOnce,
+  runOncePerModification,
+  clearRunOnceModification,
+  isRunOnceModificationApplied,
+} = ChromeUtils.importESModule(
+  "resource://gre/modules/PoliciesHelpers.sys.mjs"
+);
 
 let runCount = 0;
 function callback() {
@@ -54,4 +60,37 @@ add_task(async function test_runOncePerModification_helper() {
   equal(runCount, 4, "Callback ran again after the record was cleared.");
 
   clearRunOnceModification("test_modification");
+});
+
+add_task(async function test_isRunOnceModificationApplied_helper() {
+  ok(
+    !isRunOnceModificationApplied("test_applied", "one"),
+    "Nothing is applied before the first run."
+  );
+
+  await runOncePerModification("test_applied", "one", callback);
+  ok(
+    isRunOnceModificationApplied("test_applied", "one"),
+    "The value that was just applied is reported as applied."
+  );
+  ok(
+    !isRunOnceModificationApplied("test_applied", "two"),
+    "A different value is not."
+  );
+
+  await runOncePerModification("test_applied", 2, callback);
+  ok(
+    isRunOnceModificationApplied("test_applied", "2"),
+    "A non-string value is applied under its string form."
+  );
+  ok(
+    isRunOnceModificationApplied("test_applied", 2),
+    "The non-string value itself is reported as applied."
+  );
+
+  clearRunOnceModification("test_applied");
+  ok(
+    !isRunOnceModificationApplied("test_applied", "2"),
+    "Nothing is applied after the record was cleared."
+  );
 });

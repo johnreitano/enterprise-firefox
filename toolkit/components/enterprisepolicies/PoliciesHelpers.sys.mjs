@@ -630,18 +630,37 @@ export async function runOncePerModification(
   policyValue,
   callback
 ) {
-  // Stringify the value so that it matches what we'd get from getStringPref.
-  policyValue = policyValue + "";
-  let prefName = `browser.policies.runOncePerModification.${actionName}`;
-  let oldPolicyValue = Services.prefs.getStringPref(prefName, undefined);
-  if (policyValue === oldPolicyValue) {
+  if (isRunOnceModificationApplied(actionName, policyValue)) {
     lazy.log.debug(
       `Not running action ${actionName} again because the policy's value is unchanged`
     );
     return Promise.resolve();
   }
-  Services.prefs.setStringPref(prefName, policyValue);
+  let prefName = `browser.policies.runOncePerModification.${actionName}`;
+  // Stringify the value so that it matches what we'd get from getStringPref.
+  Services.prefs.setStringPref(prefName, policyValue + "");
   return callback();
+}
+
+/**
+ * isRunOnceModificationApplied
+ *
+ * Whether runOncePerModification has already applied this value for this
+ * action, which is when it would skip its callback. A policy can use this to
+ * find out whether one of its lists changed before it reaches the
+ * runOncePerModification step for that list.
+ *
+ * @param {string} actionName
+ *        The name given to runOncePerModification for the action.
+ * @param {string|boolean|number} policyValue
+ *        The value to compare with the last applied one, in the same form
+ *        that is given to runOncePerModification.
+ * @returns {boolean}
+ *        Whether the value is the last applied one.
+ */
+export function isRunOnceModificationApplied(actionName, policyValue) {
+  let prefName = `browser.policies.runOncePerModification.${actionName}`;
+  return Services.prefs.getStringPref(prefName, undefined) === policyValue + "";
 }
 
 /**

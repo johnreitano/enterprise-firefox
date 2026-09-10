@@ -19,6 +19,7 @@ AddonTestUtils.appInfo = getAppInfo();
 const server = AddonTestUtils.createHttpServer({ hosts: ["example.com"] });
 const BASE_URL = "http://example.com/data";
 const ADDON_ID = "uninstall-policy@tests.mozilla.org";
+const OTHER_ADDON_ID = "other-policy@tests.mozilla.org";
 const UNINSTALL_MARKER =
   "browser.policies.runOncePerModification.extensionsUninstall";
 const INSTALL_MARKER =
@@ -27,12 +28,12 @@ const INSTALL_MARKER =
 // Served from the update URL the test add-on carries.
 const updates = [];
 
-function createXPI(version) {
+function createXPI(version, id = ADDON_ID) {
   return AddonTestUtils.createTempWebExtensionFile({
     manifest: {
       version,
       browser_specific_settings: {
-        gecko: { id: ADDON_ID, update_url: `${BASE_URL}/update.json` },
+        gecko: { id, update_url: `${BASE_URL}/update.json` },
       },
     },
   });
@@ -48,6 +49,7 @@ add_setup(async function () {
   await AddonTestUtils.promiseStartupManager();
   server.registerFile("/data/v1.xpi", createXPI("1.0"));
   server.registerFile("/data/v2.xpi", createXPI("2.0"));
+  server.registerFile("/data/other.xpi", createXPI("1.0", OTHER_ADDON_ID));
   server.registerPathHandler("/data/update.json", (request, response) => {
     response.setHeader("Content-Type", "application/json");
     response.write(JSON.stringify({ addons: { [ADDON_ID]: { updates } } }));
@@ -65,8 +67,8 @@ async function installOutsidePolicy() {
   return addon;
 }
 
-async function ensureAbsent() {
-  const addon = await AddonManager.getAddonByID(ADDON_ID);
+async function ensureAbsent(id = ADDON_ID) {
+  const addon = await AddonManager.getAddonByID(id);
   if (addon) {
     const uninstalled = AddonTestUtils.promiseAddonEvent("onUninstalled");
     await addon.uninstall();
@@ -301,6 +303,49 @@ add_task(async function test_changed_uninstall_list_reinstalls_from_new_url() {
 });
 
 add_task(
+  async function test_changed_install_list_removes_policy_installed_addon() {
+    EnterprisePolicyTesting.resetRunOnceState();
+    await ensureAbsent();
+    await ensureAbsent(OTHER_ADDON_ID);
+
+    let installed = AddonTestUtils.promiseInstallEvent("onInstallEnded");
+    await applyPolicies({
+      Extensions: { Uninstall: [ADDON_ID], Install: [`${BASE_URL}/v1.xpi`] },
+    });
+    await installed;
+    const addon = await AddonManager.getAddonByID(ADDON_ID);
+    equal(
+      addon.installTelemetryInfo?.source,
+      "enterprise-policy",
+      "The policy installed the add-on"
+    );
+
+    const uninstalled = AddonTestUtils.promiseAddonEvent("onUninstalled");
+    installed = AddonTestUtils.promiseInstallEvent("onInstallEnded");
+    await applyPolicies({
+      Extensions: {
+        Uninstall: [ADDON_ID],
+        Install: [`${BASE_URL}/other.xpi`],
+      },
+    });
+    await uninstalled;
+    await installed;
+    equal(
+      await AddonManager.getAddonByID(ADDON_ID),
+      null,
+      "The add-on the Install list no longer covers was uninstalled"
+    );
+    notEqual(
+      await AddonManager.getAddonByID(OTHER_ADDON_ID),
+      null,
+      "The add-on the Install list now names was installed"
+    );
+
+    await ensureAbsent(OTHER_ADDON_ID);
+  }
+);
+
+add_task(
   async function test_preseeded_marker_does_not_freeze_install_updates() {
     EnterprisePolicyTesting.resetRunOnceState();
     await ensureAbsent();
@@ -310,10 +355,12 @@ add_task(
     await installed;
 
     Services.prefs.setStringPref(UNINSTALL_MARKER, JSON.stringify([ADDON_ID]));
+    const uninstalled = AddonTestUtils.promiseAddonEvent("onUninstalled");
     installed = AddonTestUtils.promiseInstallEvent("onInstallEnded");
     await applyPolicies({
       Extensions: { Uninstall: [ADDON_ID], Install: [`${BASE_URL}/v2.xpi`] },
     });
+    await uninstalled;
     await installed;
 
     const addon = await AddonManager.getAddonByID(ADDON_ID);
@@ -360,9 +407,48 @@ add_task(async function test_extensionsettings_install_takes_precedence() {
   );
 });
 
+add_task(
+  async function test_extensionsettings_conflict_reported_before_install() {
+    EnterprisePolicyTesting.resetRunOnceState();
+    await ensureAbsent();
+
+    const watcher = watchAddonChanges();
+    const installed = AddonTestUtils.promiseInstallEvent("onInstallEnded");
+    await applyPolicies({
+      ExtensionSettings: {
+        [ADDON_ID]: {
+          installation_mode: "normal_installed",
+          install_url: `${BASE_URL}/v1.xpi`,
+        },
+      },
+      Extensions: { Uninstall: [ADDON_ID] },
+    });
+    await installed;
+    await settle();
+    watcher.stop();
+
+    ok(
+      !watcher.seen.includes("onUninstalling"),
+      "The add-on ExtensionSettings installed is not uninstalled"
+    );
+    notEqual(
+      await AddonManager.getAddonByID(ADDON_ID),
+      null,
+      "The add-on ExtensionSettings installed is present"
+    );
+    const failures = PolicyFailures.getAll().Extensions ?? [];
+    equal(
+      failures.length,
+      1,
+      "The conflict is reported although the add-on was not installed yet"
+    );
+  }
+);
+
 add_task(async function cleanup() {
   await applyPolicies({});
   await ensureAbsent();
+  await ensureAbsent(OTHER_ADDON_ID);
   EnterprisePolicyTesting.resetRunOnceState();
   await AddonTestUtils.promiseShutdownManager();
 });
