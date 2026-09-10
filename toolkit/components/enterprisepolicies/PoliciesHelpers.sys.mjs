@@ -905,6 +905,70 @@ export function installAddonFromURL(url, extensionID, addon, policyName) {
     });
 }
 
+/**
+ * Uninstalls the add-ons an Extensions.Uninstall list names whenever they are
+ * present, so a run-once marker pre-seeded in the profile cannot keep one
+ * installed. An ID that ExtensionSettings installs is reported as a conflict
+ * and skipped, whether or not it is installed yet.
+ *
+ * While neither the Uninstall list nor the Install list has changed since it
+ * was last applied, an add-on that a policy installed is left alone. That is
+ * what lets an administrator update an add-on by listing it in both Uninstall
+ * and Install without it being downloaded again at every startup. As soon as
+ * either list changes, everything listed is uninstalled, so an add-on the
+ * Install list no longer covers does not linger.
+ *
+ * @param {string[]} ids
+ *        The IDs of the add-ons to uninstall.
+ * @param {string[]} [installList]
+ *        The policy's Install list, if it has one.
+ * @returns {Promise<boolean>}
+ *        Whether the Uninstall list changed since it was last applied.
+ */
+export async function uninstallListedAddons(ids, installList = []) {
+  let listChanged = false;
+  runOncePerModification("extensionsUninstall", JSON.stringify(ids), () => {
+    listChanged = true;
+  });
+  const keepPolicyInstalls =
+    !listChanged &&
+    !!installList.length &&
+    isRunOnceModificationApplied(
+      "extensionsInstall",
+      JSON.stringify(installList)
+    );
+  const candidates = [...new Set(ids)].filter(id => {
+    const mode = Services.policies.getExtensionSettings(id)?.installation_mode;
+    if (mode == "force_installed" || mode == "normal_installed") {
+      reportFailure(
+        "Extensions",
+        `Not uninstalling ${id} because ExtensionSettings installs it`
+      );
+      return false;
+    }
+    return true;
+  });
+  const addons = await lazy.AddonManager.getAddonsByIDs(candidates);
+  for (const addon of addons) {
+    if (!addon) {
+      continue;
+    }
+    if (
+      keepPolicyInstalls &&
+      addon.installTelemetryInfo?.source == "enterprise-policy"
+    ) {
+      continue;
+    }
+    try {
+      await addon.uninstall();
+    } catch (e) {
+      // This can fail for add-ons that can't be uninstalled.
+      lazy.log.debug(`Add-on ID (${addon.id}) couldn't be uninstalled.`);
+    }
+  }
+  return listChanged;
+}
+
 let gBlockedAboutPages = [];
 
 export function clearBlockedAboutPages() {
