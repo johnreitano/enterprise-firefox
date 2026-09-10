@@ -603,15 +603,17 @@ export function runOnce(actionName, callback) {
  * If the callback that was passed is an async function, you can await on this
  * function to await for the callback.
  *
- * The record of the last applied value is an ordinary user preference in the
- * profile, which the user can edit before startup to make the callback look
- * like it already ran. Only use this for a setting the user is allowed to
- * change afterwards. A policy that enforces something must instead check the
- * state it controls at every startup.
+ * The last applied value is stored in a user pref, see actionName, so this
+ * helper only suits settings the user is allowed to change afterwards. A
+ * policy that enforces something must instead check the state it controls
+ * at every startup.
  *
  * @param {string} actionName
  *        A given name which will be used to track if this callback has run.
- *        This string will be part of a pref name.
+ *        It is the suffix of browser.policies.runOncePerModification.<name>,
+ *        the pref that stores the last applied value. That pref is an
+ *        ordinary unlocked user pref in the profile, which the user can set
+ *        before startup to make the callback look like it already ran.
  * @param {string|boolean|number} policyValue
  *        The current value of the policy. It is converted to a string and
  *        compared to the previous value given to this function to determine
