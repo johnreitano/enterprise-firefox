@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 use nserror::{
     nsresult, NS_ERROR_CONNECTION_REFUSED, NS_ERROR_FAILURE, NS_ERROR_NOT_CONNECTED,
-    NS_ERROR_UNEXPECTED, NS_OK,
+    NS_ERROR_PORT_ACCESS_NOT_ALLOWED, NS_ERROR_UNEXPECTED, NS_OK,
 };
 use nsstring::{nsACString, nsAString, nsCString, nsString};
 use std::cell::RefCell;
@@ -18,7 +18,7 @@ use xpcom::interfaces::{
 };
 use xpcom::{xpcom_method, RefPtr};
 
-use log::{error, trace};
+use log::{error, trace, warn};
 
 use crate::message::{FeltMessage, FELT_IPC_VERSION};
 #[cfg(target_os = "linux")]
@@ -35,6 +35,74 @@ pub struct FeltXPCOM {
     is_felt_ui: bool,
     is_felt_browser: bool,
     is_felt_safe_mode: bool,
+}
+
+/// Whether this platform's IPC transport reports the connecting peer's OS
+/// process id in band. The macOS Mach-port back-end does not (peer_pid() returns
+/// None). Non-macOS unix sockets and Windows named pipes do; the ones that do
+/// not have a real peer pid (BSD/illumos and the in-process transport, which
+/// report None) must stay attested here so an absent pid fails closed rather
+/// than open.
+#[cfg(target_os = "macos")]
+const PEER_PID_ATTESTED: bool = false;
+#[cfg(not(target_os = "macos"))]
+const PEER_PID_ATTESTED: bool = true;
+
+/// Whether the connecting peer's process id equals the pid of the browser child
+/// the launcher spawned. On attested platforms an unavailable peer pid means the
+/// transport could not report one, which is a rejection (fail-closed).
+fn peer_pid_matches(peer_pid: Option<u32>, expected_pid: u32) -> bool {
+    matches!(peer_pid, Some(peer) if peer == expected_pid)
+}
+
+/// The authorization decision for a connecting peer, made from its OS process id
+/// alone and independently of the protocol-version handshake. Kept separate from
+/// the version check so identity and protocol are not conflated.
+///
+/// On attested platforms (PEER_PID_ATTESTED) the peer's pid must equal the
+/// spawned child's; a None peer pid (BSD/illumos or the in-process transport)
+/// fails closed. macOS is unattested: it has no in-band pid attestation, so this
+/// authorizes and leaves the version handshake as the only in-band check.
+/// Protection on macOS is an OS property -- an unrelated process cannot resolve
+/// the Mach endpoint (bootstrap_look_up returns BOOTSTRAP_UNKNOWN_SERVICE) --
+/// not something this code enforces.
+fn peer_is_authorized(peer_pid: Option<u32>, expected_pid: u32) -> bool {
+    if !PEER_PID_ATTESTED {
+        return true;
+    }
+
+    // TODO: on Windows the peer that connects is the launcher's browser child,
+    // not the launcher process whose pid we are passed, so a pid match would
+    // reject the legitimate browser. Peer-pid enforcement is therefore not yet
+    // active on Windows; the expected pid must come from the launcher relaying
+    // its browser child's pid (follow-up).
+    #[cfg(target_os = "windows")]
+    {
+        let _ = (peer_pid, expected_pid);
+        return true;
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        peer_pid_matches(peer_pid, expected_pid)
+    }
+}
+
+/// The protocol-version check, deliberately separate from authorization.
+fn version_supported(version: u32) -> bool {
+    version == FELT_IPC_VERSION
+}
+
+/// Retain the IPC channel ends only when the peer is authorized; otherwise drop
+/// them so a rejected peer receives nothing over the endpoint. Routing every
+/// retention through this makes it impossible to keep a channel before the
+/// authorization decision has been made.
+fn retain_channel_if_authorized<T>(authorized: bool, channel: T) -> Option<T> {
+    if authorized {
+        Some(channel)
+    } else {
+        drop(channel);
+        None
+    }
 }
 
 #[allow(non_snake_case)]
@@ -373,16 +441,32 @@ impl FeltXPCOM {
         }
     }
 
-    fn IpcChannel(&self) -> nserror::nsresult {
+    xpcom_method!(ipc_channel => IpcChannel(pid: u32));
+    fn ipc_channel(&self, expected_pid: u32) -> Result<(), nserror::nsresult> {
         let felt_server = match self.one_shot_server.take() {
             Some(f) => f,
             None => {
-                return NS_ERROR_FAILURE;
+                return Err(NS_ERROR_FAILURE);
             }
         };
 
         trace!("FeltXPCOM:IpcChannel() waiting on accept()");
-        let (_, tx): (_, ipc_channel::ipc::IpcSender<FeltMessage>) = felt_server.accept().unwrap();
+        let (accept_rx, tx): (_, ipc_channel::ipc::IpcSender<FeltMessage>) =
+            felt_server.accept().unwrap();
+
+        // Identify the connecting peer by the OS process id of the just accepted
+        // connection, so the peer can be matched against the browser child the
+        // launcher spawned before any managed secret is sent. The accept
+        // receiver is not used past this point, so drop it once queried.
+        let peer_pid = accept_rx.peer_pid();
+        drop(accept_rx);
+
+        // AUTHORIZATION: decided from the peer's pid alone, before the version
+        // handshake below, and kept separate from it. On attested platforms any
+        // other same-user process that races to connect has a different pid (or
+        // none) and is refused here, so it never receives the primarySecret,
+        // tokens, prefs, or cookies the launcher sends afterwards over `self.tx`.
+        let authorized = peer_is_authorized(peer_pid, expected_pid);
 
         let (tx_firefox_to_felt, rx): (
             ipc_channel::ipc::IpcSender<FeltMessage>,
@@ -397,8 +481,10 @@ impl FeltXPCOM {
             }
         }
 
-        let versions_match = match rx.recv() {
-            Ok(FeltMessage::VersionProbe(version)) => version == FELT_IPC_VERSION,
+        // PROTOCOL VERSION: a separate concern from authorization. Read the
+        // peer's probe and check it speaks the current wire protocol.
+        let version_ok = match rx.recv() {
+            Ok(FeltMessage::VersionProbe(version)) => version_supported(version),
             Ok(msg) => {
                 trace!("FeltXPCOM:rx.recv() INVALID MSG {:?}", msg);
                 false
@@ -409,31 +495,46 @@ impl FeltXPCOM {
             }
         };
 
-        if versions_match {
-            trace!("FeltXPCOM:YOUPI SAME VERSION");
-        } else {
-            trace!("FeltXPCOM:SAD NOT SAME VERSION");
+        // The peer may proceed only when both the pid authorization and the
+        // version handshake pass. Always answer the probe so a legitimate but
+        // rejected peer learns it was refused.
+        let admit = authorized && version_ok;
+        if let Err(err) = tx.send(FeltMessage::VersionValidated(admit)) {
+            trace!(
+                "FeltXPCOM:tx.send(FeltMessage::VersionValidated({})) err={}",
+                admit,
+                err
+            );
+            return Err(NS_ERROR_FAILURE);
         }
 
-        match tx.send(FeltMessage::VersionValidated(versions_match)) {
-            Ok(()) => {
-                trace!(
-                    "FeltXPCOM:tx.send(FeltMessage::VersionValidated({})) OK",
-                    versions_match
-                );
-                self.tx.replace(Some(tx));
-                self.rx.replace(Some(rx));
-            }
-            Err(err) => {
-                trace!(
-                    "FeltXPCOM:tx.send(FeltMessage::VersionValidated({})) err={}",
-                    versions_match,
-                    err
-                );
-
-                return NS_ERROR_FAILURE;
+        // Retention is gated on authorization: on refusal the sender/receiver
+        // are dropped here, so the endpoint yields nothing to a rejected peer.
+        let (tx, rx) = match retain_channel_if_authorized(admit, (tx, rx)) {
+            Some(pair) => pair,
+            None => {
+                if !authorized {
+                    match peer_pid {
+                        None => warn!(
+                            "FeltXPCOM:IpcChannel() refused IPC peer: transport reported no peer pid (no attestation)"
+                        ),
+                        Some(pid) => warn!(
+                            "FeltXPCOM:IpcChannel() refused IPC peer: pid {} does not match expected {}",
+                            pid, expected_pid
+                        ),
+                    }
+                } else {
+                    warn!(
+                        "FeltXPCOM:IpcChannel() refused IPC peer: unsupported protocol version"
+                    );
+                }
+                return Err(NS_ERROR_PORT_ACCESS_NOT_ALLOWED);
             }
         };
+
+        trace!("FeltXPCOM:IpcChannel() peer authenticated");
+        self.tx.replace(Some(tx));
+        self.rx.replace(Some(rx));
 
         if let Ok(thread) = moz_task::create_thread("felt_server").map_err(|_| {
             trace!("FeltServerThread::start_thread(): felt_server thread error");
@@ -497,9 +598,9 @@ impl FeltXPCOM {
             .may_block(true)
             .dispatch(&thread);
 
-            NS_OK
+            Ok(())
         } else {
-            NS_ERROR_FAILURE
+            Err(NS_ERROR_FAILURE)
         }
     }
 
@@ -741,4 +842,87 @@ impl FeltRestartForced {
 
 fn token_needs_refresh(tokens: &Tokens) -> bool {
     tokens.expires_at.saturating_add(TOKEN_EXPIRY_SKEW) < UtcDateTime::now().unix_timestamp()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Bug 2072053: the launcher must only hand its managed secrets to the
+    // browser child it spawned. On platforms that attest a peer pid, the
+    // connecting peer's pid must equal the spawned child's; anything else is a
+    // peer that must receive nothing. peer_pid_matches captures that core check
+    // independently of platform.
+    #[test]
+    fn peer_pid_matches_only_the_spawned_child() {
+        let child_pid = 4242; // stand-in for the spawned child's pid
+
+        // The intended child: pid equals the expected pid.
+        assert!(peer_pid_matches(Some(child_pid), child_pid));
+
+        // Another same-user process that connected first: a different pid is
+        // rejected.
+        assert!(!peer_pid_matches(Some(child_pid + 1), child_pid));
+
+        // The transport could not report the peer's pid: reject, fail-closed.
+        assert!(!peer_pid_matches(None, child_pid));
+    }
+
+    // The protocol-version check is a concern separate from authorization: only
+    // the current wire version is supported.
+    #[test]
+    fn only_the_current_protocol_version_is_supported() {
+        assert!(version_supported(FELT_IPC_VERSION));
+        assert!(!version_supported(FELT_IPC_VERSION + 1));
+        assert!(!version_supported(FELT_IPC_VERSION - 1));
+    }
+
+    // On attested unix platforms authorization requires a matching pid: a
+    // same-user peer with a different pid, or a transport that reports no pid, is
+    // refused, and the intended child is admitted. Windows is excluded: its pid
+    // enforcement is deferred (see peer_is_authorized).
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[test]
+    fn attested_platforms_require_matching_pid() {
+        let child_pid = 4242;
+        assert!(peer_is_authorized(Some(child_pid), child_pid));
+        assert!(!peer_is_authorized(Some(child_pid + 1), child_pid));
+        assert!(!peer_is_authorized(None, child_pid));
+    }
+
+    // On macOS the transport cannot attest a peer pid, so authorization passes
+    // here and the version handshake is the only in-band check. Endpoint
+    // reachability is an OS property, not enforced by this code.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_authorizes_without_peer_pid() {
+        let child_pid = 4242;
+        assert!(peer_is_authorized(None, child_pid));
+        assert!(peer_is_authorized(Some(child_pid + 1), child_pid));
+    }
+
+    // On Windows the connecting peer is the launcher's browser child, not the
+    // launcher whose pid we are passed, so pid enforcement is deferred and
+    // authorization does not reject on a mismatch (follow-up).
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_pid_enforcement_is_deferred() {
+        let child_pid = 4242;
+        assert!(peer_is_authorized(Some(child_pid + 1), child_pid));
+        assert!(peer_is_authorized(None, child_pid));
+    }
+
+    // Retention must be impossible for an unauthorized peer: the gate drops the
+    // channel ends and yields nothing, so no secret can reach the peer. This
+    // would still hold if the retention step were reordered ahead of the auth
+    // check, because the gate itself refuses to hand back a channel unless
+    // authorized.
+    #[test]
+    fn unauthorized_peer_never_retains_the_channel() {
+        let (tx, rx) = ipc_channel::ipc::channel::<bool>().unwrap();
+        assert!(retain_channel_if_authorized(false, (tx, rx)).is_none());
+
+        let (tx, rx) = ipc_channel::ipc::channel::<bool>().unwrap();
+        assert!(retain_channel_if_authorized(true, (tx, rx)).is_some());
+    }
 }

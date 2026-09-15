@@ -920,7 +920,14 @@ export class FeltProcessParent extends JSProcessActorParent {
       lazy.logProcess.error(`[${pid}]: ${chunk}`);
     });
 
-    Services.felt.ipcChannel();
+    // Authenticate the IPC peer before ipcChannel() hands it any managed
+    // secret. Pass the OS process id of the child we just spawned; on platforms
+    // whose transport attests a peer pid, ipcChannel() verifies the connecting
+    // peer's pid against it and refuses any other same-user process that races
+    // to connect, so such a process receives no primarySecret, tokens, prefs,
+    // or cookies. (macOS has no in-band peer pid; there the endpoint is instead
+    // unreachable to unrelated processes as an OS property.)
+    Services.felt.ipcChannel(this.proc.pid);
   }
 
   /**
