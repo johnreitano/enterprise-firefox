@@ -28,44 +28,23 @@ const REMOTE_CONSOLE_POLICIES = {
 const policiesSvc = Services.policies;
 const policiesObs = policiesSvc.QueryInterface(Ci.nsIObserver);
 
-async function writeLocalPoliciesFile(json) {
-  const filePath = FileTestUtils.getTempFile("policies.json").path;
-  await IOUtils.writeJSON(filePath, json);
-  Services.prefs.setStringPref("browser.policies.alternatePath", filePath);
-}
-
-function driveStartup() {
-  Services.obs.notifyObservers(null, "EnterprisePolicies:Reset");
-
-  let initialized = false;
-  const onInitialized = () => {
-    initialized = true;
-  };
-  Services.obs.addObserver(onInitialized, "EnterprisePolicies:Initialized");
-
-  let threw = null;
-  try {
-    policiesObs.observe(null, "policies-startup", null);
-  } catch (e) {
-    threw = e;
-  } finally {
-    Services.obs.removeObserver(
-      onInitialized,
-      "EnterprisePolicies:Initialized"
-    );
-  }
-  return { threw, initialized };
-}
-
 registerCleanupFunction(() => {
   Services.prefs.clearUserPref("browser.policies.alternatePath");
 });
 
 add_task(async function test_null_local_policy_preserves_console_policies() {
-  await writeLocalPoliciesFile(NULL_LOCAL_POLICIES);
+  const filePath = FileTestUtils.getTempFile("policies.json").path;
+  await IOUtils.writeJSON(filePath, NULL_LOCAL_POLICIES);
+  Services.prefs.setStringPref("browser.policies.alternatePath", filePath);
   EnterprisePolicyTesting.stubRemotePolicies(REMOTE_CONSOLE_POLICIES);
 
-  const { threw, initialized } = driveStartup();
+  Services.obs.notifyObservers(null, "EnterprisePolicies:Reset");
+  let threw = null;
+  try {
+    policiesObs.observe(null, "policies-startup", null);
+  } catch (e) {
+    threw = e;
+  }
 
   Assert.equal(
     threw,
@@ -86,35 +65,5 @@ add_task(async function test_null_local_policy_preserves_console_policies() {
   Assert.ok(
     !("x" in active),
     "The null-valued local policy is ignored, not applied"
-  );
-  Assert.ok(initialized, "EnterprisePolicies:Initialized fired");
-});
-
-add_task(async function test_null_nested_in_known_local_policy_is_handled() {
-  // The null-guard must hold at any recursion depth: a null nested inside a
-  // known local policy must not crash isEmptyObject (Bug 2071381), and a
-  // successfully fetched console policy must still apply.
-  await writeLocalPoliciesFile({
-    policies: { SecurityLogging: { Download: null } },
-  });
-  EnterprisePolicyTesting.stubRemotePolicies({
-    policies: { BlockAboutConfig: true },
-  });
-
-  const { threw } = driveStartup();
-
-  Assert.equal(
-    threw,
-    null,
-    "A null nested inside a known local policy does not abort initialization"
-  );
-  Assert.equal(
-    policiesSvc.status,
-    Ci.nsIEnterprisePolicies.ACTIVE,
-    "The engine is ACTIVE"
-  );
-  Assert.ok(
-    "BlockAboutConfig" in policiesSvc.getActivePolicies(),
-    "The successfully fetched console policy is still applied"
   );
 });

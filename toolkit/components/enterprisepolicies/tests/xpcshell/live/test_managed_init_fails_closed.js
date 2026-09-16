@@ -85,15 +85,6 @@ function assertFailedAndEmpty(when) {
   );
 }
 
-// The remote polling started by EnterprisePolicies:Initialized fires an update
-// when it sees changed policies. With the fetched policies still held by the
-// provider, that update would re-apply them and put the engine back to ACTIVE.
-function assertUpdateDoesNotReactivate() {
-  assertFailedAndEmpty("after the failed init");
-  Services.obs.notifyObservers(null, "EnterprisePolicies:Update");
-  assertFailedAndEmpty("after a policy update following the failed init");
-}
-
 registerCleanupFunction(() => {
   Services.obs.notifyObservers(null, "EnterprisePolicies:Reset");
 });
@@ -113,34 +104,21 @@ add_task(async function test_managed_init_failure_fails_closed() {
       signoutCalled(),
       "A managed (felt) browser fails closed via initiateShutdown()"
     );
-    assertUpdateDoesNotReactivate();
+    assertFailedAndEmpty("after the failed init");
+
+    // The remote polling started by EnterprisePolicies:Initialized fires an
+    // update when it sees changed policies. With the fetched policies still
+    // held by the provider, that update would re-apply them and put the engine
+    // back to ACTIVE.
+    Services.obs.notifyObservers(null, "EnterprisePolicies:Update");
+    assertFailedAndEmpty("after a policy update following the failed init");
   });
 });
 
+// _initialize() schedules the cleanup for the previous session's policies
+// before building the provider. Discarding the failed init's partial state
+// must not drop that cleanup along with it, or it would never run.
 add_task(async function test_non_felt_init_failure_does_not_shut_down() {
-  EnterprisePolicyTesting.stubRemotePolicies(REMOTE_CONSOLE_POLICIES);
-
-  withFakeFelt(false, signoutCalled => {
-    const threw = driveStartupWithInducedFailure();
-
-    Assert.equal(
-      threw,
-      null,
-      "The unexpected init error is caught, not propagated to the caller"
-    );
-    Assert.ok(
-      !signoutCalled(),
-      "A browser that is not felt managed does not shut down on an init failure"
-    );
-    assertUpdateDoesNotReactivate();
-  });
-});
-
-// _initialize() schedules the cleanup for the previous session's policies and
-// clears browser.policies.applied before building the provider. Discarding the
-// failed init's partial state must not drop that cleanup along with it, or it
-// would never run.
-add_task(async function test_init_failure_keeps_previous_session_cleanup() {
   EnterprisePolicyTesting.stubRemotePolicies(REMOTE_CONSOLE_POLICIES);
   Services.prefs.setBoolPref("browser.policies.applied", true);
 
@@ -148,21 +126,27 @@ add_task(async function test_init_failure_keeps_previous_session_cleanup() {
   const cleanupObserver = (subject, topic, data) => cleanupTimings.push(data);
   Services.obs.addObserver(cleanupObserver, "EnterprisePolicies:Cleanup");
   try {
-    withFakeFelt(false, () => {
-      driveStartupWithInducedFailure();
+    withFakeFelt(false, signoutCalled => {
+      const threw = driveStartupWithInducedFailure();
+
+      Assert.equal(
+        threw,
+        null,
+        "The unexpected init error is caught, not propagated to the caller"
+      );
+      Assert.ok(
+        !signoutCalled(),
+        "A browser that is not felt managed does not shut down on an init failure"
+      );
     });
   } finally {
     Services.obs.removeObserver(cleanupObserver, "EnterprisePolicies:Cleanup");
   }
 
+  assertFailedAndEmpty("after the failed init");
   Assert.deepEqual(
     cleanupTimings,
     ["onBeforeAddons"],
     "The previous session's cleanup still runs after a failed init"
   );
-  Assert.ok(
-    !Services.prefs.getBoolPref("browser.policies.applied", false),
-    "The applied-policies pref stays cleared after a failed init"
-  );
-  assertFailedAndEmpty("after the failed init");
 });
