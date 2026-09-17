@@ -48,9 +48,9 @@ const PEER_PID_ATTESTED: bool = false;
 #[cfg(not(target_os = "macos"))]
 const PEER_PID_ATTESTED: bool = true;
 
-/// Whether the connecting peer's process id equals the pid of the browser child
-/// the launcher spawned. On attested platforms an unavailable peer pid means the
-/// transport could not report one, which is a rejection (fail-closed).
+/// Whether the connecting peer's process id equals the pid of the process felt
+/// expects to run as the browser. On attested platforms an unavailable peer pid
+/// means the transport could not report one, which is a rejection (fail-closed).
 fn peer_pid_matches(peer_pid: Option<u32>, expected_pid: u32) -> bool {
     matches!(peer_pid, Some(peer) if peer == expected_pid)
 }
@@ -60,9 +60,13 @@ fn peer_pid_matches(peer_pid: Option<u32>, expected_pid: u32) -> bool {
 /// the version check so identity and protocol are not conflated.
 ///
 /// On attested platforms (PEER_PID_ATTESTED) the peer's pid must equal the
-/// spawned child's; a None peer pid (BSD/illumos or the in-process transport)
-/// fails closed. macOS is unattested: it has no in-band pid attestation, so this
-/// authorizes and leaves the version handshake as the only in-band check.
+/// expected pid; a None peer pid (BSD/illumos or the in-process transport) fails
+/// closed. The expected pid is that of the process running as the browser: the
+/// process felt spawned, or on Windows the browser child the launcher process
+/// creates, whose pid the launcher announces to felt (see FeltProcessParent), so
+/// the peer GetNamedPipeClientProcessId reports is matched like on any other
+/// attested platform. macOS is unattested: it has no in-band pid attestation, so
+/// this authorizes and leaves the version handshake as the only in-band check.
 /// Protection on macOS is an OS property -- an unrelated process cannot resolve
 /// the Mach endpoint (bootstrap_look_up returns BOOTSTRAP_UNKNOWN_SERVICE) --
 /// not something this code enforces.
@@ -71,20 +75,7 @@ fn peer_is_authorized(peer_pid: Option<u32>, expected_pid: u32) -> bool {
         return true;
     }
 
-    // TODO: on Windows the peer that connects is the launcher's browser child,
-    // not the launcher process whose pid we are passed, so a pid match would
-    // reject the legitimate browser. Peer-pid enforcement is therefore not yet
-    // active on Windows; the expected pid must come from the launcher relaying
-    // its browser child's pid (follow-up).
-    #[cfg(target_os = "windows")]
-    {
-        let _ = (peer_pid, expected_pid);
-        return true;
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        peer_pid_matches(peer_pid, expected_pid)
-    }
+    peer_pid_matches(peer_pid, expected_pid)
 }
 
 /// The protocol-version check, deliberately separate from authorization.
@@ -877,11 +868,11 @@ mod tests {
         assert!(!version_supported(FELT_IPC_VERSION - 1));
     }
 
-    // On attested unix platforms authorization requires a matching pid: a
-    // same-user peer with a different pid, or a transport that reports no pid, is
-    // refused, and the intended child is admitted. Windows is excluded: its pid
-    // enforcement is deferred (see peer_is_authorized).
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    // On attested platforms authorization requires a matching pid: a same-user
+    // peer with a different pid, or a transport that reports no pid, is refused,
+    // and the intended child is admitted. This includes Windows, where the
+    // expected pid is the browser child the launcher process announced.
+    #[cfg(not(target_os = "macos"))]
     #[test]
     fn attested_platforms_require_matching_pid() {
         let child_pid = 4242;
@@ -899,17 +890,6 @@ mod tests {
         let child_pid = 4242;
         assert!(peer_is_authorized(None, child_pid));
         assert!(peer_is_authorized(Some(child_pid + 1), child_pid));
-    }
-
-    // On Windows the connecting peer is the launcher's browser child, not the
-    // launcher whose pid we are passed, so pid enforcement is deferred and
-    // authorization does not reject on a mismatch (follow-up).
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn windows_pid_enforcement_is_deferred() {
-        let child_pid = 4242;
-        assert!(peer_is_authorized(Some(child_pid + 1), child_pid));
-        assert!(peer_is_authorized(None, child_pid));
     }
 
     // Retention must be impossible for an unauthorized peer: the gate drops the
