@@ -28,7 +28,13 @@ void felt_activate_app();
 
 bool is_felt_browser();
 
+#if defined(XP_LINUX) && !defined(ANDROID)
+// Linux fenced-fd path: connect using the bootstrap endpoint fd inherited from
+// the launcher (named in the MOZ_FELT_IPC_FD env var). No published server name.
+bool firefox_connect_to_felt_fd();
+#else
 bool firefox_connect_to_felt(const char* server_name);
+#endif
 
 void firefox_felt_connection_start_thread();
 

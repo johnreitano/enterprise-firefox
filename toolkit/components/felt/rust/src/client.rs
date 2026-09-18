@@ -24,44 +24,68 @@ pub struct FeltIpcClient {
 }
 
 impl FeltIpcClient {
+    // Windows/macOS bootstrap: connect to the published one-shot server by name,
+    // then complete the channel exchange.
+    #[cfg(not(target_os = "linux"))]
     pub fn new(felt_server_name: String) -> Self {
         trace!("FeltIpcClient::new({})", felt_server_name);
+        match ipc_channel::ipc::IpcSender::connect(felt_server_name) {
+            Ok(tx0) => {
+                trace!("FeltIpcClient::new() connected!");
+                Self::bootstrap(tx0)
+            }
+            Err(err) => {
+                trace!("FeltIpcClient::new() failed: {}", err);
+                Self { tx: None, rx: None }
+            }
+        }
+    }
 
+    // Linux fenced bootstrap: reconstruct the bootstrap sender from the fd the
+    // launcher handed us by inheritance (see firefox_connect_to_felt_fd), then
+    // complete the same channel exchange. No name is resolved, so no unrelated
+    // process could have connected in our place.
+    #[cfg(target_os = "linux")]
+    pub fn new_from_fd(fd: std::os::unix::io::RawFd) -> Self {
+        trace!("FeltIpcClient::new_from_fd({})", fd);
+        // SAFETY: fd is the inherited bootstrap sender endpoint produced by
+        // FeltXPCOM::create_inherited_channel_fd, carrying IpcSender<FeltMessage>.
+        let tx0: ipc_channel::ipc::IpcSender<ipc_channel::ipc::IpcSender<FeltMessage>> =
+            unsafe { ipc_channel::ipc::IpcSender::from_raw_fd(fd) };
+        Self::bootstrap(tx0)
+    }
+
+    // Shared exchange over the bootstrap channel: send our felt->firefox sender
+    // to felt, then receive back the firefox->felt sender it created.
+    fn bootstrap(
+        tx0: ipc_channel::ipc::IpcSender<ipc_channel::ipc::IpcSender<FeltMessage>>,
+    ) -> Self {
         let (tx_felt_to_firefox, rx_firefox_to_felt): (
             ipc_channel::ipc::IpcSender<FeltMessage>,
             ipc_channel::ipc::IpcReceiver<FeltMessage>,
         ) = ipc_channel::ipc::channel().unwrap();
-        match ipc_channel::ipc::IpcSender::connect(felt_server_name) {
-            Ok(tx0) => {
-                trace!("FeltIpcClient::new() connected!");
 
-                match tx0.send(tx_felt_to_firefox) {
-                    Ok(()) => trace!("FeltIpcClient::new() tx0.send(tx_felt_to_firefox) SENT"),
-                    Err(err) => trace!("FeltIpcClient::new() ERROR: {}", err),
-                }
+        match tx0.send(tx_felt_to_firefox) {
+            Ok(()) => trace!("FeltIpcClient::bootstrap() tx0.send(tx_felt_to_firefox) SENT"),
+            Err(err) => trace!("FeltIpcClient::bootstrap() ERROR: {}", err),
+        }
 
-                match rx_firefox_to_felt.recv() {
-                    Ok(msg) => match msg {
-                        FeltMessage::ClientChannel(tx_firefox_to_felt) => {
-                            trace!("FeltIpcClient::new() rx_firefox_to_felt.recv() OK");
-                            Self {
-                                tx: Some(tx_firefox_to_felt),
-                                rx: Some(rx_firefox_to_felt),
-                            }
-                        }
-                        _ => {
-                            trace!("FeltIpcClient::new() unexpected message");
-                            Self { tx: None, rx: None }
-                        }
-                    },
-                    Err(err) => {
-                        trace!("FeltIpcClient::new() rx_firefox_to_felt.recv() ERR {}", err);
-                        Self { tx: None, rx: None }
+        match rx_firefox_to_felt.recv() {
+            Ok(msg) => match msg {
+                FeltMessage::ClientChannel(tx_firefox_to_felt) => {
+                    trace!("FeltIpcClient::bootstrap() rx_firefox_to_felt.recv() OK");
+                    Self {
+                        tx: Some(tx_firefox_to_felt),
+                        rx: Some(rx_firefox_to_felt),
                     }
                 }
-            }
+                _ => {
+                    trace!("FeltIpcClient::bootstrap() unexpected message");
+                    Self { tx: None, rx: None }
+                }
+            },
             Err(err) => {
-                trace!("FeltIpcClient::new() failed: {}", err);
+                trace!("FeltIpcClient::bootstrap() rx_firefox_to_felt.recv() ERR {}", err);
                 Self { tx: None, rx: None }
             }
         }
@@ -125,19 +149,29 @@ pub struct FeltClientThread {
 }
 
 impl FeltClientThread {
+    #[cfg(not(target_os = "linux"))]
     pub fn new(felt_server_name: String) -> Result<Self, ()> {
         trace!(
             "FeltClientThread::new(): connecting to {}",
             felt_server_name.clone()
         );
-        let felt_client = FeltIpcClient::new(felt_server_name);
+        Self::from_client(FeltIpcClient::new(felt_server_name))
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn new_from_fd(fd: std::os::unix::io::RawFd) -> Result<Self, ()> {
+        trace!("FeltClientThread::new_from_fd(): connecting via inherited fd {fd}");
+        Self::from_client(FeltIpcClient::new_from_fd(fd))
+    }
+
+    fn from_client(felt_client: FeltIpcClient) -> Result<Self, ()> {
         if felt_client.is_connected() {
             Ok(Self {
                 ipc_client: RefCell::new(felt_client),
                 startup_ready: Arc::new(AtomicBool::new(false)),
             })
         } else {
-            trace!("FeltClientThread::new(): failed to connect to felt");
+            trace!("FeltClientThread::from_client(): failed to connect to felt");
             Err(())
         }
     }

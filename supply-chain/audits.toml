@@ -4195,6 +4195,19 @@ SO_PEERCRED, Windows GetNamedPipeClientProcessId; None on macOS and other
 backends), for FELT peer authentication (Bug 2072053).
 """
 
+[[audits.ipc-channel]]
+who = "John Reitano <jreitano@mozilla.com>"
+criteria = "safe-to-deploy"
+delta = "0.21.0@git:c66468de6dd730f8f9abb005159544c10a264b83 -> 0.21.0@git:7253581504438827fb5d7308e8f1e841e2b8538b"
+importable = false
+notes = """
+Adds public raw-fd/handle accessors on IpcSender/IpcReceiver (into_raw_fd,
+from_raw_fd on unix; into_raw_handle, from_raw_handle on windows) and a
+set_fd_inheritable helper that clears FD_CLOEXEC, so a channel endpoint can be
+handed to a child process at spawn instead of via a published one-shot server
+name (fenced FELT IPC bootstrap, Bug 2073137).
+"""
+
 [[audits.itertools]]
 who = "Mike Hommey <mh+mozilla@glandium.org>"
 criteria = "safe-to-deploy"
