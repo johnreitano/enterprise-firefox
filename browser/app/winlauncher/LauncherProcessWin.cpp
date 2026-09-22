@@ -607,13 +607,13 @@ static Maybe<int> RunLauncherMain(int& argc, wchar_t* argv[]) {
   // the bootstrap pipe HANDLE was inherited from the Felt process (its value
   // carried in MOZ_FELT_IPC_HANDLE, which also rides through to the browser).
   // Add it to the handle list so the browser child inherits it and can
-  // reconstruct the channel. This is the only place the launcher forwards it;
-  // normal launches have no such env var and are unaffected.
+  // reconstruct the channel.
+  HANDLE feltHandle = nullptr;
   if (const wchar_t* feltHandleStr = _wgetenv(L"MOZ_FELT_IPC_HANDLE")) {
     wchar_t* end = nullptr;
     unsigned long long feltHandleVal = ::wcstoull(feltHandleStr, &end, 10);
     if (end && *end == L'\0' && feltHandleVal != 0) {
-      HANDLE feltHandle =
+      feltHandle =
           reinterpret_cast<HANDLE>(static_cast<uintptr_t>(feltHandleVal));
       if (!attrs.AddInheritableHandle(feltHandle)) {
         HandleLauncherError(LAUNCHER_ERROR_FROM_LAST());
@@ -712,6 +712,12 @@ static Maybe<int> RunLauncherMain(int& argc, wchar_t* argv[]) {
     AnnounceFeltBrowserPid(pi.dwProcessId);
   }
 #endif
+
+  // The browser child now owns the FELT endpoint and we can no longer fall back
+  // to running as the browser ourselves, so drop our inherited copy.
+  if (feltHandle) {
+    ::CloseHandle(feltHandle);
+  }
 
   if (flags & LauncherFlags::eWaitForBrowser) {
     DWORD exitCode;

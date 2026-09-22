@@ -47,10 +47,8 @@ impl FeltIpcClient {
         Self::bootstrap(tx0, |rx| Self::receive_reply_from(rx, felt_pid))
     }
 
-    // Linux fenced bootstrap: reconstruct the bootstrap sender from the fd the
-    // launcher handed us by inheritance (see firefox_connect_to_felt_fd), then
-    // complete the same channel exchange. No name is resolved, so no unrelated
-    // process could have connected in our place.
+    // Linux fenced bootstrap: reconstruct the bootstrap sender from the fd
+    // inherited from the Felt process, then complete the same channel exchange.
     #[cfg(target_os = "linux")]
     pub fn new_from_fd(fd: std::os::unix::io::RawFd) -> Self {
         trace!("FeltIpcClient::new_from_fd({})", fd);
@@ -62,10 +60,8 @@ impl FeltIpcClient {
     }
 
     // Windows fenced bootstrap: reconstruct the bootstrap sender from the pipe
-    // HANDLE the launcher handed us by inheritance (see
-    // firefox_connect_to_felt_handle), then complete the same channel exchange.
-    // No name is resolved, so no unrelated process could have connected in our
-    // place.
+    // HANDLE inherited through the launcher, then complete the same channel
+    // exchange.
     #[cfg(target_os = "windows")]
     pub fn new_from_handle(handle: usize) -> Self {
         trace!("FeltIpcClient::new_from_handle({})", handle);
@@ -93,7 +89,7 @@ impl FeltIpcClient {
 
         match tx0.send(tx_felt_to_firefox) {
             Ok(()) => trace!("FeltIpcClient::bootstrap() tx0.send(tx_felt_to_firefox) SENT"),
-            Err(err) => trace!("FeltIpcClient::bootstrap() ERROR: {}", err),
+            Err(err) => error!("FeltIpcClient::bootstrap() tx0.send() failed: {}", err),
         }
 
         match receive_reply(&rx_firefox_to_felt) {
@@ -105,7 +101,7 @@ impl FeltIpcClient {
                 }
             }
             Some(_) => {
-                trace!("FeltIpcClient::bootstrap() unexpected message");
+                error!("FeltIpcClient::bootstrap() unexpected message");
                 Self::default()
             }
             None => Self::default(),
@@ -117,7 +113,7 @@ impl FeltIpcClient {
         match rx.recv() {
             Ok(msg) => Some(msg),
             Err(err) => {
-                trace!("FeltIpcClient::bootstrap() rx_firefox_to_felt.recv() ERR {}", err);
+                error!("FeltIpcClient::bootstrap() rx_firefox_to_felt.recv() failed: {}", err);
                 None
             }
         }
@@ -138,7 +134,7 @@ impl FeltIpcClient {
                 None
             }
             Err(err) => {
-                trace!("FeltIpcClient::new() rx_firefox_to_felt.recv() ERR {}", err);
+                error!("FeltIpcClient::new() rx_firefox_to_felt.recv() failed: {}", err);
                 None
             }
         }
@@ -278,7 +274,7 @@ impl FeltClientThread {
                 startup_ready: Arc::new(AtomicBool::new(false)),
             })
         } else {
-            trace!("FeltClientThread::from_client(): failure to report version");
+            error!("FeltClientThread::from_client(): failure to report version");
             Err(())
         }
     }
