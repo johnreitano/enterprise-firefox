@@ -5,9 +5,6 @@
 
 use log::trace;
 use std::sync::atomic::AtomicBool;
-// Only the macOS connect-by-name entry point takes a C string server name; the
-// Linux fenced-fd and Windows fenced-handle paths read the endpoint from an env
-// var instead.
 #[cfg(not(any(target_os = "linux", target_os = "windows")))]
 use std::ffi::CStr;
 #[cfg(not(any(target_os = "linux", target_os = "windows")))]
@@ -209,16 +206,15 @@ pub extern "C" fn firefox_connect_to_felt(server_name: *const c_char) -> bool {
     }
 }
 
-// Linux fenced-fd path: reconstruct the bootstrap endpoint from the fd the
-// launcher handed us by inheritance, named in the MOZ_FELT_IPC_FD env var. No
-// server name is resolved and no peer authentication is needed.
+// Linux fenced-fd path: reconstruct the bootstrap endpoint from the fd inherited
+// from the Felt process, named in the MOZ_FELT_IPC_FD env var.
 #[cfg(target_os = "linux")]
 #[no_mangle]
 pub extern "C" fn firefox_connect_to_felt_fd() -> bool {
     let fd = match FELT_IPC_ENDPOINT.get().copied().flatten() {
         Some(fd) => fd,
         None => {
-            trace!("firefox_connect_to_felt_fd(): missing/invalid {FELT_IPC_FD_ENV}");
+            log::error!("firefox_connect_to_felt_fd(): missing/invalid {FELT_IPC_FD_ENV}");
             return false;
         }
     };
@@ -226,7 +222,7 @@ pub extern "C" fn firefox_connect_to_felt_fd() -> bool {
     match client::FeltClientThread::new_from_fd(fd) {
         Ok(client) => store_felt_client(client),
         Err(()) => {
-            trace!("firefox_connect_to_felt_fd(): error");
+            log::error!("firefox_connect_to_felt_fd(): failed to connect over fd {fd}");
             false
         }
     }
@@ -234,15 +230,14 @@ pub extern "C" fn firefox_connect_to_felt_fd() -> bool {
 
 // Windows fenced-handle path: reconstruct the bootstrap endpoint from the pipe
 // HANDLE inherited through the launcher, its value named in the
-// MOZ_FELT_IPC_HANDLE env var. No server name is resolved and no peer
-// authentication is needed.
+// MOZ_FELT_IPC_HANDLE env var.
 #[cfg(target_os = "windows")]
 #[no_mangle]
 pub extern "C" fn firefox_connect_to_felt_handle() -> bool {
     let handle = match FELT_IPC_ENDPOINT.get().copied().flatten() {
         Some(handle) => handle,
         None => {
-            trace!("firefox_connect_to_felt_handle(): missing/invalid {FELT_IPC_HANDLE_ENV}");
+            log::error!("firefox_connect_to_felt_handle(): missing/invalid {FELT_IPC_HANDLE_ENV}");
             return false;
         }
     };
@@ -250,7 +245,7 @@ pub extern "C" fn firefox_connect_to_felt_handle() -> bool {
     match client::FeltClientThread::new_from_handle(handle) {
         Ok(client) => store_felt_client(client),
         Err(()) => {
-            trace!("firefox_connect_to_felt_handle(): error");
+            log::error!("firefox_connect_to_felt_handle(): failed to connect over handle {handle}");
             false
         }
     }

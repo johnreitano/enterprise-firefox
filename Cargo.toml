@@ -432,7 +432,7 @@ libcrux-traits = { path = "build/rust/libcrux-traits" }
 libdbus-sys = { path = "third_party/rust/libdbus-sys" }
 
 # Patching to build with windows 0.62.2 dep and to add the raw fd/handle
-# accessors the FELT fenced-endpoint bootstrap needs (Bug 2072053).
+# accessors the FELT fenced-endpoint bootstrap needs.
 ipc-channel = { git = "https://github.com/johnreitano/ipc-channel", rev = "c94d624bded1060078b9b1ffd82ec21937c4300a" }
 
 # Patching to keep only one embeeded-io dependency

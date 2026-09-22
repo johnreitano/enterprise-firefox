@@ -861,12 +861,10 @@ export class FeltProcessParent extends JSProcessActorParent {
     // Linux/Windows use the fenced bootstrap: create a normal ipc::channel() in
     // the parent and hand the browser child one endpoint as an inherited fd
     // (Linux) or pipe HANDLE (Windows), with no published name. On Windows the
-    // browser is spawned by the launcher process (Bug 2070625), so the
-    // inheritable HANDLE travels felt -> launcher -> browser by handle
-    // inheritance (its value carried in MOZ_FELT_IPC_HANDLE). macOS still uses
-    // the connect-by-name one-shot server.
-    // TODO(macos): keep the one-shot server (mach receive rights are not inherited
-    // across posix_spawn), or hand over a mach right / fileport.
+    // browser is spawned by the launcher process, so the inheritable HANDLE
+    // travels felt -> launcher -> browser by handle inheritance (its value
+    // carried in MOZ_FELT_IPC_HANDLE). macOS still uses the connect-by-name
+    // one-shot server.
     const useFencedFd = Services.appinfo.OS == "Linux";
     const useFencedHandle = Services.appinfo.OS == "WINNT";
 
@@ -983,9 +981,7 @@ export class FeltProcessParent extends JSProcessActorParent {
 
     if (useFencedFd || useFencedHandle) {
       // Fenced path: receive the browser's felt->firefox sender over the
-      // inherited bootstrap channel and start the felt server. The endpoint was
-      // never published, so no other same-user process could have connected in
-      // the browser's place.
+      // inherited bootstrap channel and start the felt server.
       Services.felt.acceptInheritedChannel();
     } else {
       Services.felt.ipcChannel();

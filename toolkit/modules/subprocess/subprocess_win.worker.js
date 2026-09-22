@@ -585,6 +585,24 @@ class Process extends BaseProcess {
     let handleArray = win32.HANDLE.array()(handles.concat(extraHandles));
 
     let threadAttrs = win32.createThreadAttributeList(handleArray);
+    if (!threadAttrs && extraHandles.length) {
+      // Without the attribute list, CreateProcessW would inherit every
+      // inheritable handle in this process rather than only the listed ones.
+      for (let handle of new Set(handles)) {
+        if (handle && handle.dispose) {
+          handle.dispose();
+        }
+      }
+      for (let handle of extraHandles) {
+        libc.CloseHandle(handle);
+      }
+      for (let pipe of this.pipes) {
+        pipe.close();
+      }
+      throw new Error(
+        "Failed to create the thread attribute list needed for handleInherit"
+      );
+    }
     if (threadAttrs) {
       // If have thread attributes to pass, pass the size of the full extended
       // startup info struct.
@@ -621,9 +639,8 @@ class Process extends BaseProcess {
       libc.DeleteProcThreadAttributeList(threadAttrs);
     }
 
-    // The child now holds its own inherited copy; drop the parent's so the
-    // endpoint is held only by the (launcher then) browser, mirroring the unix
-    // fenced-fd worker.
+    // The child now holds its own inherited copy; drop ours, mirroring the unix
+    // fdInherit handling.
     for (let handle of extraHandles) {
       libc.CloseHandle(handle);
     }

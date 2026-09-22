@@ -7291,9 +7291,9 @@ int XREMain::XRE_main(int argc, char* argv[], const BootstrapConfig& aConfig) {
     // Initialize Felt state up-front so we can decide whether to continue.
     felt_init();
 
-    // FELT IPC channel. On Linux the fenced-fd path ignores this value (the
-    // endpoint is inherited via MOZ_FELT_IPC_FD), but the arg is still read
-    // here so it is stripped from the command line below on every platform.
+    // FELT IPC channel. Only macOS consumes this value; Linux and Windows
+    // ignore it because their endpoint is inherited (MOZ_FELT_IPC_FD /
+    // MOZ_FELT_IPC_HANDLE).
     [[maybe_unused]] Maybe<const char*> felt =
         geckoargs::sFelt.Get(gArgc, gArgv, CheckArgFlag::None);
     const char* mozFeltEnv = PR_GetEnv("MOZ_FELT_UI");
@@ -7332,13 +7332,13 @@ int XREMain::XRE_main(int argc, char* argv[], const BootstrapConfig& aConfig) {
     NS_WARNING("Checking for FELT");
     if (is_felt_browser()) {
 #  if defined(XP_LINUX) && !defined(ANDROID)
-      // Fenced-fd path: the bootstrap endpoint fd is inherited from the
-      // launcher (MOZ_FELT_IPC_FD), so there is no `-felt <name>` socket to
+      // Fenced-fd path: the bootstrap endpoint fd is inherited from the Felt
+      // process (MOZ_FELT_IPC_FD), so there is no `-felt <name>` socket to
       // validate.
       if (!firefox_connect_to_felt_fd()) {
-        Output(
-            true,
-            "Error: Failed to connect to Felt. SSO authentication required.\n");
+        Output(true,
+               "Error: Failed to connect to Felt over the inherited IPC "
+               "endpoint.\n");
         return 1;
       }
 #  elif defined(XP_WIN)
@@ -7346,9 +7346,9 @@ int XREMain::XRE_main(int argc, char* argv[], const BootstrapConfig& aConfig) {
       // through the launcher (MOZ_FELT_IPC_HANDLE), so there is no `-felt
       // <name>` socket to validate.
       if (!firefox_connect_to_felt_handle()) {
-        Output(
-            true,
-            "Error: Failed to connect to Felt. SSO authentication required.\n");
+        Output(true,
+               "Error: Failed to connect to Felt over the inherited IPC "
+               "endpoint.\n");
         return 1;
       }
 #  else

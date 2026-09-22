@@ -412,7 +412,7 @@ impl FeltXPCOM {
     }
 
     // Shared post-bootstrap setup: given the felt->firefox sender obtained from
-    // the one-shot server (Windows/macOS) or the inherited fd (Linux), create
+    // the one-shot server (macOS) or the inherited fd/handle (Linux/Windows), create
     // the reverse firefox->felt channel, run the version handshake, retain both
     // ends, and start the felt server receive loop.
     fn start_felt_server(&self, tx: ipc_channel::ipc::IpcSender<FeltMessage>) -> nserror::nsresult {
@@ -542,66 +542,81 @@ impl FeltXPCOM {
     // anonymous ipc::channel(), retain the receiver, and return the sender's raw
     // fd cleared of FD_CLOEXEC so it survives exec. FeltProcessParent hands this
     // fd to the browser child at spawn (fdInherit + env var); no name is ever
-    // published, which removes the disclosure (Bug 2072053) and the accept()
-    // race (Bug 2072390) the one-shot server had.
+    // published, which removes the server-name disclosure and the accept() race
+    // the one-shot server had.
     xpcom_method!(create_inherited_channel_fd => CreateInheritedChannelFd() -> i64);
     #[cfg(target_os = "linux")]
     fn create_inherited_channel_fd(&self) -> Result<i64, nserror::nsresult> {
         let (bootstrap_tx, bootstrap_rx): (
             ipc_channel::ipc::IpcSender<ipc_channel::ipc::IpcSender<FeltMessage>>,
             ipc_channel::ipc::IpcReceiver<ipc_channel::ipc::IpcSender<FeltMessage>>,
-        ) = ipc_channel::ipc::channel().map_err(|_| NS_ERROR_FAILURE)?;
+        ) = ipc_channel::ipc::channel().map_err(|err| {
+            error!("FeltXPCOM:CreateInheritedChannelFd() channel() failed: {err}");
+            NS_ERROR_FAILURE
+        })?;
         self.bootstrap_rx.replace(Some(bootstrap_rx));
 
         // into_raw_fd hands out the fd without closing it (Err returns the sender
         // back if it was not uniquely owned, which it is here).
-        let fd = bootstrap_tx.into_raw_fd().map_err(|_| NS_ERROR_FAILURE)?;
-        ipc_channel::platform::set_fd_inheritable(fd).map_err(|_| NS_ERROR_FAILURE)?;
+        let fd = bootstrap_tx.into_raw_fd().map_err(|_| {
+            error!("FeltXPCOM:CreateInheritedChannelFd() into_raw_fd() failed: sender not uniquely owned");
+            NS_ERROR_FAILURE
+        })?;
+        if let Err(err) = ipc_channel::platform::set_fd_inheritable(fd) {
+            error!("FeltXPCOM:CreateInheritedChannelFd() set_fd_inheritable({fd}) failed: {err}");
+            unsafe { libc::close(fd) };
+            return Err(NS_ERROR_FAILURE);
+        }
         trace!("FeltXPCOM:CreateInheritedChannelFd() fd={}", fd);
-        // The parent's copy of this sender fd is closed by the spawn worker right
-        // after launch (see subprocess_unix.worker.js fdInherit handling), so the
-        // endpoint ends up held only by the browser child.
+        // The spawn worker closes the parent's copy of this fd right after launch
+        // (see subprocess_unix.worker.js fdInherit handling), leaving the browser
+        // child's inherited copy as the only one.
         Ok(fd as i64)
     }
 
     #[cfg(not(target_os = "linux"))]
     fn create_inherited_channel_fd(&self) -> Result<i64, nserror::nsresult> {
         // Windows uses create_inherited_channel_handle (a pipe HANDLE, not an fd).
-        // TODO(macos): keep the one-shot server, macOS is already fenced by the
-        // Mach bootstrap namespace and mach rights are not inherited across
-        // posix_spawn.
         Err(NS_ERROR_NOT_IMPLEMENTED)
     }
 
-    // Windows fenced bootstrap, step 1 (called before spawn): create a normal,
-    // anonymous ipc::channel(), retain the receiver, and return the value of an
-    // inheritable duplicate of the sender endpoint's pipe HANDLE. The original
-    // sender is dropped so only the inheritable duplicate remains; it is inherited
-    // by the launcher and re-inherited by the browser child (see
-    // FeltProcessParent handleInherit + MOZ_FELT_IPC_HANDLE, and the winlauncher
-    // handle-list addition). No name is ever published.
+    // Windows fenced bootstrap, step 1 (called before spawn): create a normal
+    // ipc::channel() (a single-instance named pipe with a random, unpublished
+    // name, already connected inside this process), retain the receiver, and
+    // return the value of an inheritable duplicate of the sender endpoint's pipe
+    // HANDLE. The original sender is dropped so only the inheritable duplicate
+    // remains; it is inherited by the launcher and re-inherited by the browser
+    // child (see FeltProcessParent handleInherit + MOZ_FELT_IPC_HANDLE, and the
+    // winlauncher handle-list addition).
     xpcom_method!(create_inherited_channel_handle => CreateInheritedChannelHandle() -> i64);
     #[cfg(target_os = "windows")]
     fn create_inherited_channel_handle(&self) -> Result<i64, nserror::nsresult> {
         let (bootstrap_tx, bootstrap_rx): (
             ipc_channel::ipc::IpcSender<ipc_channel::ipc::IpcSender<FeltMessage>>,
             ipc_channel::ipc::IpcReceiver<ipc_channel::ipc::IpcSender<FeltMessage>>,
-        ) = ipc_channel::ipc::channel().map_err(|_| NS_ERROR_FAILURE)?;
+        ) = ipc_channel::ipc::channel().map_err(|err| {
+            error!("FeltXPCOM:CreateInheritedChannelHandle() channel() failed: {err}");
+            NS_ERROR_FAILURE
+        })?;
         self.bootstrap_rx.replace(Some(bootstrap_rx));
 
         // inheritable_raw_handle duplicates the sender's pipe handle with
         // HANDLE_FLAG_INHERIT set, leaving the sender intact; dropping the sender
         // then closes the non-inheritable original, so only the inheritable
         // duplicate survives to be inherited by the child.
-        let handle = bootstrap_tx
-            .inheritable_raw_handle()
-            .map_err(|_| NS_ERROR_FAILURE)?;
+        let handle = bootstrap_tx.inheritable_raw_handle().map_err(|err| {
+            error!(
+                "FeltXPCOM:CreateInheritedChannelHandle() inheritable_raw_handle() failed: {err}"
+            );
+            NS_ERROR_FAILURE
+        })?;
         drop(bootstrap_tx);
         let handle_value = handle as usize as i64;
         trace!("FeltXPCOM:CreateInheritedChannelHandle() handle={handle_value}");
-        // The parent's copy of this inheritable handle is closed by the spawn
-        // worker right after launch (see subprocess_win.worker.js handleInherit
-        // handling), so the endpoint ends up held only by the browser child.
+        // The spawn worker closes this process's copy right after launch (see
+        // subprocess_win.worker.js handleInherit handling); the launcher closes
+        // its inherited copy once it has spawned the browser, leaving the browser
+        // child's copy as the only one.
         Ok(handle_value)
     }
 
@@ -611,10 +626,11 @@ impl FeltXPCOM {
         Err(NS_ERROR_NOT_IMPLEMENTED)
     }
 
-    // Linux fenced bootstrap, step 2 (called after spawn): receive the browser's
-    // felt->firefox sender over the retained bootstrap receiver, then start the
-    // felt server. Replaces the one-shot server accept() entirely; no peer
-    // authorization is needed because the endpoint was inherited, not published.
+    // Linux/Windows fenced bootstrap, step 2 (called after spawn): receive the
+    // browser's felt->firefox sender over the retained bootstrap receiver, then
+    // start the felt server. Replaces the one-shot server accept() entirely; the
+    // endpoint was inherited and no name is published, so no peer can connect by
+    // rendezvous.
     xpcom_method!(accept_inherited_channel => AcceptInheritedChannel());
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     fn accept_inherited_channel(&self) -> Result<(), nserror::nsresult> {
@@ -740,6 +756,8 @@ impl FeltXPCOM {
     // for the child to connect to. On Linux/Windows the fenced bootstrap
     // (create_inherited_channel_fd / create_inherited_channel_handle) is used
     // instead and this returns an error.
+    // TODO(macos): macOS keeps the one-shot server, which is fenced by the Mach
+    // bootstrap namespace; it could move to an inherited Mach right later.
     xpcom_method!(one_shot_ipc_server => OneShotIpcServer() -> nsACString);
     #[cfg(target_os = "macos")]
     fn one_shot_ipc_server(&self) -> Result<nsCString, nserror::nsresult> {
