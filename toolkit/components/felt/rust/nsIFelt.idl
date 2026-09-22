@@ -6,7 +6,7 @@
 #include "nsISupports.idl"
 #include "nsICookie.idl"
 
-[scriptable, uuid(373195cb-bbb9-4e01-b276-b799a18ca355)]
+[scriptable, uuid(a422bc40-120c-4811-bdcf-24fcaa479aad)]
 interface nsIFelt : nsISupports {
   const unsigned long FeltEncryptionExitCode_Archive = 0x93;
   const unsigned long FeltEncryptionExitCode_Delete = 0x94;
@@ -16,8 +16,34 @@ interface nsIFelt : nsISupports {
   // (Bug 2021342).
   const unsigned long FeltEncryptionExitCode_SdrTokenUnlockFailed = 0x95;
 
+  /**
+   * Windows/macOS bootstrap: create the published, connect-by-name one-shot IPC
+   * server and return its name for the spawned browser to connect to. Fails on
+   * Linux, which uses the fenced-fd bootstrap (createInheritedChannelFd /
+   * acceptInheritedChannel) instead.
+   */
   [must_use]
   ACString oneShotIpcServer();
+
+  /**
+   * Linux fenced bootstrap, step 1 (call BEFORE spawning the browser): create a
+   * normal anonymous ipc::channel(), retain the receiver, and return the raw fd
+   * of the sender endpoint with FD_CLOEXEC cleared so it survives exec. The
+   * caller hands this fd to the browser child at spawn (via fdInherit and an env
+   * var); the name is never published. Fails on non-Linux platforms.
+   */
+  [must_use]
+  long long createInheritedChannelFd();
+
+  /**
+   * Linux fenced bootstrap, step 2 (call AFTER spawning the browser): receive
+   * the browser's felt->firefox sender over the retained bootstrap receiver and
+   * start the felt server. Replaces ipcChannel()'s one-shot accept() and needs
+   * no peer authorization because the endpoint was inherited, not published.
+   * Fails on non-Linux platforms.
+   */
+  [must_use]
+  void acceptInheritedChannel();
 
   [must_use]
   AString binPath();

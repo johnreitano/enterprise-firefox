@@ -4,8 +4,13 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 use log::trace;
+use std::sync::atomic::AtomicBool;
+// Only the non-Linux connect-by-name entry point takes a C string server name;
+// the Linux fenced-fd path reads the fd from an env var instead.
+#[cfg(not(target_os = "linux"))]
+use std::ffi::CStr;
+#[cfg(not(target_os = "linux"))]
 use std::os::raw::c_char;
-use std::{ffi::CStr, sync::atomic::AtomicBool};
 
 use std::env;
 use std::sync::{atomic::Ordering, Mutex};
@@ -41,6 +46,12 @@ pub use utils::{CONSOLE_URL, TOKENS};
 static IS_FELT_UI: AtomicBool = AtomicBool::new(false);
 static IS_FELT_BROWSER: AtomicBool = AtomicBool::new(false);
 static IS_FELT_SAFE_MODE: AtomicBool = AtomicBool::new(false);
+
+/// Env var carrying the inherited bootstrap-endpoint fd on the Linux fenced-fd
+/// path. Set by FeltProcessParent on the spawned browser; its presence also
+/// marks the process as the felt browser (replacing the `-felt <name>` argv).
+#[cfg(target_os = "linux")]
+const FELT_IPC_FD_ENV: &str = "MOZ_FELT_IPC_FD";
 // Whether a browser shutdown locks the session instead of signing out.
 pub(crate) static SHUTDOWN_LOCK_INTENT: AtomicBool = AtomicBool::new(false);
 
@@ -86,6 +97,13 @@ pub extern "C" fn felt_init() {
     trace!("felt_init(): force_chrome={}", force_chrome);
 
     let felt_ui_requested = arg_matches("feltui") || found_felt_ui_env;
+
+    // On Linux the fenced-fd bootstrap replaces the `-felt <name>` argv: the
+    // spawned browser is marked by the inherited-fd env var instead. Other
+    // platforms still use the argv marker.
+    #[cfg(target_os = "linux")]
+    let is_felt_browser = env::var(FELT_IPC_FD_ENV).is_ok() && !force_chrome;
+    #[cfg(not(target_os = "linux"))]
     let is_felt_browser = arg_matches("felt") && !force_chrome;
 
     if is_felt_browser && felt_ui_requested {
@@ -126,21 +144,50 @@ pub extern "C" fn is_felt_browser() -> bool {
 
 pub static FELT_CLIENT: Mutex<Option<client::FeltClientThread>> = Mutex::new(None);
 
+fn store_felt_client(client: client::FeltClientThread) -> bool {
+    let mut state = FELT_CLIENT.lock().expect("Could not lock mutex");
+    trace!("store_felt_client(): connected, storing client");
+    *state = Some(client);
+    true
+}
+
+// Windows/macOS: connect to the published one-shot server by name.
+#[cfg(not(target_os = "linux"))]
 #[no_mangle]
 pub extern "C" fn firefox_connect_to_felt(server_name: *const c_char) -> bool {
     let srv_name = unsafe { CStr::from_ptr(server_name) };
     let server_socket = String::from_utf8_lossy(srv_name.to_bytes()).to_string();
     trace!("firefox_connect_to_felt({})", server_socket);
     match client::FeltClientThread::new(server_socket) {
-        Ok(client) => {
-            let mut state = FELT_CLIENT.lock().expect("Could not lock mutex");
-            trace!("firefox_connect_to_felt(): connected, storing client");
-            *state = Some(client);
-            trace!("firefox_connect_to_felt() done: success");
-            true
-        }
+        Ok(client) => store_felt_client(client),
         Err(()) => {
             trace!("firefox_connect_to_felt(): error");
+            false
+        }
+    }
+}
+
+// Linux fenced-fd path: reconstruct the bootstrap endpoint from the fd the
+// launcher handed us by inheritance, named in the MOZ_FELT_IPC_FD env var. No
+// server name is resolved and no peer authentication is needed.
+#[cfg(target_os = "linux")]
+#[no_mangle]
+pub extern "C" fn firefox_connect_to_felt_fd() -> bool {
+    let fd = match std::env::var(FELT_IPC_FD_ENV)
+        .ok()
+        .and_then(|v| v.parse::<std::os::unix::io::RawFd>().ok())
+    {
+        Some(fd) if fd >= 0 => fd,
+        _ => {
+            trace!("firefox_connect_to_felt_fd(): missing/invalid {FELT_IPC_FD_ENV}");
+            return false;
+        }
+    };
+    trace!("firefox_connect_to_felt_fd({fd})");
+    match client::FeltClientThread::new_from_fd(fd) {
+        Ok(client) => store_felt_client(client),
+        Err(()) => {
+            trace!("firefox_connect_to_felt_fd(): error");
             false
         }
     }
