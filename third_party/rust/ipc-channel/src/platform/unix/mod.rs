@@ -119,9 +119,9 @@ pub fn channel() -> Result<(OsIpcSender, OsIpcReceiver), UnixError> {
 
 /// Clear `FD_CLOEXEC` on `fd` so it is inherited across `exec` into a child.
 ///
-/// Endpoints created by `channel()` are `SOCK_CLOEXEC` by default; a fenced
-/// bootstrap must clear the flag on the end it hands to the child before
-/// spawning, otherwise the fd is closed by the `exec`.
+/// On Linux and illumos endpoints created by `channel()` are `SOCK_CLOEXEC`, so
+/// a fenced bootstrap must clear the flag on the end it hands to the child
+/// before spawning, otherwise the fd is closed by the `exec`.
 pub fn set_fd_inheritable(fd: RawFd) -> io::Result<()> {
     let flags = unsafe { libc::fcntl(fd, libc::F_GETFD) };
     if flags < 0 {

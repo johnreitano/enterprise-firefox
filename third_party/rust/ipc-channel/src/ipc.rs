@@ -229,6 +229,10 @@ where
     /// Export this receiver's underlying fd without closing it, for handing one
     /// channel end to a child process as an inherited fd (fenced-endpoint
     /// bootstrap). Ownership of the fd is transferred to the caller.
+    ///
+    /// On Linux and illumos the returned fd retains `FD_CLOEXEC`, so the caller
+    /// must call [`set_fd_inheritable`](crate::platform::set_fd_inheritable) on
+    /// it before spawning a child or the fd will be closed on exec.
     #[cfg(all(
         not(feature = "force-inprocess"),
         any(
@@ -246,7 +250,10 @@ where
     ///
     /// # Safety
     /// `fd` must be an endpoint fd previously produced by [`IpcReceiver::into_raw_fd`]
-    /// (or the equivalent OS export), carrying messages of type `T`.
+    /// (or the equivalent OS export), carrying messages of type `T`. A descriptor
+    /// inherited from a parent process is an acceptable source. The descriptor
+    /// must not be owned or closed anywhere else, since the returned receiver
+    /// takes ownership and closing it twice is undefined behaviour.
     #[cfg(all(
         not(feature = "force-inprocess"),
         any(
@@ -265,6 +272,9 @@ where
 
     /// Export this receiver's underlying pipe handle without closing it.
     /// Ownership of the handle is transferred to the caller.
+    ///
+    /// Any buffered receiver state is discarded, so this is only valid on a
+    /// fresh endpoint that has not yet been read from.
     #[cfg(all(not(feature = "force-inprocess"), target_os = "windows"))]
     pub fn into_raw_handle(self) -> std::os::windows::io::RawHandle {
         self.os_receiver.into_raw_handle()
@@ -276,14 +286,17 @@ where
     pub fn inheritable_raw_handle(&self) -> io::Result<std::os::windows::io::RawHandle> {
         self.os_receiver
             .inheritable_raw_handle()
-            .map_err(|e| io::Error::from_raw_os_error(e.code().0))
+            .map_err(io::Error::other)
     }
 
     /// Reconstruct a typed receiver from a raw pipe handle.
     ///
     /// # Safety
     /// `handle` must be an endpoint handle previously produced by
-    /// [`IpcReceiver::into_raw_handle`], carrying messages of type `T`.
+    /// [`IpcReceiver::into_raw_handle`], carrying messages of type `T`. A handle
+    /// inherited from a parent process is an acceptable source. The handle must
+    /// not be owned or closed anywhere else, since the returned receiver takes
+    /// ownership and closing it twice is undefined behaviour.
     #[cfg(all(not(feature = "force-inprocess"), target_os = "windows"))]
     pub unsafe fn from_raw_handle(handle: std::os::windows::io::RawHandle) -> Self {
         IpcReceiver {
@@ -412,6 +425,10 @@ where
     ///
     /// Only succeeds when this sender uniquely owns the fd (no outstanding
     /// clones); otherwise the sender is returned unchanged via `Err`.
+    ///
+    /// On Linux and illumos the returned fd retains `FD_CLOEXEC`, so the caller
+    /// must call [`set_fd_inheritable`](crate::platform::set_fd_inheritable) on
+    /// it before spawning a child or the fd will be closed on exec.
     #[cfg(all(
         not(feature = "force-inprocess"),
         any(
@@ -435,7 +452,10 @@ where
     ///
     /// # Safety
     /// `fd` must be an endpoint fd previously produced by [`IpcSender::into_raw_fd`]
-    /// (or the equivalent OS export), carrying messages of type `T`.
+    /// (or the equivalent OS export), carrying messages of type `T`. A descriptor
+    /// inherited from a parent process is an acceptable source. The descriptor
+    /// must not be owned or closed anywhere else, since the returned sender takes
+    /// ownership and closing it twice is undefined behaviour.
     #[cfg(all(
         not(feature = "force-inprocess"),
         any(
@@ -464,14 +484,17 @@ where
     pub fn inheritable_raw_handle(&self) -> io::Result<std::os::windows::io::RawHandle> {
         self.os_sender
             .inheritable_raw_handle()
-            .map_err(|e| io::Error::from_raw_os_error(e.code().0))
+            .map_err(io::Error::other)
     }
 
     /// Reconstruct a typed sender from a raw pipe handle.
     ///
     /// # Safety
     /// `handle` must be an endpoint handle previously produced by
-    /// [`IpcSender::into_raw_handle`], carrying messages of type `T`.
+    /// [`IpcSender::into_raw_handle`], carrying messages of type `T`. A handle
+    /// inherited from a parent process is an acceptable source. The handle must
+    /// not be owned or closed anywhere else, since the returned sender takes
+    /// ownership and closing it twice is undefined behaviour.
     #[cfg(all(not(feature = "force-inprocess"), target_os = "windows"))]
     pub unsafe fn from_raw_handle(handle: std::os::windows::io::RawHandle) -> Self {
         IpcSender {
