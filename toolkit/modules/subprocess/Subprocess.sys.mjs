@@ -98,6 +98,13 @@ export var Subprocess = {
    * them beforehand; the parent's copies are closed after launch. Used by the
    * FELT fenced-fd IPC bootstrap. Ignored on Windows.
    *
+   * @param {number[]} [options.handleInherit]
+   * Windows-only. Extra inheritable HANDLE values (as numbers) to add to the
+   * child's PROC_THREAD_ATTRIBUTE_HANDLE_LIST so it inherits them alongside the
+   * stdio handles. The caller is responsible for making them inheritable
+   * beforehand; the parent's copies are closed after launch. Used by the FELT
+   * fenced-handle IPC bootstrap. Ignored on Unix.
+   *
    * @returns {Promise<Process>}
    *
    * @throws {Error}
