@@ -59,6 +59,41 @@ const FELT_IPC_FD_ENV: &str = "MOZ_FELT_IPC_FD";
 /// marks the process as the felt browser (replacing the `-felt <name>` argv).
 #[cfg(target_os = "windows")]
 const FELT_IPC_HANDLE_ENV: &str = "MOZ_FELT_IPC_HANDLE";
+
+#[cfg(target_os = "linux")]
+type FeltIpcEndpoint = std::os::unix::io::RawFd;
+#[cfg(target_os = "windows")]
+type FeltIpcEndpoint = usize;
+
+/// The inherited bootstrap endpoint, parsed from its env var by felt_init.
+/// None if the var was present but did not hold a usable value.
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+static FELT_IPC_ENDPOINT: std::sync::OnceLock<Option<FeltIpcEndpoint>> =
+    std::sync::OnceLock::new();
+
+/// Parses and removes the inherited-endpoint env var, so that processes this
+/// browser spawns (background tasks, restarts) do not inherit it and mistake
+/// themselves for the felt browser. Returns whether the var was present.
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+fn take_felt_ipc_endpoint() -> bool {
+    #[cfg(target_os = "linux")]
+    let name = FELT_IPC_FD_ENV;
+    #[cfg(target_os = "windows")]
+    let name = FELT_IPC_HANDLE_ENV;
+    let Some(value) = env::var_os(name) else {
+        return false;
+    };
+    env::remove_var(name);
+    let parsed = value
+        .to_str()
+        .and_then(|v| v.parse::<FeltIpcEndpoint>().ok());
+    #[cfg(target_os = "linux")]
+    let endpoint = parsed.filter(|fd| *fd >= 0);
+    #[cfg(target_os = "windows")]
+    let endpoint = parsed.filter(|handle| *handle != 0);
+    let _ = FELT_IPC_ENDPOINT.set(endpoint);
+    true
+}
 // Whether a browser shutdown locks the session instead of signing out.
 pub(crate) static SHUTDOWN_LOCK_INTENT: AtomicBool = AtomicBool::new(false);
 
@@ -108,10 +143,8 @@ pub extern "C" fn felt_init() {
     // On Linux/Windows the fenced bootstrap replaces the `-felt <name>` argv: the
     // spawned browser is marked by the inherited-endpoint env var instead. macOS
     // still uses the argv marker.
-    #[cfg(target_os = "linux")]
-    let is_felt_browser = env::var(FELT_IPC_FD_ENV).is_ok() && !force_chrome;
-    #[cfg(target_os = "windows")]
-    let is_felt_browser = env::var(FELT_IPC_HANDLE_ENV).is_ok() && !force_chrome;
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    let is_felt_browser = take_felt_ipc_endpoint() && !force_chrome;
     #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     let is_felt_browser = arg_matches("felt") && !force_chrome;
 
@@ -182,12 +215,9 @@ pub extern "C" fn firefox_connect_to_felt(server_name: *const c_char) -> bool {
 #[cfg(target_os = "linux")]
 #[no_mangle]
 pub extern "C" fn firefox_connect_to_felt_fd() -> bool {
-    let fd = match std::env::var(FELT_IPC_FD_ENV)
-        .ok()
-        .and_then(|v| v.parse::<std::os::unix::io::RawFd>().ok())
-    {
-        Some(fd) if fd >= 0 => fd,
-        _ => {
+    let fd = match FELT_IPC_ENDPOINT.get().copied().flatten() {
+        Some(fd) => fd,
+        None => {
             trace!("firefox_connect_to_felt_fd(): missing/invalid {FELT_IPC_FD_ENV}");
             return false;
         }
@@ -209,12 +239,9 @@ pub extern "C" fn firefox_connect_to_felt_fd() -> bool {
 #[cfg(target_os = "windows")]
 #[no_mangle]
 pub extern "C" fn firefox_connect_to_felt_handle() -> bool {
-    let handle = match std::env::var(FELT_IPC_HANDLE_ENV)
-        .ok()
-        .and_then(|v| v.parse::<usize>().ok())
-    {
-        Some(handle) if handle != 0 => handle,
-        _ => {
+    let handle = match FELT_IPC_ENDPOINT.get().copied().flatten() {
+        Some(handle) => handle,
+        None => {
             trace!("firefox_connect_to_felt_handle(): missing/invalid {FELT_IPC_HANDLE_ENV}");
             return false;
         }

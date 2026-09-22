@@ -27,20 +27,15 @@ use crate::utils::{Tokens, CONSOLE_URL, TOKENS, TOKEN_EXPIRY_SKEW};
 
 #[xpcom(implement(nsIFelt), atomic)]
 pub struct FeltXPCOM {
-    // macOS keeps the published, connect-by-name one-shot server rendezvous.
-    // TODO(macos): convert this to an inherited endpoint (mach right) too, see
-    // accept_inherited_channel below.
-    #[cfg(target_os = "macos")]
+    // The #[xpcom] macro does not forward #[cfg] on fields into the generated
+    // initializer, so both bootstrap fields exist on every platform; each is
+    // only used where its bootstrap applies (one-shot server: macOS; inherited
+    // channel: Linux/Windows).
+    #[allow(dead_code)]
     one_shot_server: RefCell<
         Option<ipc_channel::ipc::IpcOneShotServer<ipc_channel::ipc::IpcSender<FeltMessage>>>,
     >,
-    // Linux/Windows fenced bootstrap: the receiver half of a normal, anonymous
-    // ipc::channel(). Its sender half is handed to the browser child as an
-    // inherited fd (Linux) or pipe HANDLE (Windows) -- see
-    // create_inherited_channel_fd / create_inherited_channel_handle; the child
-    // sends its felt->firefox sender over it, with no published name and no
-    // accept() race.
-    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    #[allow(dead_code)]
     bootstrap_rx:
         RefCell<Option<ipc_channel::ipc::IpcReceiver<ipc_channel::ipc::IpcSender<FeltMessage>>>>,
     tx: RefCell<Option<ipc_channel::ipc::IpcSender<FeltMessage>>>,
@@ -58,9 +53,7 @@ impl FeltXPCOM {
         _is_felt_safe_mode: bool,
     ) -> RefPtr<FeltXPCOM> {
         FeltXPCOM::allocate(InitFeltXPCOM {
-            #[cfg(target_os = "macos")]
             one_shot_server: RefCell::new(None),
-            #[cfg(any(target_os = "linux", target_os = "windows"))]
             bootstrap_rx: RefCell::new(None),
             tx: RefCell::new(None),
             rx: RefCell::new(None),
