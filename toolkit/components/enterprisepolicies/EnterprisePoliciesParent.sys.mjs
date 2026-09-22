@@ -118,6 +118,26 @@ class RemotePolicyProviderInitError extends Error {
 }
 
 /**
+ * Describe why a console request failed. On an XHR error, ConsoleClient throws
+ * a TypeError whose message is a fixed marker: the host and the nsresult are
+ * only in its cause, which stringifying drops.
+ *
+ * @param {Error} e what ingestPolicies() threw
+ * @returns {string}
+ */
+function describeConsoleRequestError(e) {
+  const { hostname, channelStatus } = e?.cause ?? {};
+  if (!hostname) {
+    return `${e}`;
+  }
+  const status =
+    channelStatus == null
+      ? "an unknown network error"
+      : ChromeUtils.getXPCOMErrorName(channelStatus);
+  return `request to ${hostname} failed with ${status}`;
+}
+
+/**
  * Compute a stable hash of a JSON-serialisable value. Used to detect whether a
  * policy set (or a single policy's parameters) changed without having to
  * re-parse and re-validate them.
@@ -258,8 +278,9 @@ EnterprisePoliciesManager.prototype = {
           `Failed to fetch startup policies when building the policies provider: ${e}`,
           e
         );
-        // bug 2027006 will move the fetching of policies to felt
-        // and no shutdown will be needed then
+        // Fail closed rather than run with no policies. This only takes effect
+        // under Felt, which fetched from this console just before launching
+        // Firefox, so a failure here should be rare.
         lazy.initiateShutdown();
       } else if (AppConstants.MOZ_ENTERPRISE && Services.felt.isFeltBrowser()) {
         // A managed (felt) browser that cannot finish policy initialization
@@ -302,7 +323,10 @@ EnterprisePoliciesManager.prototype = {
         // Ingest the startup policies.
         await remoteProvider.ingestPolicies();
       } catch (e) {
-        lazy.log.error(`Failed to fetch remote policies on startup: ${e}`);
+        lazy.log.error(
+          `Failed to fetch remote policies on startup: ${describeConsoleRequestError(e)}`,
+          e
+        );
         remoteProvider._failed = true;
         throw new RemotePolicyProviderInitError(
           "Failed to fetch remote policies on startup",
@@ -1641,7 +1665,7 @@ class RemotePoliciesProvider extends PoliciesProvider {
       Services.obs.notifyObservers(null, "EnterprisePolicies:Update");
     } catch (e) {
       lazy.log.error(
-        `RemotePoliciesProvider performPolling() with frequency ${this._pollingFrequency} caused error`,
+        `Failed to poll for remote policies: ${describeConsoleRequestError(e)}`,
         e
       );
     } finally {
@@ -1700,7 +1724,7 @@ class RemotePoliciesProvider extends PoliciesProvider {
     try {
       lazy.RelaunchEnforcer.onConsolePoll(res.relaunch ?? null);
     } catch (e) {
-      lazy.log.error("Failed to apply the restart deadline", e);
+      lazy.log.error(`Failed to apply the restart deadline: ${e}`, e);
     }
 
     // The console returns byte-identical JSON when the remote policy set is
