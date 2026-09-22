@@ -24,9 +24,9 @@ pub struct FeltIpcClient {
 }
 
 impl FeltIpcClient {
-    // Windows/macOS bootstrap: connect to the published one-shot server by name,
-    // then complete the channel exchange.
-    #[cfg(not(target_os = "linux"))]
+    // macOS bootstrap: connect to the published one-shot server by name, then
+    // complete the channel exchange.
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     pub fn new(felt_server_name: String) -> Self {
         trace!("FeltIpcClient::new({})", felt_server_name);
         match ipc_channel::ipc::IpcSender::connect(felt_server_name) {
@@ -52,6 +52,24 @@ impl FeltIpcClient {
         // FeltXPCOM::create_inherited_channel_fd, carrying IpcSender<FeltMessage>.
         let tx0: ipc_channel::ipc::IpcSender<ipc_channel::ipc::IpcSender<FeltMessage>> =
             unsafe { ipc_channel::ipc::IpcSender::from_raw_fd(fd) };
+        Self::bootstrap(tx0)
+    }
+
+    // Windows fenced bootstrap: reconstruct the bootstrap sender from the pipe
+    // HANDLE the launcher handed us by inheritance (see
+    // firefox_connect_to_felt_handle), then complete the same channel exchange.
+    // No name is resolved, so no unrelated process could have connected in our
+    // place.
+    #[cfg(target_os = "windows")]
+    pub fn new_from_handle(handle: usize) -> Self {
+        trace!("FeltIpcClient::new_from_handle({})", handle);
+        // SAFETY: handle is the inherited bootstrap sender endpoint produced by
+        // FeltXPCOM::create_inherited_channel_handle, carrying IpcSender<FeltMessage>.
+        let tx0: ipc_channel::ipc::IpcSender<ipc_channel::ipc::IpcSender<FeltMessage>> = unsafe {
+            ipc_channel::ipc::IpcSender::from_raw_handle(
+                handle as std::os::windows::io::RawHandle,
+            )
+        };
         Self::bootstrap(tx0)
     }
 
@@ -180,7 +198,7 @@ pub struct FeltClientThread {
 }
 
 impl FeltClientThread {
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     pub fn new(felt_server_name: String) -> Result<Self, ()> {
         trace!(
             "FeltClientThread::new(): connecting to {}",
@@ -193,6 +211,12 @@ impl FeltClientThread {
     pub fn new_from_fd(fd: std::os::unix::io::RawFd) -> Result<Self, ()> {
         trace!("FeltClientThread::new_from_fd(): connecting via inherited fd {fd}");
         Self::from_client(FeltIpcClient::new_from_fd(fd))
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn new_from_handle(handle: usize) -> Result<Self, ()> {
+        trace!("FeltClientThread::new_from_handle(): connecting via inherited handle {handle}");
+        Self::from_client(FeltIpcClient::new_from_handle(handle))
     }
 
     fn from_client(felt_client: FeltIpcClient) -> Result<Self, ()> {

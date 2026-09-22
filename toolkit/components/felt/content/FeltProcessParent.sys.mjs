@@ -858,20 +858,25 @@ export class FeltProcessParent extends JSProcessActorParent {
   }
 
   async startFirefoxProcess() {
-    // Linux uses the fenced-fd bootstrap: create a normal ipc::channel() in the
-    // parent and hand the browser child one endpoint as an inherited fd, with no
-    // published name. Windows/macOS still use the connect-by-name one-shot server.
-    // TODO(windows): the browser is spawned by the launcher process (Bug 2070625),
-    // so the inherited handle must be propagated through the launcher to the
-    // browser child (DuplicateHandle chain), which is the hard part.
+    // Linux/Windows use the fenced bootstrap: create a normal ipc::channel() in
+    // the parent and hand the browser child one endpoint as an inherited fd
+    // (Linux) or pipe HANDLE (Windows), with no published name. On Windows the
+    // browser is spawned by the launcher process (Bug 2070625), so the
+    // inheritable HANDLE travels felt -> launcher -> browser by handle
+    // inheritance (its value carried in MOZ_FELT_IPC_HANDLE). macOS still uses
+    // the connect-by-name one-shot server.
     // TODO(macos): keep the one-shot server (mach receive rights are not inherited
     // across posix_spawn), or hand over a mach right / fileport.
     const useFencedFd = Services.appinfo.OS == "Linux";
+    const useFencedHandle = Services.appinfo.OS == "WINNT";
 
     let socket;
     let feltFd = -1;
+    let feltHandle = -1;
     if (useFencedFd) {
       feltFd = Services.felt.createInheritedChannelFd();
+    } else if (useFencedHandle) {
+      feltHandle = Services.felt.createInheritedChannelHandle();
     } else {
       socket = Services.felt.oneShotIpcServer();
     }
@@ -926,9 +931,10 @@ export class FeltProcessParent extends JSProcessActorParent {
     }
 
     lazy.log.debug(`Using profileArgs: ${profileArgs}`);
-    // On the fenced-fd path the browser is identified by the MOZ_FELT_IPC_FD env
-    // var (set below) rather than the `-felt <name>` argv rendezvous.
-    const feltArgs = useFencedFd ? [] : ["-felt", socket];
+    // On the fenced paths the browser is identified by the MOZ_FELT_IPC_FD /
+    // MOZ_FELT_IPC_HANDLE env var (set below) rather than the `-felt <name>` argv
+    // rendezvous.
+    const feltArgs = useFencedFd || useFencedHandle ? [] : ["-felt", socket];
     const firefoxRunArgs = [
       ...launcherArgs,
       "--foreground",
@@ -951,6 +957,14 @@ export class FeltProcessParent extends JSProcessActorParent {
       firefoxRun.fdInherit = [feltFd];
       firefoxRun.environmentAppend = true;
       firefoxRun.environment = { MOZ_FELT_IPC_FD: String(feltFd) };
+    } else if (useFencedHandle) {
+      // Inherit the endpoint HANDLE into the spawned launcher (added to its
+      // PROC_THREAD_ATTRIBUTE_HANDLE_LIST) and tell the child its value via the
+      // environment. The launcher re-inherits it to the browser child, and the
+      // env var rides through transitively.
+      firefoxRun.handleInherit = [feltHandle];
+      firefoxRun.environmentAppend = true;
+      firefoxRun.environment = { MOZ_FELT_IPC_HANDLE: String(feltHandle) };
     }
 
     try {
@@ -969,8 +983,8 @@ export class FeltProcessParent extends JSProcessActorParent {
       lazy.logProcess.error(`[${pid}]: ${chunk}`);
     });
 
-    if (useFencedFd) {
-      // Fenced-fd path: receive the browser's felt->firefox sender over the
+    if (useFencedFd || useFencedHandle) {
+      // Fenced path: receive the browser's felt->firefox sender over the
       // inherited bootstrap channel and start the felt server. The endpoint was
       // never published, so no other same-user process could have connected in
       // the browser's place.

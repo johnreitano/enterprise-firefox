@@ -5,11 +5,12 @@
 
 use log::trace;
 use std::sync::atomic::AtomicBool;
-// Only the non-Linux connect-by-name entry point takes a C string server name;
-// the Linux fenced-fd path reads the fd from an env var instead.
-#[cfg(not(target_os = "linux"))]
+// Only the macOS connect-by-name entry point takes a C string server name; the
+// Linux fenced-fd and Windows fenced-handle paths read the endpoint from an env
+// var instead.
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 use std::ffi::CStr;
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 use std::os::raw::c_char;
 
 use std::env;
@@ -52,6 +53,12 @@ static IS_FELT_SAFE_MODE: AtomicBool = AtomicBool::new(false);
 /// marks the process as the felt browser (replacing the `-felt <name>` argv).
 #[cfg(target_os = "linux")]
 const FELT_IPC_FD_ENV: &str = "MOZ_FELT_IPC_FD";
+/// Env var carrying the value of the inherited bootstrap-endpoint pipe HANDLE on
+/// the Windows fenced-handle path. Set by FeltProcessParent on the spawned
+/// launcher and inherited transitively by the browser child; its presence also
+/// marks the process as the felt browser (replacing the `-felt <name>` argv).
+#[cfg(target_os = "windows")]
+const FELT_IPC_HANDLE_ENV: &str = "MOZ_FELT_IPC_HANDLE";
 // Whether a browser shutdown locks the session instead of signing out.
 pub(crate) static SHUTDOWN_LOCK_INTENT: AtomicBool = AtomicBool::new(false);
 
@@ -98,12 +105,14 @@ pub extern "C" fn felt_init() {
 
     let felt_ui_requested = arg_matches("feltui") || found_felt_ui_env;
 
-    // On Linux the fenced-fd bootstrap replaces the `-felt <name>` argv: the
-    // spawned browser is marked by the inherited-fd env var instead. Other
-    // platforms still use the argv marker.
+    // On Linux/Windows the fenced bootstrap replaces the `-felt <name>` argv: the
+    // spawned browser is marked by the inherited-endpoint env var instead. macOS
+    // still uses the argv marker.
     #[cfg(target_os = "linux")]
     let is_felt_browser = env::var(FELT_IPC_FD_ENV).is_ok() && !force_chrome;
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "windows")]
+    let is_felt_browser = env::var(FELT_IPC_HANDLE_ENV).is_ok() && !force_chrome;
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     let is_felt_browser = arg_matches("felt") && !force_chrome;
 
     if is_felt_browser && felt_ui_requested {
@@ -151,8 +160,8 @@ fn store_felt_client(client: client::FeltClientThread) -> bool {
     true
 }
 
-// Windows/macOS: connect to the published one-shot server by name.
-#[cfg(not(target_os = "linux"))]
+// macOS: connect to the published one-shot server by name.
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 #[no_mangle]
 pub extern "C" fn firefox_connect_to_felt(server_name: *const c_char) -> bool {
     let srv_name = unsafe { CStr::from_ptr(server_name) };
@@ -188,6 +197,33 @@ pub extern "C" fn firefox_connect_to_felt_fd() -> bool {
         Ok(client) => store_felt_client(client),
         Err(()) => {
             trace!("firefox_connect_to_felt_fd(): error");
+            false
+        }
+    }
+}
+
+// Windows fenced-handle path: reconstruct the bootstrap endpoint from the pipe
+// HANDLE inherited through the launcher, its value named in the
+// MOZ_FELT_IPC_HANDLE env var. No server name is resolved and no peer
+// authentication is needed.
+#[cfg(target_os = "windows")]
+#[no_mangle]
+pub extern "C" fn firefox_connect_to_felt_handle() -> bool {
+    let handle = match std::env::var(FELT_IPC_HANDLE_ENV)
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+    {
+        Some(handle) if handle != 0 => handle,
+        _ => {
+            trace!("firefox_connect_to_felt_handle(): missing/invalid {FELT_IPC_HANDLE_ENV}");
+            return false;
+        }
+    };
+    trace!("firefox_connect_to_felt_handle({handle})");
+    match client::FeltClientThread::new_from_handle(handle) {
+        Ok(client) => store_felt_client(client),
+        Err(()) => {
+            trace!("firefox_connect_to_felt_handle(): error");
             false
         }
     }

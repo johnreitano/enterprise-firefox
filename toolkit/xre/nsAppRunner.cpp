@@ -7341,6 +7341,16 @@ int XREMain::XRE_main(int argc, char* argv[], const BootstrapConfig& aConfig) {
             "Error: Failed to connect to Felt. SSO authentication required.\n");
         return 1;
       }
+#  elif defined(XP_WIN)
+      // Fenced-handle path: the bootstrap endpoint pipe HANDLE is inherited
+      // through the launcher (MOZ_FELT_IPC_HANDLE), so there is no `-felt
+      // <name>` socket to validate.
+      if (!firefox_connect_to_felt_handle()) {
+        Output(
+            true,
+            "Error: Failed to connect to Felt. SSO authentication required.\n");
+        return 1;
+      }
 #  else
       // Felt browser mode requires a valid Felt socket for SSO enforcement
       if (!felt.isSome()) {

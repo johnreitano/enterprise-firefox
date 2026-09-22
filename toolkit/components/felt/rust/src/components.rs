@@ -27,18 +27,20 @@ use crate::utils::{Tokens, CONSOLE_URL, TOKENS, TOKEN_EXPIRY_SKEW};
 
 #[xpcom(implement(nsIFelt), atomic)]
 pub struct FeltXPCOM {
-    // Windows and macOS keep the published, connect-by-name one-shot server
-    // rendezvous. TODO(windows)/TODO(macos): convert these to an inherited
-    // endpoint (handle / mach right) too, see accept_inherited_channel below.
-    #[cfg(not(target_os = "linux"))]
+    // macOS keeps the published, connect-by-name one-shot server rendezvous.
+    // TODO(macos): convert this to an inherited endpoint (mach right) too, see
+    // accept_inherited_channel below.
+    #[cfg(target_os = "macos")]
     one_shot_server: RefCell<
         Option<ipc_channel::ipc::IpcOneShotServer<ipc_channel::ipc::IpcSender<FeltMessage>>>,
     >,
-    // Linux fenced bootstrap: the receiver half of a normal, anonymous
+    // Linux/Windows fenced bootstrap: the receiver half of a normal, anonymous
     // ipc::channel(). Its sender half is handed to the browser child as an
-    // inherited fd (see create_inherited_channel_fd); the child sends its
-    // felt->firefox sender over it, with no published name and no accept() race.
-    #[cfg(target_os = "linux")]
+    // inherited fd (Linux) or pipe HANDLE (Windows) -- see
+    // create_inherited_channel_fd / create_inherited_channel_handle; the child
+    // sends its felt->firefox sender over it, with no published name and no
+    // accept() race.
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     bootstrap_rx:
         RefCell<Option<ipc_channel::ipc::IpcReceiver<ipc_channel::ipc::IpcSender<FeltMessage>>>>,
     tx: RefCell<Option<ipc_channel::ipc::IpcSender<FeltMessage>>>,
@@ -56,9 +58,9 @@ impl FeltXPCOM {
         _is_felt_safe_mode: bool,
     ) -> RefPtr<FeltXPCOM> {
         FeltXPCOM::allocate(InitFeltXPCOM {
-            #[cfg(not(target_os = "linux"))]
+            #[cfg(target_os = "macos")]
             one_shot_server: RefCell::new(None),
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "windows"))]
             bootstrap_rx: RefCell::new(None),
             tx: RefCell::new(None),
             rx: RefCell::new(None),
@@ -393,10 +395,10 @@ impl FeltXPCOM {
         NS_OK
     }
 
-    // Windows/macOS bootstrap: accept the connection to the published one-shot
-    // server, then start the felt server. On Linux the fenced-fd path
+    // macOS bootstrap: accept the connection to the published one-shot server,
+    // then start the felt server. On Linux/Windows the fenced path
     // (accept_inherited_channel) is used instead and this is not called.
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "macos")]
     fn IpcChannel(&self) -> nserror::nsresult {
         let felt_server = match self.one_shot_server.take() {
             Some(f) => f,
@@ -410,9 +412,9 @@ impl FeltXPCOM {
         self.start_felt_server(tx)
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(not(target_os = "macos"))]
     fn IpcChannel(&self) -> nserror::nsresult {
-        // Linux uses the fenced-fd bootstrap; see accept_inherited_channel.
+        // Linux/Windows use the fenced bootstrap; see accept_inherited_channel.
         NS_ERROR_NOT_IMPLEMENTED
     }
 
@@ -571,12 +573,48 @@ impl FeltXPCOM {
 
     #[cfg(not(target_os = "linux"))]
     fn create_inherited_channel_fd(&self) -> Result<i64, nserror::nsresult> {
-        // TODO(windows): the browser is spawned by the launcher process
-        // (Bug 2070625), so an inheritable pipe HANDLE must be propagated through
-        // the launcher to the browser child (DuplicateHandle chain) and returned
-        // here. TODO(macos): keep the one-shot server, macOS is already fenced by
-        // the Mach bootstrap namespace and mach rights are not inherited across
+        // Windows uses create_inherited_channel_handle (a pipe HANDLE, not an fd).
+        // TODO(macos): keep the one-shot server, macOS is already fenced by the
+        // Mach bootstrap namespace and mach rights are not inherited across
         // posix_spawn.
+        Err(NS_ERROR_NOT_IMPLEMENTED)
+    }
+
+    // Windows fenced bootstrap, step 1 (called before spawn): create a normal,
+    // anonymous ipc::channel(), retain the receiver, and return the value of an
+    // inheritable duplicate of the sender endpoint's pipe HANDLE. The original
+    // sender is dropped so only the inheritable duplicate remains; it is inherited
+    // by the launcher and re-inherited by the browser child (see
+    // FeltProcessParent handleInherit + MOZ_FELT_IPC_HANDLE, and the winlauncher
+    // handle-list addition). No name is ever published.
+    xpcom_method!(create_inherited_channel_handle => CreateInheritedChannelHandle() -> i64);
+    #[cfg(target_os = "windows")]
+    fn create_inherited_channel_handle(&self) -> Result<i64, nserror::nsresult> {
+        let (bootstrap_tx, bootstrap_rx): (
+            ipc_channel::ipc::IpcSender<ipc_channel::ipc::IpcSender<FeltMessage>>,
+            ipc_channel::ipc::IpcReceiver<ipc_channel::ipc::IpcSender<FeltMessage>>,
+        ) = ipc_channel::ipc::channel().map_err(|_| NS_ERROR_FAILURE)?;
+        self.bootstrap_rx.replace(Some(bootstrap_rx));
+
+        // inheritable_raw_handle duplicates the sender's pipe handle with
+        // HANDLE_FLAG_INHERIT set, leaving the sender intact; dropping the sender
+        // then closes the non-inheritable original, so only the inheritable
+        // duplicate survives to be inherited by the child.
+        let handle = bootstrap_tx
+            .inheritable_raw_handle()
+            .map_err(|_| NS_ERROR_FAILURE)?;
+        drop(bootstrap_tx);
+        let handle_value = handle as usize as i64;
+        trace!("FeltXPCOM:CreateInheritedChannelHandle() handle={handle_value}");
+        // The parent's copy of this inheritable handle is closed by the spawn
+        // worker right after launch (see subprocess_win.worker.js handleInherit
+        // handling), so the endpoint ends up held only by the browser child.
+        Ok(handle_value)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    fn create_inherited_channel_handle(&self) -> Result<i64, nserror::nsresult> {
+        // Linux uses create_inherited_channel_fd; macOS keeps the one-shot server.
         Err(NS_ERROR_NOT_IMPLEMENTED)
     }
 
@@ -585,7 +623,7 @@ impl FeltXPCOM {
     // felt server. Replaces the one-shot server accept() entirely; no peer
     // authorization is needed because the endpoint was inherited, not published.
     xpcom_method!(accept_inherited_channel => AcceptInheritedChannel());
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     fn accept_inherited_channel(&self) -> Result<(), nserror::nsresult> {
         let bootstrap_rx = match self.bootstrap_rx.take() {
             Some(rx) => rx,
@@ -600,7 +638,7 @@ impl FeltXPCOM {
         self.start_felt_server(tx).to_result()
     }
 
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     fn accept_inherited_channel(&self) -> Result<(), nserror::nsresult> {
         Err(NS_ERROR_NOT_IMPLEMENTED)
     }
@@ -705,11 +743,12 @@ impl FeltXPCOM {
         Ok(self.is_felt_safe_mode)
     }
 
-    // Windows/macOS bootstrap: create the published one-shot server and return
-    // its name for the child to connect to. On Linux the fenced-fd bootstrap
-    // (create_inherited_channel_fd) is used instead and this returns an error.
+    // macOS bootstrap: create the published one-shot server and return its name
+    // for the child to connect to. On Linux/Windows the fenced bootstrap
+    // (create_inherited_channel_fd / create_inherited_channel_handle) is used
+    // instead and this returns an error.
     xpcom_method!(one_shot_ipc_server => OneShotIpcServer() -> nsACString);
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "macos")]
     fn one_shot_ipc_server(&self) -> Result<nsCString, nserror::nsresult> {
         if let Ok((felt_server, felt_server_name)) =
             ipc_channel::ipc::IpcOneShotServer::<ipc_channel::ipc::IpcSender<FeltMessage>>::new()
@@ -725,7 +764,7 @@ impl FeltXPCOM {
         }
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(not(target_os = "macos"))]
     fn one_shot_ipc_server(&self) -> Result<nsCString, nserror::nsresult> {
         Err(NS_ERROR_NOT_IMPLEMENTED)
     }

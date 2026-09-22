@@ -6,7 +6,7 @@
 #include "nsISupports.idl"
 #include "nsICookie.idl"
 
-[scriptable, uuid(a422bc40-120c-4811-bdcf-24fcaa479aad)]
+[scriptable, uuid(fcdd9fba-344f-4a55-b758-c1c828163f2c)]
 interface nsIFelt : nsISupports {
   const unsigned long FeltEncryptionExitCode_Archive = 0x93;
   const unsigned long FeltEncryptionExitCode_Delete = 0x94;
@@ -36,11 +36,23 @@ interface nsIFelt : nsISupports {
   long long createInheritedChannelFd();
 
   /**
-   * Linux fenced bootstrap, step 2 (call AFTER spawning the browser): receive
-   * the browser's felt->firefox sender over the retained bootstrap receiver and
-   * start the felt server. Replaces ipcChannel()'s one-shot accept() and needs
-   * no peer authorization because the endpoint was inherited, not published.
-   * Fails on non-Linux platforms.
+   * Windows fenced bootstrap, step 1 (call BEFORE spawning the browser): create
+   * a normal anonymous ipc::channel(), retain the receiver, and return the value
+   * of an inheritable duplicate of the sender endpoint's pipe HANDLE. The caller
+   * hands this HANDLE to the browser child at spawn (via handleInherit and the
+   * MOZ_FELT_IPC_HANDLE env var); on the launcher path it travels felt ->
+   * launcher -> browser by handle inheritance. The name is never published.
+   * Fails on non-Windows platforms.
+   */
+  [must_use]
+  long long createInheritedChannelHandle();
+
+  /**
+   * Linux/Windows fenced bootstrap, step 2 (call AFTER spawning the browser):
+   * receive the browser's felt->firefox sender over the retained bootstrap
+   * receiver and start the felt server. Replaces ipcChannel()'s one-shot
+   * accept() and needs no peer authorization because the endpoint was inherited,
+   * not published. Fails on macOS.
    */
   [must_use]
   void acceptInheritedChannel();
