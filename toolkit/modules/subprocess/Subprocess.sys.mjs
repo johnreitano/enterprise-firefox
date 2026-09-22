@@ -92,6 +92,12 @@ export var Subprocess = {
    * security permission prompts and decisions. This option is ignored on
    * platforms that do not support it.
    *
+   * @param {number[]} [options.fdInherit]
+   * Unix-only. Extra file descriptors to inherit into the child at the same
+   * descriptor number. The caller is responsible for clearing FD_CLOEXEC on
+   * them beforehand; the parent's copies are closed after launch. Used by the
+   * FELT fenced-fd IPC bootstrap. Ignored on Windows.
+   *
    * @returns {Promise<Process>}
    *
    * @throws {Error}
