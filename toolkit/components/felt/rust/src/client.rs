@@ -14,6 +14,7 @@ use xpcom::RefPtr;
 
 use log::{error, trace};
 
+#[cfg(not(target_os = "linux"))]
 use crate::components::peer_is_authorized;
 use crate::message::{nsICookieWrapper, FeltMessage, FELT_IPC_VERSION};
 use crate::utils::{self, Tokens, TOKENS};
@@ -25,13 +26,11 @@ pub struct FeltIpcClient {
 }
 
 impl FeltIpcClient {
+    // Windows/macOS bootstrap: connect to the published one-shot server by name,
+    // then complete the channel exchange.
+    #[cfg(not(target_os = "linux"))]
     pub fn new(felt_server_name: String, felt_pid: u32) -> Self {
         trace!("FeltIpcClient::new({})", felt_server_name);
-
-        let (tx_felt_to_firefox, rx_firefox_to_felt): (
-            ipc_channel::ipc::IpcSender<FeltMessage>,
-            ipc_channel::ipc::IpcReceiver<FeltMessage>,
-        ) = ipc_channel::ipc::channel().unwrap();
         let tx0 = match ipc_channel::ipc::IpcSender::connect(felt_server_name) {
             Ok(tx0) => tx0,
             Err(err) => {
@@ -51,21 +50,50 @@ impl FeltIpcClient {
             return Self::default();
         }
 
+        Self::bootstrap(tx0, |rx| Self::receive_reply_from(rx, felt_pid))
+    }
+
+    // Linux fenced bootstrap: reconstruct the bootstrap sender from the fd the
+    // launcher handed us by inheritance (see firefox_connect_to_felt_fd), then
+    // complete the same channel exchange. No name is resolved, so no unrelated
+    // process could have connected in our place.
+    #[cfg(target_os = "linux")]
+    pub fn new_from_fd(fd: std::os::unix::io::RawFd) -> Self {
+        trace!("FeltIpcClient::new_from_fd({})", fd);
+        // SAFETY: fd is the inherited bootstrap sender endpoint produced by
+        // FeltXPCOM::create_inherited_channel_fd, carrying IpcSender<FeltMessage>.
+        let tx0: ipc_channel::ipc::IpcSender<ipc_channel::ipc::IpcSender<FeltMessage>> =
+            unsafe { ipc_channel::ipc::IpcSender::from_raw_fd(fd) };
+        Self::bootstrap(tx0, Self::receive_reply)
+    }
+
+    // Shared exchange over the bootstrap channel: send our felt->firefox sender
+    // to felt, then receive back, with `receive_reply`, the firefox->felt sender
+    // it created.
+    fn bootstrap(
+        tx0: ipc_channel::ipc::IpcSender<ipc_channel::ipc::IpcSender<FeltMessage>>,
+        receive_reply: impl FnOnce(&ipc_channel::ipc::IpcReceiver<FeltMessage>) -> Option<FeltMessage>,
+    ) -> Self {
+        let (tx_felt_to_firefox, rx_firefox_to_felt): (
+            ipc_channel::ipc::IpcSender<FeltMessage>,
+            ipc_channel::ipc::IpcReceiver<FeltMessage>,
+        ) = ipc_channel::ipc::channel().unwrap();
+
         match tx0.send(tx_felt_to_firefox) {
-            Ok(()) => trace!("FeltIpcClient::new() tx0.send(tx_felt_to_firefox) SENT"),
-            Err(err) => trace!("FeltIpcClient::new() ERROR: {}", err),
+            Ok(()) => trace!("FeltIpcClient::bootstrap() tx0.send(tx_felt_to_firefox) SENT"),
+            Err(err) => trace!("FeltIpcClient::bootstrap() ERROR: {}", err),
         }
 
-        match Self::receive_reply_from(&rx_firefox_to_felt, felt_pid) {
+        match receive_reply(&rx_firefox_to_felt) {
             Some(FeltMessage::ClientChannel(tx_firefox_to_felt)) => {
-                trace!("FeltIpcClient::new() rx_firefox_to_felt.recv() OK");
+                trace!("FeltIpcClient::bootstrap() rx_firefox_to_felt.recv() OK");
                 Self {
                     tx: Some(tx_firefox_to_felt),
                     rx: Some(rx_firefox_to_felt),
                 }
             }
             Some(_) => {
-                trace!("FeltIpcClient::new() unexpected message");
+                trace!("FeltIpcClient::bootstrap() unexpected message");
                 Self::default()
             }
             None => Self::default(),
@@ -73,6 +101,17 @@ impl FeltIpcClient {
     }
 
     #[cfg(not(target_os = "macos"))]
+    fn receive_reply(rx: &ipc_channel::ipc::IpcReceiver<FeltMessage>) -> Option<FeltMessage> {
+        match rx.recv() {
+            Ok(msg) => Some(msg),
+            Err(err) => {
+                trace!("FeltIpcClient::bootstrap() rx_firefox_to_felt.recv() ERR {}", err);
+                None
+            }
+        }
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     fn endpoint_belongs_to(
         tx0: &ipc_channel::ipc::IpcSender<ipc_channel::ipc::IpcSender<FeltMessage>>,
         felt_pid: u32,
@@ -117,18 +156,12 @@ impl FeltIpcClient {
         }
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     fn receive_reply_from(
         rx: &ipc_channel::ipc::IpcReceiver<FeltMessage>,
         _felt_pid: u32,
     ) -> Option<FeltMessage> {
-        match rx.recv() {
-            Ok(msg) => Some(msg),
-            Err(err) => {
-                trace!("FeltIpcClient::new() rx_firefox_to_felt.recv() ERR {}", err);
-                None
-            }
-        }
+        Self::receive_reply(rx)
     }
 
     pub fn send_felt_ready(&self) {
@@ -237,19 +270,29 @@ pub struct FeltClientThread {
 }
 
 impl FeltClientThread {
+    #[cfg(not(target_os = "linux"))]
     pub fn new(felt_server_name: String, felt_pid: u32) -> Result<Self, ()> {
         trace!(
             "FeltClientThread::new(): connecting to {}",
             felt_server_name.clone()
         );
-        let felt_client = FeltIpcClient::new(felt_server_name, felt_pid);
+        Self::from_client(FeltIpcClient::new(felt_server_name, felt_pid))
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn new_from_fd(fd: std::os::unix::io::RawFd) -> Result<Self, ()> {
+        trace!("FeltClientThread::new_from_fd(): connecting via inherited fd {fd}");
+        Self::from_client(FeltIpcClient::new_from_fd(fd))
+    }
+
+    fn from_client(felt_client: FeltIpcClient) -> Result<Self, ()> {
         if felt_client.report_version() {
             Ok(Self {
                 ipc_client: RefCell::new(felt_client),
                 startup_ready: Arc::new(AtomicBool::new(false)),
             })
         } else {
-            trace!("FeltClientThread::new(): failure to report version");
+            trace!("FeltClientThread::from_client(): failure to report version");
             Err(())
         }
     }
@@ -596,7 +639,7 @@ impl FeltClientThread {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "linux")))]
 mod tests {
     use super::*;
     use ipc_channel::ipc::{channel, IpcOneShotServer, IpcSender};

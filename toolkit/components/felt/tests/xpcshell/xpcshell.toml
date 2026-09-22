@@ -7,8 +7,9 @@ head = "head.js"
 
 ["test_felt_browser_endpoint_refusal.js"]
 # Launches the application binary. On Windows the startup errors it exercises
-# are shown in a message box, so it would hang there.
-run-if = ["os != 'win' && buildapp == 'browser'"]
+# are shown in a message box, so it would hang there. On Linux the browser
+# takes its endpoint from an inherited fd instead of `-felt`.
+run-if = ["os == 'mac' && buildapp == 'browser'"]
 run-sequentially = ["true"]
 
 ["test_felt_browser_ipc_args.js"]
