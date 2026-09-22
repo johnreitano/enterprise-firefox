@@ -949,13 +949,7 @@ export class FeltProcessParent extends JSProcessActorParent {
     const useFencedHandle = Services.appinfo.OS == "WINNT";
 
     let socket;
-    let feltFd = -1;
-    let feltHandle = -1;
-    if (useFencedFd) {
-      feltFd = Services.felt.createInheritedChannelFd();
-    } else if (useFencedHandle) {
-      feltHandle = Services.felt.createInheritedChannelHandle();
-    } else {
+    if (!useFencedFd && !useFencedHandle) {
       socket = Services.felt.oneShotIpcServer();
     }
 
@@ -1031,9 +1025,12 @@ export class FeltProcessParent extends JSProcessActorParent {
       environment: { ...this._startupPolicies.environment, ...extraRunEnv },
     };
 
+    // The fenced endpoint is created only now, with no await before the spawn,
+    // so it is inheritable for as short a time as possible.
     if (useFencedFd) {
       // Inherit the endpoint fd into the child (kept out of CloseSuperfluousFds
       // by fdMap) and tell the child its number via the environment.
+      const feltFd = Services.felt.createInheritedChannelFd();
       firefoxRun.fdInherit = [feltFd];
       firefoxRun.environment.MOZ_FELT_IPC_FD = String(feltFd);
     } else if (useFencedHandle) {
@@ -1041,6 +1038,7 @@ export class FeltProcessParent extends JSProcessActorParent {
       // PROC_THREAD_ATTRIBUTE_HANDLE_LIST) and tell the child its value via the
       // environment. The launcher re-inherits it to the browser child, and the
       // env var rides through transitively.
+      const feltHandle = Services.felt.createInheritedChannelHandle();
       firefoxRun.handleInherit = [feltHandle];
       firefoxRun.environment.MOZ_FELT_IPC_HANDLE = String(feltHandle);
     }
