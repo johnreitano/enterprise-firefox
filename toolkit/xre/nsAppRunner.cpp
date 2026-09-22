@@ -7389,9 +7389,10 @@ int XREMain::XRE_main(int argc, char* argv[], const BootstrapConfig& aConfig) {
     // Initialize Felt state up-front so we can decide whether to continue.
     felt_init();
 
-    // FELT IPC channel. On Linux the fenced-fd path ignores these values (the
-    // endpoint is inherited via MOZ_FELT_IPC_FD), but the args are still read
-    // here so they are stripped from the command line below on every platform.
+    // FELT IPC channel. On Linux and Windows the fenced paths ignore these
+    // values (the endpoint is inherited via MOZ_FELT_IPC_FD /
+    // MOZ_FELT_IPC_HANDLE), but the args are still read here so they are
+    // stripped from the command line below on every platform.
     [[maybe_unused]] Maybe<const char*> felt =
         geckoargs::sFelt.Get(gArgc, gArgv, CheckArgFlag::None);
     [[maybe_unused]] Maybe<uint64_t> feltPid =
@@ -7437,6 +7438,16 @@ int XREMain::XRE_main(int argc, char* argv[], const BootstrapConfig& aConfig) {
       // launcher (MOZ_FELT_IPC_FD), so there is no `-felt <name>` socket to
       // validate.
       if (!firefox_connect_to_felt_fd()) {
+        Output(
+            true,
+            "Error: Failed to connect to Felt. SSO authentication required.\n");
+        return 1;
+      }
+#  elif defined(XP_WIN)
+      // Fenced-handle path: the bootstrap endpoint pipe HANDLE is inherited
+      // through the launcher (MOZ_FELT_IPC_HANDLE), so there is no `-felt
+      // <name>` socket to validate.
+      if (!firefox_connect_to_felt_handle()) {
         Output(
             true,
             "Error: Failed to connect to Felt. SSO authentication required.\n");

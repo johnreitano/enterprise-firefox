@@ -98,10 +98,10 @@ add_task(async function test_accepted_peer_leaves_the_browser_running() {
 // process's pid, so ipcChannel() must refuse the browser and the browser must
 // be terminated. The browser is told to expect this process, so it does connect. ipcChannel() blocks until the browser connects. On Windows the
 // browser is started as felt starts it, through a launcher process that runs
-// it as a child, so the child must be gone too. On Linux felt publishes no
-// endpoint: the browser inherits it.
+// it as a child, so the child must be gone too. On Linux and Windows felt
+// publishes no endpoint: the browser inherits it.
 add_task(
-  { skip_if: () => AppConstants.platform == "linux" },
+  { skip_if: () => AppConstants.platform != "macosx" },
   async function test_ipc_channel_refuses_and_terminates_the_real_browser() {
     const isWindows = AppConstants.platform == "win";
     const endpoint = Services.felt.oneShotIpcServer();

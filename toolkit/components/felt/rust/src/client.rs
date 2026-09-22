@@ -14,7 +14,7 @@ use xpcom::RefPtr;
 
 use log::{error, trace};
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 use crate::components::peer_is_authorized;
 use crate::message::{nsICookieWrapper, FeltMessage, FELT_IPC_VERSION};
 use crate::utils::{self, Tokens, TOKENS};
@@ -26,9 +26,9 @@ pub struct FeltIpcClient {
 }
 
 impl FeltIpcClient {
-    // Windows/macOS bootstrap: connect to the published one-shot server by name,
-    // then complete the channel exchange.
-    #[cfg(not(target_os = "linux"))]
+    // macOS bootstrap: connect to the published one-shot server by name, then
+    // complete the channel exchange.
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     pub fn new(felt_server_name: String, felt_pid: u32) -> Self {
         trace!("FeltIpcClient::new({})", felt_server_name);
         let tx0 = match ipc_channel::ipc::IpcSender::connect(felt_server_name) {
@@ -42,14 +42,8 @@ impl FeltIpcClient {
 
         // AUTHORIZATION: any same-user process could have claimed the endpoint
         // name given on the command line, so the endpoint is only trusted if it
-        // belongs to the felt process named next to it. Everywhere but macOS
-        // this is decided before anything is sent; a Mach send right has no
-        // attestable owner, so on macOS it is decided from the sender of the
-        // reply.
-        if !Self::endpoint_belongs_to(&tx0, felt_pid) {
-            return Self::default();
-        }
-
+        // belongs to the felt process named next to it. A Mach send right has
+        // no attestable owner, so this is decided from the sender of the reply.
         Self::bootstrap(tx0, |rx| Self::receive_reply_from(rx, felt_pid))
     }
 
@@ -64,6 +58,24 @@ impl FeltIpcClient {
         // FeltXPCOM::create_inherited_channel_fd, carrying IpcSender<FeltMessage>.
         let tx0: ipc_channel::ipc::IpcSender<ipc_channel::ipc::IpcSender<FeltMessage>> =
             unsafe { ipc_channel::ipc::IpcSender::from_raw_fd(fd) };
+        Self::bootstrap(tx0, Self::receive_reply)
+    }
+
+    // Windows fenced bootstrap: reconstruct the bootstrap sender from the pipe
+    // HANDLE the launcher handed us by inheritance (see
+    // firefox_connect_to_felt_handle), then complete the same channel exchange.
+    // No name is resolved, so no unrelated process could have connected in our
+    // place.
+    #[cfg(target_os = "windows")]
+    pub fn new_from_handle(handle: usize) -> Self {
+        trace!("FeltIpcClient::new_from_handle({})", handle);
+        // SAFETY: handle is the inherited bootstrap sender endpoint produced by
+        // FeltXPCOM::create_inherited_channel_handle, carrying IpcSender<FeltMessage>.
+        let tx0: ipc_channel::ipc::IpcSender<ipc_channel::ipc::IpcSender<FeltMessage>> = unsafe {
+            ipc_channel::ipc::IpcSender::from_raw_handle(
+                handle as std::os::windows::io::RawHandle,
+            )
+        };
         Self::bootstrap(tx0, Self::receive_reply)
     }
 
@@ -100,7 +112,7 @@ impl FeltIpcClient {
         }
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     fn receive_reply(rx: &ipc_channel::ipc::IpcReceiver<FeltMessage>) -> Option<FeltMessage> {
         match rx.recv() {
             Ok(msg) => Some(msg),
@@ -111,31 +123,7 @@ impl FeltIpcClient {
         }
     }
 
-    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
-    fn endpoint_belongs_to(
-        tx0: &ipc_channel::ipc::IpcSender<ipc_channel::ipc::IpcSender<FeltMessage>>,
-        felt_pid: u32,
-    ) -> bool {
-        let peer_pid = tx0.peer_pid();
-        let authorized = peer_is_authorized(peer_pid, felt_pid);
-        if !authorized {
-            error!(
-                "FeltIpcClient::new() refused endpoint: owned by pid {:?}, expected felt pid {}",
-                peer_pid, felt_pid
-            );
-        }
-        authorized
-    }
-
-    #[cfg(target_os = "macos")]
-    fn endpoint_belongs_to(
-        _tx0: &ipc_channel::ipc::IpcSender<ipc_channel::ipc::IpcSender<FeltMessage>>,
-        _felt_pid: u32,
-    ) -> bool {
-        true
-    }
-
-    #[cfg(target_os = "macos")]
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     fn receive_reply_from(
         rx: &ipc_channel::ipc::IpcReceiver<FeltMessage>,
         felt_pid: u32,
@@ -154,14 +142,6 @@ impl FeltIpcClient {
                 None
             }
         }
-    }
-
-    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
-    fn receive_reply_from(
-        rx: &ipc_channel::ipc::IpcReceiver<FeltMessage>,
-        _felt_pid: u32,
-    ) -> Option<FeltMessage> {
-        Self::receive_reply(rx)
     }
 
     pub fn send_felt_ready(&self) {
@@ -270,7 +250,7 @@ pub struct FeltClientThread {
 }
 
 impl FeltClientThread {
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     pub fn new(felt_server_name: String, felt_pid: u32) -> Result<Self, ()> {
         trace!(
             "FeltClientThread::new(): connecting to {}",
@@ -283,6 +263,12 @@ impl FeltClientThread {
     pub fn new_from_fd(fd: std::os::unix::io::RawFd) -> Result<Self, ()> {
         trace!("FeltClientThread::new_from_fd(): connecting via inherited fd {fd}");
         Self::from_client(FeltIpcClient::new_from_fd(fd))
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn new_from_handle(handle: usize) -> Result<Self, ()> {
+        trace!("FeltClientThread::new_from_handle(): connecting via inherited handle {handle}");
+        Self::from_client(FeltIpcClient::new_from_handle(handle))
     }
 
     fn from_client(felt_client: FeltIpcClient) -> Result<Self, ()> {
@@ -639,7 +625,7 @@ impl FeltClientThread {
     }
 }
 
-#[cfg(all(test, not(target_os = "linux")))]
+#[cfg(all(test, not(any(target_os = "linux", target_os = "windows"))))]
 mod tests {
     use super::*;
     use ipc_channel::ipc::{channel, IpcOneShotServer, IpcSender};
@@ -677,8 +663,8 @@ mod tests {
         let client = FeltIpcClient::new(name, std::process::id() + 1);
         let impostor_was_answered = impostor.join().unwrap();
         assert!(client.tx.is_none() && client.rx.is_none());
-        // Everywhere but macOS the browser sends nothing to a refused endpoint;
-        // on macOS it needs the reply to decide.
-        assert_eq!(impostor_was_answered, cfg!(target_os = "macos"));
+        // A Mach send right has no attestable owner, so the browser needs the
+        // reply to decide.
+        assert!(impostor_was_answered);
     }
 }
