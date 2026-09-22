@@ -34,8 +34,9 @@ use windows::{
         Foundation::{
             CloseHandle, CompareObjectHandles, DuplicateHandle, GetLastError,
             DUPLICATE_CLOSE_SOURCE, DUPLICATE_HANDLE_OPTIONS, DUPLICATE_SAME_ACCESS,
-            ERROR_BROKEN_PIPE, ERROR_IO_INCOMPLETE, ERROR_IO_PENDING, ERROR_NOT_FOUND,
-            ERROR_NO_DATA, ERROR_PIPE_CONNECTED, HANDLE, INVALID_HANDLE_VALUE, WAIT_TIMEOUT,
+            ERROR_BROKEN_PIPE, ERROR_INVALID_HANDLE, ERROR_IO_INCOMPLETE, ERROR_IO_PENDING,
+            ERROR_NOT_FOUND, ERROR_NO_DATA, ERROR_PIPE_CONNECTED, HANDLE, INVALID_HANDLE_VALUE,
+            WAIT_TIMEOUT,
         },
         Storage::FileSystem::{
             CreateFileA, ReadFile, WriteFile, FILE_ATTRIBUTE_NORMAL, FILE_FLAG_OVERLAPPED,
@@ -404,7 +405,10 @@ fn dup_handle_to_process_with_flags(
 /// process spawned with `bInheritHandles = TRUE` will inherit.
 fn dup_handle_inheritable(handle: &WinHandle) -> Result<WinHandle, WinError> {
     if !handle.is_valid() {
-        return Ok(WinHandle::invalid());
+        return Err(WinError::new(
+            ERROR_INVALID_HANDLE.to_hresult(),
+            "dup_handle_inheritable",
+        ));
     }
 
     unsafe {
@@ -1214,7 +1218,16 @@ impl OsIpcReceiver {
     /// receiver state is discarded, so this is only valid on a fresh endpoint
     /// that has not yet been read from.
     pub fn into_raw_handle(self) -> RawHandle {
-        let raw = self.reader.borrow_mut().handle.take_raw();
+        let mut reader = self.reader.borrow_mut();
+        assert!(
+            reader.r#async.is_none(),
+            "into_raw_handle/inheritable_raw_handle on a receiver with an async read in flight"
+        );
+        debug_assert!(
+            reader.read_buf.is_empty(),
+            "exporting a receiver would discard buffered bytes"
+        );
+        let raw = reader.handle.take_raw();
         raw.0 as RawHandle
     }
 
@@ -1231,7 +1244,16 @@ impl OsIpcReceiver {
     /// receiver's own handle intact. The returned raw handle is owned by the
     /// caller and must be closed (or consumed by a spawned child).
     pub fn inheritable_raw_handle(&self) -> Result<RawHandle, WinError> {
-        let dup = dup_handle_inheritable(&self.reader.borrow().handle)?;
+        let reader = self.reader.borrow();
+        assert!(
+            reader.r#async.is_none(),
+            "into_raw_handle/inheritable_raw_handle on a receiver with an async read in flight"
+        );
+        debug_assert!(
+            reader.read_buf.is_empty(),
+            "exporting a receiver would discard buffered bytes"
+        );
+        let dup = dup_handle_inheritable(&reader.handle)?;
         let raw = dup.as_raw();
         mem::forget(dup);
         Ok(raw.0 as RawHandle)

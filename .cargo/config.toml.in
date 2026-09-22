@@ -60,9 +60,9 @@ git = "https://github.com/jfkthame/mapped_hyph.git"
 rev = "eff105f6ad7ec9b79816cfc1985a28e5340ad14b"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/johnreitano/ipc-channel?rev=929a537c5f1b47b8f4671e3717404f78cacf4e82"]
+[source."git+https://github.com/johnreitano/ipc-channel?rev=c94d624bded1060078b9b1ffd82ec21937c4300a"]
 git = "https://github.com/johnreitano/ipc-channel"
-rev = "929a537c5f1b47b8f4671e3717404f78cacf4e82"
+rev = "c94d624bded1060078b9b1ffd82ec21937c4300a"
 replace-with = "vendored-sources"
 
 [source."git+https://github.com/martinthomson/ohttp?rev=600931b5a1e947776cbaad931ed78f1e89005352"]

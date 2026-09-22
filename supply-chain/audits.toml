@@ -4182,6 +4182,18 @@ server name (fenced FELT IPC bootstrap, Bug 2072053). No transport behaviour is
 otherwise changed.
 """
 
+[[audits.ipc-channel]]
+who = "John Reitano <jreitano@mozilla.com>"
+criteria = "safe-to-deploy"
+delta = "0.21.0@git:929a537c5f1b47b8f4671e3717404f78cacf4e82 -> 0.21.0@git:c94d624bded1060078b9b1ffd82ec21937c4300a"
+importable = false
+notes = """
+Review fixes for the raw fd/handle accessors (Bug 2072053): adds Windows
+export-precondition assertions, improves error fidelity, returns an error on an
+invalid source, corrects documentation, and adds two Unix tests. The public API
+surface is unchanged.
+"""
+
 [[audits.itertools]]
 who = "Mike Hommey <mh+mozilla@glandium.org>"
 criteria = "safe-to-deploy"
