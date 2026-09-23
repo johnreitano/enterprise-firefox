@@ -8,9 +8,8 @@
 // against that pid. The announcement is exactly one line of a fixed form;
 // every other stdout line is browser output and must not be mistaken for one.
 
-const { parseAnnouncedBrowserPid } = ChromeUtils.importESModule(
-  "chrome://felt/content/FeltProcessParent.sys.mjs"
-);
+const { FeltProcessParent, parseAnnouncedBrowserPid } =
+  ChromeUtils.importESModule("chrome://felt/content/FeltProcessParent.sys.mjs");
 
 add_task(function test_announcement_yields_the_pid() {
   Assert.equal(parseAnnouncedBrowserPid("FELT_BROWSER_PID=4242"), 4242);
@@ -45,4 +44,37 @@ add_task(function test_other_lines_are_not_announcements() {
       `not an announcement: ${JSON.stringify(line)}`
     );
   }
+});
+
+// The pipe hands back whatever each read returns, so the announcement can be
+// split across reads or share one with other output. The drain must still pass
+// it to its callback as one whole line.
+add_task(async function test_drain_reassembles_a_split_announcement() {
+  const encoder = new TextEncoder();
+  const reads = [
+    "browser output without a newline",
+    "\nFELT_BROWSER_",
+    "PID=42",
+    "42\r\nmore output\n",
+    "",
+  ].map(s => encoder.encode(s));
+  const pipe = {
+    read: async () => reads.shift(),
+    close: async () => {},
+  };
+
+  const lines = [];
+  await FeltProcessParent.prototype.onPipeDataAvailable(pipe, 1, (pid, line) =>
+    lines.push(line)
+  );
+
+  Assert.deepEqual(lines, [
+    "browser output without a newline",
+    "FELT_BROWSER_PID=4242\r",
+    "more output",
+  ]);
+  Assert.deepEqual(
+    lines.map(parseAnnouncedBrowserPid).filter(pid => pid !== null),
+    [4242]
+  );
 });
