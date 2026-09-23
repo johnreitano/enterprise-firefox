@@ -451,8 +451,7 @@ static bool IsPackagedAppAutostarted() {
 // The body of LauncherMain. Returns Nothing whenever this process is to go on
 // and run as the browser itself; LauncherMain announces it to felt in that
 // case.
-static Maybe<int> RunLauncherMain(int& argc, wchar_t* argv[],
-                                  const bool aIsFeltSpawned) {
+static Maybe<int> RunLauncherMain(int& argc, wchar_t* argv[]) {
   EnsureBrowserCommandlineSafe(argc, argv);
 
   // return fast when we're a child process.
@@ -689,7 +688,7 @@ static Maybe<int> RunLauncherMain(int& argc, wchar_t* argv[],
   // Only now is the child certain to be the process that runs as the browser:
   // each failure above falls back to running it in this process, which
   // LauncherMain then announces instead.
-  if (aIsFeltSpawned) {
+  if (IsFeltSpawned(argc, argv)) {
     AnnounceFeltBrowserPid(pi.dwProcessId);
   }
 
@@ -714,13 +713,12 @@ static Maybe<int> RunLauncherMain(int& argc, wchar_t* argv[],
 }
 
 Maybe<int> LauncherMain(int& argc, wchar_t* argv[]) {
-  const bool isFeltSpawned = IsFeltSpawned(argc, argv);
-  Maybe<int> result = RunLauncherMain(argc, argv, isFeltSpawned);
+  Maybe<int> result = RunLauncherMain(argc, argv);
   // Nothing means this process goes on to run as the browser, either because
   // no launcher process was interposed or because interposing one failed and
   // we fell back. A launcher that did interpose has announced this process
   // already, and it is the only thing that sets gDeelevationStatus.
-  if (result.isNothing() && isFeltSpawned &&
+  if (result.isNothing() && IsFeltSpawned(argc, argv) &&
       gDeelevationStatus == DeelevationStatus::DefaultStaticValue) {
     AnnounceFeltBrowserPid(::GetCurrentProcessId());
   }
