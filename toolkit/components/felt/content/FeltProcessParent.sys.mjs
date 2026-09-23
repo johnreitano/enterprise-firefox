@@ -1010,12 +1010,10 @@ export class FeltProcessParent extends JSProcessActorParent {
 
     // Authenticate the IPC peer before ipcChannel() hands it any managed
     // secret. Pass the OS process id of the process that runs as the browser;
-    // on platforms whose transport attests a peer pid, ipcChannel() verifies the
-    // connecting peer's pid against it and refuses any other same-user process
-    // that races to connect, so such a process receives no primarySecret,
-    // tokens, prefs, or cookies. (macOS has no in-band peer pid; there the
-    // endpoint is instead unreachable to unrelated processes as an OS
-    // property.) That process is the one just spawned, except when the Windows
+    // ipcChannel() verifies the connecting peer's pid against it and refuses
+    // any other same-user process that races to connect, so such a process
+    // receives no primarySecret, tokens, prefs, or cookies. That process is the
+    // one just spawned, except when the Windows
     // launcher process is interposed: then it is the browser child the launcher
     // announces, so wait for the announcement.
     const browserPid = useLauncherProcess

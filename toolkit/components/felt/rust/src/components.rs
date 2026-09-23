@@ -37,36 +37,16 @@ pub struct FeltXPCOM {
     is_felt_safe_mode: bool,
 }
 
-/// Whether the connecting peer's process id equals the pid of the process felt
-/// expects to run as the browser. An unavailable peer pid means the transport
-/// could not report one (BSD/illumos or the in-process transport), which is a
-/// rejection (fail-closed). Not compiled on macOS, whose Mach back-end never
-/// reports a peer pid, so it is not left as dead code there.
-#[cfg(not(target_os = "macos"))]
-fn peer_pid_matches(peer_pid: Option<u32>, expected_pid: u32) -> bool {
-    matches!(peer_pid, Some(peer) if peer == expected_pid)
-}
-
 /// The authorization decision for a connecting peer, made from its OS process id
 /// alone and independently of the protocol-version handshake, so identity and
-/// protocol are not conflated.
-///
-/// macOS has no in-band pid attestation: its Mach back-end's peer_pid() returns
-/// None, so authorization passes here and the version handshake is the only
-/// in-band check. Protection on macOS is an OS property -- an unrelated process
-/// cannot resolve the Mach endpoint (bootstrap_look_up returns
-/// BOOTSTRAP_UNKNOWN_SERVICE) -- not something this code enforces.
-#[cfg(target_os = "macos")]
-fn peer_is_authorized(_peer_pid: Option<u32>, _expected_pid: u32) -> bool {
-    true
-}
-
-/// Everywhere else the peer's pid must equal the expected pid: the process felt
-/// spawned, or on Windows the browser child the launcher process creates and
-/// announces to felt (see FeltProcessParent). A None peer pid fails closed.
-#[cfg(not(target_os = "macos"))]
+/// protocol are not conflated. The peer's pid must equal the pid of the process
+/// felt expects to run as the browser: the process felt spawned, or on Windows
+/// the browser child the launcher process creates and announces to felt (see
+/// FeltProcessParent). An unavailable peer pid means the transport could not
+/// report one (BSD/illumos or the in-process transport), which is a rejection
+/// (fail-closed).
 fn peer_is_authorized(peer_pid: Option<u32>, expected_pid: u32) -> bool {
-    peer_pid_matches(peer_pid, expected_pid)
+    matches!(peer_pid, Some(peer) if peer == expected_pid)
 }
 
 /// The protocol-version check, kept separate from authorization.
@@ -443,9 +423,9 @@ impl FeltXPCOM {
         drop(pending_authentication_rx);
 
         // AUTHORIZATION: decided from the peer's pid alone, before the version
-        // handshake below, and kept separate from it. On attested platforms any
-        // other same-user process that races to connect has a different pid (or
-        // none) and is refused here, so it never receives the primarySecret,
+        // handshake below, and kept separate from it. Any other same-user
+        // process that races to connect has a different pid (or none) and is
+        // refused here, so it never receives the primarySecret,
         // tokens, prefs, or cookies the launcher sends afterwards over `self.tx`.
         let authorized = peer_is_authorized(peer_pid, expected_pid);
         if !authorized {
@@ -823,25 +803,16 @@ mod tests {
     use super::*;
 
     // Bug 2072053: the launcher must only hand its managed secrets to the
-    // browser child it spawned. On platforms that attest a peer pid, the
-    // connecting peer's pid must equal the spawned child's; anything else is a
-    // peer that must receive nothing. peer_pid_matches captures that core check;
-    // macOS has no peer pid to match, so it and this test are gated off that
-    // target.
-    #[cfg(not(target_os = "macos"))]
+    // browser it spawned. The connecting peer's pid must equal the expected
+    // pid; a same-user peer with a different pid, or a transport that reports
+    // no pid, is refused. On Windows the expected pid is the browser child the
+    // launcher process announced.
     #[test]
-    fn peer_pid_matches_only_the_spawned_child() {
+    fn only_the_expected_peer_pid_is_authorized() {
         let child_pid = 4242; // stand-in for the spawned child's pid
-
-        // The intended child: pid equals the expected pid.
-        assert!(peer_pid_matches(Some(child_pid), child_pid));
-
-        // Another same-user process that connected first: a different pid is
-        // rejected.
-        assert!(!peer_pid_matches(Some(child_pid + 1), child_pid));
-
-        // The transport could not report the peer's pid: reject, fail-closed.
-        assert!(!peer_pid_matches(None, child_pid));
+        assert!(peer_is_authorized(Some(child_pid), child_pid));
+        assert!(!peer_is_authorized(Some(child_pid + 1), child_pid));
+        assert!(!peer_is_authorized(None, child_pid));
     }
 
     // The protocol-version check is separate from authorization: only the
@@ -851,18 +822,5 @@ mod tests {
         assert!(version_supported(FELT_IPC_VERSION));
         assert!(!version_supported(FELT_IPC_VERSION + 1));
         assert!(!version_supported(FELT_IPC_VERSION - 1));
-    }
-
-    // On attested platforms authorization requires a matching pid: a same-user
-    // peer with a different pid, or a transport that reports no pid, is refused,
-    // and the intended child is admitted. This includes Windows, where the
-    // expected pid is the browser child the launcher process announced.
-    #[cfg(not(target_os = "macos"))]
-    #[test]
-    fn attested_platforms_require_matching_pid() {
-        let child_pid = 4242;
-        assert!(peer_is_authorized(Some(child_pid), child_pid));
-        assert!(!peer_is_authorized(Some(child_pid + 1), child_pid));
-        assert!(!peer_is_authorized(None, child_pid));
     }
 }
