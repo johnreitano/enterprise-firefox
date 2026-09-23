@@ -4044,11 +4044,12 @@ dependencies = [
 [[package]]
 name = "ipc-channel"
 version = "0.21.0"
-source = "git+https://github.com/johnreitano/ipc-channel?rev=c66468de6dd730f8f9abb005159544c10a264b83#c66468de6dd730f8f9abb005159544c10a264b83"
+source = "git+https://github.com/mozilla/ipc-channel?rev=4fe32fd10d10b597889d1df254a6334654dda78b#4fe32fd10d10b597889d1df254a6334654dda78b"
 dependencies = [
  "crossbeam-channel",
  "libc",
  "mio",
+ "nix",
  "postcard",
  "rand",
  "rustc-hash 2.1.1",
