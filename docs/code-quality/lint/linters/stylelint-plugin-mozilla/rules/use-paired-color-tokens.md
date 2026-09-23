@@ -76,7 +76,7 @@ rule's text color is not safe there.
 The element an at-rule paints is the one its enclosing rule matches, so for this
 check a `color` on that rule covers what the at-rule paints:
 
-```css
+```scss
 .card {
   color: var(--panel-text-color);
 

@@ -9,7 +9,7 @@ tab_width = 2
 language = "C++"
 namespaces = ["mozilla", "dom"]
 include_guard = "DOM_PUSH_DECLARATIVE_PUSH_PARSER_GENERATED_H_"
-includes = ["nsString.h"]
+includes = ["nsTArray.h", "nsString.h"]
 
 [export.rename]
 "ThinVec" = "nsTArray"

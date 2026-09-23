@@ -613,9 +613,13 @@ export class PanelList extends HTMLElement {
    * be reached by keyboard this way, having no message to take an accesskey
    * from.
    *
-   * Only applies while focus is inside the panel. A panel-list that stays open
-   * over a focused field, as the Smartbar's mention panel does, filters itself
-   * from what the field receives, so the keystroke belongs to the field.
+   * Stands aside while an editable field outside the panel has focus. A
+   * panel-list that stays open over a focused field, as the Smartbar's mention
+   * panel does, filters itself from what the field receives, so the keystroke
+   * belongs to the field. Any other focus outside the panel, such as the
+   * anchor button or the document body after a XUL panel took focus on a
+   * mouse open, does not claim the letter. With focus outside every list, an
+   * open submenu takes the letter and its outer list stands aside.
    *
    * @param {string} key
    *   The pressed key.
@@ -626,9 +630,34 @@ export class PanelList extends HTMLElement {
     if (key.length != 1) {
       return false;
     }
-    let focused = this.getRootNode().activeElement;
-    if (!this.contains(focused)) {
-      return false;
+    // The focus chain from the document down through shadow roots, since the
+    // panel may sit in a shadow tree other than the focused element's.
+    let chain = [];
+    for (
+      let el = this.ownerDocument.activeElement;
+      el;
+      el = el.shadowRoot?.activeElement
+    ) {
+      chain.push(el);
+    }
+    let focused = chain.find(el => this.contains(el));
+    if (!focused) {
+      let deepest = chain.at(-1);
+      if (
+        deepest?.isContentEditable ||
+        ["input", "textarea", "select"].includes(deepest?.localName)
+      ) {
+        return false;
+      }
+      // Both this list and its open submenu hear the keystroke through their
+      // document listeners.
+      if (
+        [...this.querySelectorAll("panel-item[submenu]")].some(
+          item => item.submenuPanel?.open
+        )
+      ) {
+        return false;
+      }
     }
     let letter = key.toLowerCase();
     let startsWithLetter = item =>

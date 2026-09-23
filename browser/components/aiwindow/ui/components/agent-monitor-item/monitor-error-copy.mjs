@@ -4,7 +4,8 @@
 
 /**
  * User-facing copy for a failed monitor run, keyed by the errorCode a history
- * entry carries.
+ * entry carries, plus the code for a create or resume refused at the active
+ * monitor limit.
  *
  * The keys mirror MONITOR_ERROR_CODES in Monitor.sys.mjs. They are repeated as
  * plain strings rather than imported because this module is loaded into the
@@ -22,6 +23,7 @@ export const MONITOR_ERROR_L10N_IDS = Object.freeze({
   model_error: "ai-tasks-alert-history-error-model",
   prompt_load_error: "ai-tasks-alert-history-error-prompt-load",
   unknown_error: "ai-tasks-alert-history-error-unknown",
+  active_limit_reached: "ai-tasks-alert-error-active-limit",
 });
 
 export const DEFAULT_MONITOR_ERROR_L10N_ID =

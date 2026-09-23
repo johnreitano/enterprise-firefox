@@ -21,7 +21,7 @@ const { AITabStore } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/ui/modules/AITabStore.sys.mjs"
 );
 const { expandUrlTokens } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/aiwindow/models/ChatUtils.sys.mjs"
+  "moz-src:///browser/components/aiwindow/ui/modules/UrlTokenizer.sys.mjs"
 );
 
 const { MockEngineManager } = ChromeUtils.importESModule(

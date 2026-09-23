@@ -224,6 +224,12 @@ let Player = {
   isUnpipWithoutPauseShortcut: e => e.shiftKey === true,
 
   /**
+   * Becomes true once the first Tab press puts focus on the play/pause button
+   * or, for Shift + Tab, on the visible control preceding it.
+   */
+  didTabOverrideControlFocus: false,
+
+  /**
    * Initializes the player browser, and sets up the initial state.
    *
    * @param {number} id
@@ -478,6 +484,28 @@ let Player = {
         if (event.keyCode == KeyEvent.DOM_VK_TAB) {
           this.controls.setAttribute(KEYING_ATTRIBUTE, true);
           this.showVideoControls();
+          // Tab order follows DOM order. To ensure Tab lands on primary controls
+          // after opening PiP for the first time, override the default Tab
+          // behaviour and focus on the primary buttons.
+          // Do not override in init() to prevent regressing the "space" play/pause shortcut.
+          if (
+            !this.didTabOverrideControlFocus &&
+            !this.controls.contains(document.activeElement)
+          ) {
+            if (!event.shiftKey) {
+              this.didTabOverrideControlFocus = true;
+              event.preventDefault();
+              // On all window sizes, the play/pause button is always visible.
+              this.playpauseButton.focus();
+            } else {
+              let previousControl = this.getControlBefore(this.playpauseButton);
+              if (previousControl) {
+                this.didTabOverrideControlFocus = true;
+                event.preventDefault();
+                previousControl.focus();
+              }
+            }
+          }
         } else if (event.keyCode == KeyEvent.DOM_VK_ESCAPE) {
           let isSettingsPanelInFocus = this.settingsPanel.contains(
             document.activeElement
@@ -1450,9 +1478,42 @@ let Player = {
     this.closePipWindow({ reason: "Shortcut" });
   },
 
+  /**
+   * Get the visible control preceding another button, wrapping around
+   * if needed. For example, if the next preceding button is at the top
+   * right corner from the buttom center, return the button from that position.
+   *
+   * @returns {Element|null}
+   *  The preceding control
+   */
+  getControlBefore(control) {
+    let controls = this.focusableControls;
+    let index = controls.indexOf(control);
+    if (index < 0) {
+      return null;
+    }
+    return controls.at(index - 1) ?? null;
+  },
+
   get controls() {
     delete this.controls;
     return (this.controls = document.getElementById("controls"));
+  },
+
+  /**
+   * Get an array of visible controls that can take focus, in DOM order.
+   * Don't store the result, for the layout can change when the window
+   * resizes or metadata loads.
+   *
+   * @returns {Array<Element>}
+   *  Array of focusable, visible controls
+   */
+  get focusableControls() {
+    return [
+      ...this.controls.querySelectorAll(
+        "button.control-item, input.control-item"
+      ),
+    ].filter(control => !control.disabled && control.checkVisibility());
   },
 
   get scrubber() {
@@ -1478,6 +1539,11 @@ let Player = {
   get seekBackward() {
     delete this.seekBackward;
     return (this.seekBackward = document.getElementById("seekBackward"));
+  },
+
+  get playpauseButton() {
+    delete this.playpauseButton;
+    return (this.playpauseButton = document.getElementById("playpause"));
   },
 
   get seekForward() {

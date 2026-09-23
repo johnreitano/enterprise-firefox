@@ -118,11 +118,15 @@ bool nsWindowWayland::CreateRestoreSession(bool aRestoreWindow) {
   return !!mSessionRestoreToken;
 }
 
-void nsWindowWayland::GetWorkspaceID(nsAString& workspaceID) {
+void nsWindowWayland::GetWorkspaceID(nsAString& aWorkspaceID) {
+  if (!nsAppShell::IsSessionRestoreSupported()) {
+    aWorkspaceID.Truncate();
+    return;
+  }
   if (mWorkspaceID.IsEmpty()) {
     mWorkspaceID = GenerateWorkspaceID();
   }
-  workspaceID = NS_ConvertUTF8toUTF16(mWorkspaceID);
+  aWorkspaceID = NS_ConvertUTF8toUTF16(mWorkspaceID);
 
   LOG("nsWindowWayland::GetWorkspaceID() ID %s token %p", mWorkspaceID.get(),
       mSessionRestoreToken);
@@ -158,8 +162,11 @@ void nsWindowWayland::RestoreXdgToplevel() {
   }
 }
 
-void nsWindowWayland::MoveToWorkspace(const nsAString& workspaceIDStr) {
-  mWorkspaceID = NS_ConvertUTF16toUTF8(workspaceIDStr);
+void nsWindowWayland::MoveToWorkspace(const nsAString& aWorkspaceIDStr) {
+  if (!nsAppShell::IsSessionRestoreSupported()) {
+    return;
+  }
+  mWorkspaceID = NS_ConvertUTF16toUTF8(aWorkspaceIDStr);
   LOG("nsWindowWayland::MoveToWorkspace() session ID %s "
       "mWaitingToSessionRestore %d mNeedsShow %d",
       mWorkspaceID.get(), mWaitingToSessionRestore, mNeedsShow);
@@ -2286,3 +2293,38 @@ bool nsWindowWayland::ApplyEnterLeaveMutterWorkaround() {
 }
 
 void nsWindowWayland::OnMapNative() { MaybeCreatePipResources(); }
+
+// Force commit to toplevel GdkWindow (mShell) to propagate
+// changes made to mContainer. There's only way how to force Gtk3 to
+// do the commit without actual painting (Bug 2070729) and that's child
+// subsurface position change.
+//
+// We create a temporary child window located outside of the window
+// origin without any content and move it to issue synced commit to toplevel
+// window.
+void nsWindowWayland::ForceToplevelCommit() {
+  if (!GetToplevelGdkWindow()) {
+    return;
+  }
+  if (!mCommitWindow) {
+    GdkWindowAttr attr = {};
+    attr.window_type = GDK_WINDOW_SUBSURFACE;
+    attr.wclass = GDK_INPUT_OUTPUT;
+    attr.width = attr.height = 1;
+    attr.x = attr.y = sCommitOrigin;
+    attr.event_mask = 0;
+    mCommitWindow =
+        gdk_window_new(GetToplevelGdkWindow(), &attr, GDK_WA_X | GDK_WA_Y);
+    cairo_region_t* empty = cairo_region_create();
+    gdk_window_input_shape_combine_region(mCommitWindow, empty, 0, 0);
+    cairo_region_destroy(empty);
+    gdk_window_set_transient_for(mCommitWindow, GetToplevelGdkWindow());
+    gdk_window_show(mCommitWindow);
+  }
+
+  // Alternate commit position around sCommitOrigin.
+  mCommitWindowPosition = mCommitWindowPosition == sCommitOrigin
+                              ? sCommitOrigin + 1
+                              : sCommitOrigin;
+  gdk_window_move(mCommitWindow, mCommitWindowPosition, mCommitWindowPosition);
+}

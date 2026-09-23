@@ -124,7 +124,6 @@ ChromeUtils.defineESModuleGetters(this, {
   Weave: "resource://services-sync/main.sys.mjs",
   WebNavigationFrames: "resource://gre/modules/WebNavigationFrames.sys.mjs",
   webrtcUI: "resource:///modules/webrtcUI.sys.mjs",
-  WebsiteFilter: "resource:///modules/policies/WebsiteFilter.sys.mjs",
   ZoomUI: "resource:///modules/ZoomUI.sys.mjs",
 });
 
@@ -850,11 +849,17 @@ function updateFxaToolbarMenu(enable, isInitialUpdate = false) {
   const taskbarTab = mainWindowEl.hasAttribute("taskbartab");
 
   // To minimize the toolbar button flickering or appearing/disappearing during startup,
-  // we use this pref to anticipate the likely FxA status.
-  const statusGuess = !!Services.prefs.getStringPref(
-    "identity.fxaccounts.account.device.name",
-    ""
-  );
+  // we use this pref to anticipate the likely FxA status. Only guess a signed-in
+  // state when accounts are enabled: a device name can be persisted without ever
+  // signing in (e.g. it is written on first read or when creating a backup), so
+  // without gating on syncEnabled a profile with accounts disabled would
+  // incorrectly report "signed_in".
+  const statusGuess =
+    syncEnabled &&
+    !!Services.prefs.getStringPref(
+      "identity.fxaccounts.account.device.name",
+      ""
+    );
   mainWindowEl.setAttribute(
     "fxastatus",
     statusGuess ? "signed_in" : "not_configured"

@@ -202,6 +202,10 @@ skip-if = [
 
 ["browser_aiwindow_smartbar_inline_mentions.js"]
 
+["browser_aiwindow_smartbar_inline_mentions_context.js"]
+
+["browser_aiwindow_smartbar_inline_mentions_suggestions.js"]
+
 ["browser_aiwindow_smartbar_input_cta.js"]
 
 ["browser_aiwindow_smartbar_interactions.js"]
@@ -345,6 +349,8 @@ skip-if = [
 ]
 
 ["browser_smartwindow_manage_tabs_tool.js"]
+
+["browser_smartwindow_manage_tabs_tool_telemetry.js"]
 
 ["browser_smartwindow_metrics_telemetry.js"]
 

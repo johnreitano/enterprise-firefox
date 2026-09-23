@@ -1070,7 +1070,9 @@ describe("<WallpaperCategories>", () => {
     it("asks again when the applied wallpaper changes", () => {
       // A page from the startup cache never sees the library broadcast, so a
       // change to the library alone would never reach it. The applied pref does.
+      // Restored with no thumbnail bytes, which is the state that needs them.
       const props = withSavedWallpapers();
+      props.Wallpapers.customWallpaperThumbnails = [];
       const { container, rerender } = render(<Harness {...props} />);
       fireEvent.click(container.querySelector("#custom-wallpaper"));
 
@@ -1220,20 +1222,6 @@ describe("<WallpaperCategories>", () => {
       );
     });
 
-    it("shows the whole library when a trainhop rollout enables it", () => {
-      const props = withSavedWallpapers(SAVED, {
-        "newtabWallpapers.customWallpaper.library.enabled": false,
-        trainhopConfig: { customWallpaperLibrary: { enabled: true } },
-      });
-
-      const { container } = render(<Harness {...props} />);
-      fireEvent.click(container.querySelector("#custom-wallpaper"));
-
-      expect(
-        container.querySelectorAll('.your-images input[type="radio"]')
-      ).toHaveLength(SAVED.length);
-    });
-
     it("drops thumbnail object URLs when the panel closes", () => {
       const revoked = [];
       globalThis.URL.revokeObjectURL = url => revoked.push(url);
@@ -1280,6 +1268,65 @@ describe("<WallpaperCategories>", () => {
           !action.data.length
       );
       expect(cleared).toHaveLength(1);
+    });
+
+    // Bug 2072951: applying leaves the library alone, so re-fetching it mints a
+    // new blob URL per tile and the whole grid reloads for a frame.
+    it("does not ask for thumbnails again when a picture is applied", () => {
+      const props = withSavedWallpapers();
+      const { rerender } = render(<Harness {...props} />);
+      props.dispatch.mockClear();
+
+      rerender(
+        <Harness
+          {...{
+            ...props,
+            Prefs: {
+              values: {
+                ...props.Prefs.values,
+                "newtabWallpapers.customWallpaper.uuid": SAVED[1].filename,
+              },
+            },
+          }}
+        />
+      );
+
+      const asked = props.dispatch.mock.calls.some(
+        ([action]) => action.type === at.WALLPAPERS_CUSTOM_THUMBNAILS_REQUEST
+      );
+      expect(asked).toBe(false);
+    });
+
+    // The thumbnails and the applied pref can land in one update. A check on
+    // derived state would still read the pre-setState value and ask again.
+    it("does not ask twice when the thumbnails and the applied picture arrive together", () => {
+      const props = withSavedWallpapers();
+      props.Wallpapers.customWallpaperThumbnails = [];
+      const { rerender } = render(<Harness {...props} />);
+      props.dispatch.mockClear();
+
+      rerender(
+        <Harness
+          {...{
+            ...props,
+            Wallpapers: {
+              ...props.Wallpapers,
+              customWallpaperThumbnails: THUMBNAILS,
+            },
+            Prefs: {
+              values: {
+                ...props.Prefs.values,
+                "newtabWallpapers.customWallpaper.uuid": SAVED[1].filename,
+              },
+            },
+          }}
+        />
+      );
+
+      const asked = props.dispatch.mock.calls.filter(
+        ([action]) => action.type === at.WALLPAPERS_CUSTOM_THUMBNAILS_REQUEST
+      );
+      expect(asked).toHaveLength(0);
     });
 
     it("ignores thumbnails a startup cache restore turned into plain objects", () => {

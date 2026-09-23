@@ -940,7 +940,7 @@ static const KeyConversionData gKeyConversions[] = {
     KEYCODE_ENTRY(VK_7, '7'),
     KEYCODE_ENTRY(VK_8, '8'),
     KEYCODE_ENTRY(VK_9, '9'),
-    KEYCODE_ENTRY(VK_SEMICOLON, ':'),
+    KEYCODE_ENTRY(VK_SEMICOLON, ';'),
     KEYCODE_ENTRY(VK_EQUALS, '='),
     KEYCODE_ENTRY(VK_A, 'A'),
     KEYCODE_ENTRY(VK_B, 'B'),

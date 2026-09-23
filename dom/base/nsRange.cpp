@@ -660,9 +660,9 @@ nsRange::AutoCharacterDataChangedHandler::ComputeNewBoundaryOnModifyDataOrSplit(
           nullptr};
 }
 
-void nsRange::CharacterDataChanged(nsIContent* aContent,
+void nsRange::CharacterDataChanged(nsIContent* aCharacterData,
                                    const CharacterDataChangeInfo& aInfo) {
-  MOZ_ASSERT(aContent);
+  MOZ_ASSERT(aCharacterData);
   MOZ_ASSERT(mIsPositioned);
 
   const bool isSplit =
@@ -670,13 +670,13 @@ void nsRange::CharacterDataChanged(nsIContent* aContent,
       aInfo.mDetails->mType == CharacterDataChangeInfo::Details::eSplit;
   if (isSplit) {
     if (mCrossShadowBoundaryRange &&
-        (aContent == mCrossShadowBoundaryRange->GetStartContainer() ||
-         aContent == mCrossShadowBoundaryRange->GetEndContainer())) {
+        (aCharacterData == mCrossShadowBoundaryRange->GetStartContainer() ||
+         aCharacterData == mCrossShadowBoundaryRange->GetEndContainer())) {
       ResetCrossShadowBoundaryRange(ResetCommonAncestorIfInAnySelection::Yes);
     }
   }
 
-  AutoCharacterDataChangedHandler handler(*this, *aContent, aInfo);
+  AutoCharacterDataChangedHandler handler(*this, *aCharacterData, aInfo);
   RangeBoundariesAndRoot newBoundaries = handler.ComputeNewBoundaries();
   if (isSplit) {
     mNewCharacterDataOnSplitText = handler.GetComingNewNextSiblings();
@@ -690,37 +690,73 @@ void nsRange::CharacterDataChanged(nsIContent* aContent,
     return;
   }
   if (isSplit) {
-    // If aContent is split and it was the common ancestor (i.e., both start and
-    // end boundary container is aContent), we need to register the range to the
-    // new common ancestor.
-    // FIXME: This comment should be the right intention, but here actually does
-    // different thing. The containers of newBoundaries.mStart and
-    // newBoundaries.mEnd may be different, the new start container can be the
-    // original node (the left node) and the new end container can be the new
-    // node (the right node). In that case, we should register this range to the
-    // parent element node of aContent which is the original node. However, this
-    // currently okay because DoSetRange() will compute the correct common
-    // ancestor again.
-    if (IsInAnySelection() && GetStartContainer() == GetEndContainer()) {
-      MOZ_DIAGNOSTIC_ASSERT(GetStartContainer() ==
-                            mRegisteredClosestCommonInclusiveAncestor);
-      UnregisterClosestCommonInclusiveAncestor();
-      RegisterClosestCommonInclusiveAncestor(
-          newBoundaries.mStart.IsSet() ? newBoundaries.mStart.GetContainer()
-                                       : newBoundaries.mEnd.GetContainer());
+    MOZ_ASSERT(GetStartContainer() == aCharacterData ||
+               GetEndContainer() == aCharacterData);
+    nsIContent* const newText = aInfo.mDetails->mNextSibling;
+    MOZ_ASSERT(newText->IsText());
+    MOZ_ASSERT(!newText->IsInComposedDoc());
+    // If new start boundary is returned, its container must be the new `Text`
+    // because we don't need to change the point if the container is not changed
+    // from aCharacterData.
+    MOZ_ASSERT_IF(newBoundaries.mStart.IsSet(),
+                  newBoundaries.mStart.GetContainer() == newText);
+    // If both boundaries are returned, the new containers must be the new
+    // `Text`.
+    MOZ_ASSERT_IF(newBoundaries.mEnd.IsSet() && newBoundaries.mStart.IsSet(),
+                  newBoundaries.mEnd.GetContainer() == newText);
+    // If only new end boundary is returned, the new end container is the new
+    // `Text` in the most cases. However, if aCharacter does not have a parent
+    // node and the new start container is not the new `Text`,
+    // AutoCharacterDataChangedHandler returns aCharacterData as new end
+    // container to avoid to make a disconnected range.
+    MOZ_ASSERT_IF(newBoundaries.mEnd.IsSet() && !newBoundaries.mStart.IsSet() &&
+                      aCharacterData->GetParentNode(),
+                  newBoundaries.mEnd.GetContainer() == newText);
+    MOZ_ASSERT_IF(newBoundaries.mEnd.IsSet() && !newBoundaries.mStart.IsSet() &&
+                      !aCharacterData->GetParentNode(),
+                  newBoundaries.mEnd.GetContainer() == aCharacterData);
+    if (IsInAnySelection()) {
+      // If both the old containers are aCharacterData and this is a selection
+      // range, we need to compute the new common inclusive ancestor because the
+      // new `Text` has not been inserted into the parent of aCharacterData yet.
+      if (GetStartContainer() == GetEndContainer()) {
+        MOZ_DIAGNOSTIC_ASSERT(GetStartContainer() ==
+                              mRegisteredClosestCommonInclusiveAncestor);
+        UnregisterClosestCommonInclusiveAncestor();
+        // If the both containers become the new `Text`, it's the new common
+        // inclusive ancestor.
+        if (newBoundaries.mStart.IsSet() && newBoundaries.mEnd.IsSet()) {
+          RegisterClosestCommonInclusiveAncestor(newText);
+          // FYI: aCharacterData may still be a closest common inclusive
+          // ancestor of some other selection ranges.
+        }
+        // If only the end boundary become the new `Text`, the parent node will
+        // be the new closest common inclusive ancestor.
+        else {
+          MOZ_ASSERT(aCharacterData->GetParentNode());
+          RegisterClosestCommonInclusiveAncestor(
+              aCharacterData->GetParentNode());
+        }
+      }
+      // Otherwise, i.e., the start or end container is outside aCharacterData,
+      // we don't need to do it because new `Text` will be inserted into the
+      // parent node of aCharacterData that means the new inclusive common
+      // ancestor is an inclusive ancestor of the parent node. So, it won't be
+      // changed.
     }
-    // If the old container is marked as "selected", we need to mark the new
-    // container as so.
-    if (newBoundaries.mStart.IsSet() &&
-        GetStartContainer()
+    // If aCharacter is a (non-inclusive) descendant of a selection range, the
+    // new `Text` should be marked as so too because it'll be inserted into the
+    // parent node of aCharacterData which is an inclusive descendant of the
+    // closest common inclusive ancestor of the selection range.
+    //
+    // Note that even if both old containers are aCharacterData and this range
+    // will be completely moved into the new `Text`, aCharacterData may still be
+    // a part of another selection range. Therefore, we always need to check
+    // whether aCharacterData is in a selection range.
+    if (aCharacterData
             ->IsDescendantOfClosestCommonInclusiveAncestorForRangeInSelection()) {
-      newBoundaries.mStart.GetContainer()
-          ->SetDescendantOfClosestCommonInclusiveAncestorForRangeInSelection();
-    } else if (
-        newBoundaries.mEnd.IsSet() &&
-        GetEndContainer()
-            ->IsDescendantOfClosestCommonInclusiveAncestorForRangeInSelection()) {
-      newBoundaries.mEnd.GetContainer()
+      MOZ_ASSERT(aCharacterData->GetParentNode());
+      newText
           ->SetDescendantOfClosestCommonInclusiveAncestorForRangeInSelection();
     }
   }
@@ -1222,11 +1258,11 @@ void nsRange::AssertIfMismatchRootAndRangeBoundaries(
 // Calling DoSetRange with either parent argument null will collapse
 // the range to have both endpoints point to the other node
 template <typename SPT, typename SRT, typename EPT, typename ERT>
-void nsRange::
-    DoSetRange(const RangeBoundaryBase<SPT, SRT>& aStartBoundary,
-               const RangeBoundaryBase<EPT, ERT>& aEndBoundary,
-               nsINode* aRootNode,
-               bool aNotInsertedYet /* = false */, RangeBehaviour aRangeBehaviour /* = CollapseDefaultRangeAndCrossShadowBoundaryRanges */) {
+void nsRange::DoSetRange(
+    const RangeBoundaryBase<SPT, SRT>& aStartBoundary,
+    const RangeBoundaryBase<EPT, ERT>& aEndBoundary, nsINode* aRootNode,
+    bool aNotInsertedYet /* = false */, RangeBehaviour aRangeBehaviour
+    /* = CollapseDefaultRangeAndCrossShadowBoundaryRanges */) {
   mIsPositioned = aStartBoundary.IsSetAndValid() &&
                   aEndBoundary.IsSetAndValid() && aRootNode;
   MOZ_ASSERT_IF(!mIsPositioned, !aStartBoundary.IsSet());

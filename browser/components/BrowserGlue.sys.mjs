@@ -15,7 +15,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "resource:///modules/asrouter/ASRouterDefaultConfig.sys.mjs",
   ASRouterNewTabHook: "resource:///modules/asrouter/ASRouterNewTabHook.sys.mjs",
   AddonManager: "resource://gre/modules/AddonManager.sys.mjs",
-  BackupService: "resource:///modules/backup/BackupService.sys.mjs",
+  BackupService: "moz-src:///browser/components/backup/BackupService.sys.mjs",
   BrowserSearchTelemetry:
     "moz-src:///browser/components/search/BrowserSearchTelemetry.sys.mjs",
   BrowserUtils: "resource://gre/modules/BrowserUtils.sys.mjs",
@@ -77,7 +77,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   TRRRacer: "resource:///modules/TRRPerformance.sys.mjs",
   WebChannel: "resource://gre/modules/WebChannel.sys.mjs",
   WebProtocolHandlerRegistrar:
-    "resource:///modules/WebProtocolHandlerRegistrar.sys.mjs",
+    "moz-src:///browser/components/protocolhandler/WebProtocolHandlerRegistrar.sys.mjs",
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
 });
 
@@ -1375,24 +1375,25 @@ BrowserGlue.prototype = {
     // When Firefox was launched by FELT, show a signout confirmation prompt
     // instead of the standard quit dialog.
     if (AppConstants.MOZ_ENTERPRISE && Services.felt?.isFeltBrowser()) {
-      if (lazy.EnterpriseHandler.shouldShowClosePrompt()) {
-        aCancelQuit.QueryInterface(Ci.nsISupportsPRBool).data = true;
-        this._quitSource = "unknown";
-        const promptWindow = lazy.BrowserWindowTracker.getTopWindow({
-          allowFromInactiveWorkspace: true,
-        });
-        lazy.EnterpriseHandler.showSignoutPrompt(promptWindow)
-          .then(proceed => {
-            if (proceed) {
-              Services.startup.quit(Ci.nsIAppStartup.eAttemptQuit);
-            }
-          })
-          .catch(e => {
-            console.error("Enterprise signout prompt failed, quitting:", e);
-            Services.startup.quit(Ci.nsIAppStartup.eForceQuit);
-          });
+      if (!lazy.EnterpriseHandler.shouldHandleClose()) {
         return;
       }
+      aCancelQuit.QueryInterface(Ci.nsISupportsPRBool).data = true;
+      this._quitSource = "unknown";
+      const promptWindow = lazy.BrowserWindowTracker.getTopWindow({
+        allowFromInactiveWorkspace: true,
+      });
+      lazy.EnterpriseHandler.showSignoutPrompt(promptWindow)
+        .then(proceed => {
+          if (proceed) {
+            lazy.EnterpriseHandler.lockOrSignOut();
+          }
+        })
+        .catch(e => {
+          console.error("Enterprise signout prompt failed, quitting:", e);
+          Services.startup.quit(Ci.nsIAppStartup.eForceQuit);
+        });
+      return;
     }
 
     // browser.warnOnQuit is a hidden global boolean to override all quit prompts.

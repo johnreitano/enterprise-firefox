@@ -422,6 +422,11 @@ class HostWebGLContext final : public SupportsWeakPtr {
     mContext->PolygonOffset(factor, units);
   }
 
+  void PolygonOffsetClampEXT(GLfloat factor, GLfloat units,
+                             GLfloat clamp) const {
+    mContext->PolygonOffsetClampEXT(factor, units, clamp);
+  }
+
   void SampleCoverage(GLclampf value, bool invert) const {
     mContext->SampleCoverage(value, invert);
   }

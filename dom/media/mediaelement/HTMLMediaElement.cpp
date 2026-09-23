@@ -456,8 +456,18 @@ class HTMLMediaElement::MediaControlKeyListener final
 
     MOZ_ASSERT(mControlAgent);
     auto* owner = Owner();
-    PositionState state(owner->Duration(),
-                        owner->Paused() ? 0.0 : owner->PlaybackRate(),
+    // `Duration()` is NaN while the element has neither a decoder nor a
+    // stream, and infinite for a stream. Neither is a length that a platform's
+    // media controls can lay a timeline out from, so report no position state
+    // at all instead.
+    const double duration = owner->Duration();
+    if (!std::isfinite(duration)) {
+      MEDIACONTROL_LOG("Clear media position state (duration={})", duration);
+      mControlAgent->UpdateGuessedPositionState(mOwnerBrowsingContextId,
+                                                mElementId, Nothing());
+      return;
+    }
+    PositionState state(duration, owner->Paused() ? 0.0 : owner->PlaybackRate(),
                         owner->CurrentTime(), TimeStamp::Now());
     MEDIACONTROL_LOG(
         "Notify media position state (duration={}, playbackRate={}, "
@@ -1034,7 +1044,7 @@ class HTMLMediaElement::MediaStreamRenderer {
     ResolveAudioDevicePromiseIfExists(__func__);
 
     RefPtr promise = mSetAudioDevicePromise.Ensure(__func__);
-    GenericPromise::AllSettled(GetCurrentSerialEventTarget(), promises)
+    GenericPromise::AllSettled(AbstractThread::MainThread(), promises)
         ->Then(GetMainThreadSerialEventTarget(), __func__,
                [self = RefPtr{this},
                 this](const GenericPromise::AllSettledPromiseType::

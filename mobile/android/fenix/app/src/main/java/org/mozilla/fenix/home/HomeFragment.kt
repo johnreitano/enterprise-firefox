@@ -158,6 +158,7 @@ import org.mozilla.fenix.home.ui.HomeSwipeIntegration
 import org.mozilla.fenix.home.ui.Homepage
 import org.mozilla.fenix.home.ui.WallpaperBackground
 import org.mozilla.fenix.ipprotection.store.Surface as IPProtectionSurface
+import org.mozilla.fenix.ipprotection.ui.IPProtectionBottomSheetFragment
 import org.mozilla.fenix.messaging.DefaultMessageController
 import org.mozilla.fenix.messaging.FenixMessageSurfaceId
 import org.mozilla.fenix.messaging.MessagingFeature
@@ -730,12 +731,21 @@ class HomeFragment : Fragment(), UserInteractionHandler, OnLongPressedListener {
                                     ToolbarSlot(captureToolbarBounds, { toolbarBoundsInRoot = it }) {
                                         toolbarView.Content()
                                     }
+                                } else {
+                                    if (settings.shouldShowTabStripAtTop) {
+                                        TabStrip()
+                                    }
                                 }
                             },
                             bottomBar = {
                                 if (isToolbarAtTop) {
                                     ToolbarSlot(captureToolbarBounds, { navbarBoundsInRoot = it }) {
-                                        homeNavigationBar?.Content()
+                                        Column {
+                                            if (settings.shouldShowTabStripAtBottom) {
+                                                TabStrip()
+                                            }
+                                            homeNavigationBar?.Content()
+                                        }
                                     }
                                 } else {
                                     ToolbarSlot(captureToolbarBounds, { toolbarBoundsInRoot = it }) {
@@ -945,6 +955,7 @@ class HomeFragment : Fragment(), UserInteractionHandler, OnLongPressedListener {
                         browsingModeManager = (requireActivity() as HomeActivity).browsingModeManager,
                         settings = requireComponents.settings,
                     ),
+                hideWhenKeyboardShown = requireComponents.settings.shouldUseBottomTabStrip,
                 onAddTabClick = {
                     if (requireComponents.settings.enableHomepageAsNewTab) {
                         requireComponents.useCases.fenixBrowserUseCases.addNewHomepageTab(
@@ -1480,8 +1491,7 @@ class HomeFragment : Fragment(), UserInteractionHandler, OnLongPressedListener {
                     )
             },
             navigateToIpProtection = {
-                findNavController()
-                    .navigate(HomeFragmentDirections.actionGlobalIpProtectionDialog(IPProtectionSurface.HOMEPAGE))
+                IPProtectionBottomSheetFragment.showPrompt(fragment = this, surface = IPProtectionSurface.HOMEPAGE)
             },
         )
     }

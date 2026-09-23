@@ -2605,33 +2605,31 @@ unsafe fn process_message(
                 };
 
                 if adapter_luid.is_some() && !desc.force_fallback_adapter {
-                    let instance = global.instance();
-                    let instance = instance
-                        .as_hal::<wgc::api::Dx12>()
-                        .expect("D3D12 backend instance on windows");
-
-                    for adapter in instance.enumerate_adapters(None) {
-                        let raw_adapter = adapter.adapter.raw_adapter();
-                        let desc = unsafe { raw_adapter.GetDesc() };
-                        if let Ok(desc) = desc {
-                            if desc.AdapterLuid.LowPart == adapter_luid.unwrap().low_part
-                                && desc.AdapterLuid.HighPart == adapter_luid.unwrap().high_part
-                            {
-                                global.create_adapter_from_hal(
-                                    wgh::DynExposedAdapter::from(adapter),
-                                    adapter_id,
-                                );
-                                result = Some(true);
-                                break;
+                    // We can't unwrap here since instance creation could have failed.
+                    if let Some(instance) = global.instance().as_hal::<wgc::api::Dx12>() {
+                        for adapter in instance.enumerate_adapters(None) {
+                            let raw_adapter = adapter.adapter.raw_adapter();
+                            let desc = unsafe { raw_adapter.GetDesc() };
+                            if let Ok(desc) = desc {
+                                if desc.AdapterLuid.LowPart == adapter_luid.unwrap().low_part
+                                    && desc.AdapterLuid.HighPart == adapter_luid.unwrap().high_part
+                                {
+                                    global.create_adapter_from_hal(
+                                        wgh::DynExposedAdapter::from(adapter),
+                                        adapter_id,
+                                    );
+                                    result = Some(true);
+                                    break;
+                                }
                             }
                         }
-                    }
-                    if result.is_none() {
-                        log::error!(concat!(
-                            "Failed to find D3D12 adapter with the same LUID ",
-                            "that the compositor is using!"
-                        ));
-                        result = Some(false);
+                        if result.is_none() {
+                            log::error!(concat!(
+                                "Failed to find D3D12 adapter with the same LUID ",
+                                "that the compositor is using!"
+                            ));
+                            result = Some(false);
+                        }
                     }
                 }
             }

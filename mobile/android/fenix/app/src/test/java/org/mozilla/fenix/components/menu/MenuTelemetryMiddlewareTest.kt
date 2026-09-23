@@ -28,6 +28,7 @@ import org.mozilla.fenix.components.menu.store.MenuAction
 import org.mozilla.fenix.components.menu.store.MenuState
 import org.mozilla.fenix.components.menu.store.MenuStore
 import org.mozilla.fenix.helpers.FenixGleanTestRule
+import org.mozilla.fenix.tabgroups.flow.TabGroupFlowEntryPoint
 import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
@@ -519,6 +520,18 @@ class MenuTelemetryMiddlewareTest {
         store.dispatch(MenuAction.Navigate.WebCompatReporter)
 
         assertTelemetryRecorded(Events.browserMenuAction, item = "report_broken_site")
+    }
+
+    @Test
+    fun `WHEN adding a tab to a group THEN record the group flow telemetry`() {
+        val store = createStore()
+        assertNull(Events.browserMenuAction.testGetValue())
+
+        store.dispatch(
+            MenuAction.Navigate.OpenTabGroupFlow(entryPoint = TabGroupFlowEntryPoint.AddTabToGroup(tabId = "123"))
+        )
+
+        assertTelemetryRecorded(Events.browserMenuAction, item = "add_to_group")
     }
 
     private fun assertTelemetryRecorded(

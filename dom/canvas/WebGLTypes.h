@@ -215,6 +215,7 @@ enum class WebGLExtensionID : uint8_t {
   EXT_disjoint_timer_query,
   EXT_float_blend,
   EXT_frag_depth,
+  EXT_polygon_offset_clamp,
   EXT_shader_texture_lod,
   EXT_sRGB,
   EXT_texture_compression_bptc,

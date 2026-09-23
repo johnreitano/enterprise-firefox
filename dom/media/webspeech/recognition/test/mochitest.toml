@@ -2,6 +2,7 @@
 tags = "mtg"
 subsuite = "media"
 prefs = ["media.navigator.streams.fake=true"]
+environment = ["MOZ_PROFILER_STARTUP_FILTERS=GeckoMain,Compositor,Renderer,DOM Worker,MediaTrackGrph,NativeAudioCallback,Speech,Parakeet,GraphRunner"]
 scheme = "https"
 support-files = [
   "head.js",

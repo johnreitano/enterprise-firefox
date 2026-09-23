@@ -242,7 +242,8 @@ add_task(async function concurrent_viewers_claim_one_impression() {
     })
   );
 
-  const shown = await Promise.all(
+  // A background winner may not render its bar, so compare claim results.
+  const dismissed = await Promise.all(
     [tabA, tabB].map(tab =>
       SpecialPowers.spawn(tab.linkedBrowser, [], async () => {
         // Wait for document loading without requiring a rendered page.
@@ -250,14 +251,16 @@ add_task(async function concurrent_viewers_claim_one_impression() {
           () => content.wrappedJSObject.PDFViewerApplication?.pdfDocument,
           "the PDF document is loaded"
         );
-        await content.customElements.whenDefined("moz-message-bar");
-        const bar = content.document.querySelector("moz-message-bar");
-        return !!bar && !bar.hidden;
+        await content.wrappedJSObject.PDFViewerApplication.preferences
+          .initializedPromise;
+        return content.wrappedJSObject.PDFViewerApplicationOptions.get(
+          "featuresNotificationDismissed"
+        );
       })
     )
   );
   Assert.equal(
-    shown.filter(Boolean).length,
+    dismissed.filter(value => !value).length,
     1,
     "only one concurrent viewer claims the last impression"
   );
@@ -266,6 +269,22 @@ add_task(async function concurrent_viewers_claim_one_impression() {
     1,
     "the concurrent loads spend exactly one impression"
   );
+
+  const winner = dismissed[0] ? tabB : tabA,
+    loser = dismissed[0] ? tabA : tabB;
+  gBrowser.selectedTab = winner;
+  await waitForBarShown(winner.linkedBrowser);
+  await SpecialPowers.spawn(loser.linkedBrowser, [], async () => {
+    Assert.ok(
+      content.document.querySelector("moz-message-bar").hidden,
+      "the other viewer keeps the notification hidden"
+    );
+    Assert.equal(
+      content.customElements.get("moz-message-bar"),
+      undefined,
+      "the other viewer doesn't load the moz-message-bar module"
+    );
+  });
 
   await waitForPdfJSClose(tabB.linkedBrowser, true);
   await waitForPdfJSClose(tabA.linkedBrowser, true);

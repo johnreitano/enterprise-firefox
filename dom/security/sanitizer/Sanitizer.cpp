@@ -7,9 +7,11 @@
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/Span.h"
 #include "mozilla/StaticPtr.h"
+#include "mozilla/UseCounter.h"
 #include "mozilla/dom/BindingDeclarations.h"
 #include "mozilla/dom/BindingUtils.h"
 #include "mozilla/dom/CustomElementRegistry.h"
+#include "mozilla/dom/Document.h"
 #include "mozilla/dom/DocumentFragment.h"
 #include "mozilla/dom/HTMLTemplateElement.h"
 #include "mozilla/dom/SanitizerBinding.h"
@@ -19,11 +21,12 @@
 #include "nsGenericHTMLElement.h"
 #include "nsIContentInlines.h"
 #include "nsNameSpaceManager.h"
+#include "nsPIDOMWindow.h"
 
 namespace mozilla::dom {
 using namespace sanitizer;
 
-NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(Sanitizer, mGlobal)
+NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(Sanitizer, mWindow)
 
 NS_IMPL_CYCLE_COLLECTING_ADDREF(Sanitizer)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(Sanitizer)
@@ -50,7 +53,7 @@ JSObject* Sanitizer::WrapObject(JSContext* aCx,
 /* static */
 // https://html.spec.whatwg.org/#get-a-sanitizer-instance-from-options
 already_AddRefed<Sanitizer> Sanitizer::GetInstance(
-    nsIGlobalObject* aGlobal,
+    nsPIDOMWindowInner* aWindow,
     const OwningSanitizerOrSanitizerConfigOrSanitizerPresets& aOptions,
     bool aSafe, ErrorResult& aRv) {
   // Step 3. Assert: sanitizerSpec is either a Sanitizer instance, a
@@ -66,7 +69,7 @@ already_AddRefed<Sanitizer> Sanitizer::GetInstance(
     // Step 4.2. Set sanitizerSpec to the built-in safe default configuration.
     // NOTE: The built-in safe default configuration is complete and not
     // influenced by |safe|.
-    RefPtr<Sanitizer> sanitizer = new Sanitizer(aGlobal);
+    RefPtr<Sanitizer> sanitizer = new Sanitizer(aWindow);
     sanitizer->SetDefaultConfig();
     return sanitizer.forget();
   }
@@ -74,7 +77,7 @@ already_AddRefed<Sanitizer> Sanitizer::GetInstance(
   // Step 5. If sanitizerSpec is a dictionary:
   if (aOptions.IsSanitizerConfig()) {
     // Step 5.1. Let sanitizer be a new Sanitizer object.
-    RefPtr<Sanitizer> sanitizer = new Sanitizer(aGlobal);
+    RefPtr<Sanitizer> sanitizer = new Sanitizer(aWindow);
 
     // Step 5.2. Let permissiveDefaults be true if safe is false;
     // false otherwise.
@@ -99,8 +102,9 @@ already_AddRefed<Sanitizer> Sanitizer::GetInstance(
 already_AddRefed<Sanitizer> Sanitizer::Constructor(
     const GlobalObject& aGlobal,
     const SanitizerConfigOrSanitizerPresets& aConfig, ErrorResult& aRv) {
-  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
-  RefPtr<Sanitizer> sanitizer = new Sanitizer(global);
+  nsCOMPtr<nsPIDOMWindowInner> window =
+      do_QueryInterface(aGlobal.GetAsSupports());
+  RefPtr<Sanitizer> sanitizer = new Sanitizer(window);
 
   // Step 1. If configuration is a SanitizerPresets string, then:
   if (aConfig.IsSanitizerPresets()) {
@@ -132,6 +136,7 @@ void Sanitizer::SetDefaultConfig() {
   MOZ_ASSERT(mDataAttributes.isNothing());
 
   mIsDefaultConfig = true;
+  mCountsAsDefaultConfig = true;
 
   // https://html.spec.whatwg.org/#built-in-safe-default-configuration
   // {
@@ -821,20 +826,97 @@ void Sanitizer::AssertIsValid() const {
 #endif
 }
 
+void Sanitizer::RecordConfigKeyUse(UseCounter aCounter) const {
+  if (Document* doc = mWindow->GetExtantDoc()) {
+    doc->SetUseCounter(aCounter);
+  }
+}
+
+void Sanitizer::RecordConfigChange(UseCounter aCounter) {
+  mCountsAsDefaultConfig = false;
+  RecordConfigKeyUse(aCounter);
+}
+
+void Sanitizer::RecordSanitizeUse() const {
+  // Recorded here rather than in SetDefaultConfig(), so that it means "an
+  // unmodified default configuration was used to sanitize" rather than "a
+  // default configuration was created".
+  if (mCountsAsDefaultConfig) {
+    RecordConfigKeyUse(eUseCounter_custom_SanitizerDefaultConfig);
+  }
+}
+
+template <typename T>
+void Sanitizer::RecordElementAttributeKeyUses(const T& aElement) const {
+  if (!aElement.IsSanitizerElementNamespaceWithAttributes()) {
+    return;
+  }
+
+  const auto& element = aElement.GetAsSanitizerElementNamespaceWithAttributes();
+  if (element.mAttributes.WasPassed()) {
+    RecordConfigKeyUse(eUseCounter_custom_SanitizerConfigElementAttributes);
+  }
+  if (element.mRemoveAttributes.WasPassed()) {
+    RecordConfigKeyUse(
+        eUseCounter_custom_SanitizerConfigElementRemoveAttributes);
+  }
+}
+
+void Sanitizer::RecordDictionaryConfigKeyUses(
+    const SanitizerConfig& aConfig) const {
+  // An empty dictionary is not the built-in default configuration: it
+  // canonicalizes to empty remove lists, which allows everything except what
+  // "remove unsafe" strips.
+  if (!aConfig.IsAnyMemberPresent()) {
+    RecordConfigKeyUse(eUseCounter_custom_SanitizerEmptyConfig);
+    return;
+  }
+
+#define CHECK_CONFIG(key_)                                        \
+  if (aConfig.m##key_.WasPassed()) {                              \
+    RecordConfigKeyUse(eUseCounter_custom_SanitizerConfig##key_); \
+  }
+
+  CHECK_CONFIG(Elements);
+  CHECK_CONFIG(RemoveElements);
+  CHECK_CONFIG(ReplaceWithChildrenElements);
+  CHECK_CONFIG(Attributes);
+  CHECK_CONFIG(RemoveAttributes);
+  CHECK_CONFIG(ProcessingInstructions);
+  CHECK_CONFIG(RemoveProcessingInstructions);
+  CHECK_CONFIG(Comments);
+  CHECK_CONFIG(DataAttributes);
+  CHECK_CONFIG(JavascriptURLs);
+
+#undef CHECK_CONFIG
+
+  if (aConfig.mElements.WasPassed()) {
+    for (const auto& element : aConfig.mElements.Value()) {
+      RecordElementAttributeKeyUses(element);
+    }
+  }
+}
+
 // https://html.spec.whatwg.org/#configure-a-sanitizer
 void Sanitizer::SetConfig(const SanitizerConfig& aConfig,
                           bool aPermissiveDefaults, ErrorResult& aRv) {
   // Step 1. Canonicalize configuration with permissiveDefaults.
   CanonicalizeConfiguration(aConfig, aPermissiveDefaults, aRv);
   if (aRv.Failed()) {
+    RecordConfigKeyUse(eUseCounter_custom_SanitizerInvalidConfig);
     return;
   }
 
   // Step 2. If configuration is not valid, then throw a TypeError.
   IsValid(aRv);
   if (aRv.Failed()) {
+    RecordConfigKeyUse(eUseCounter_custom_SanitizerInvalidConfig);
     return;
   }
+
+  // Only record accepted configurations; a rejected one is already covered by
+  // SanitizerInvalidConfig above.
+  RecordDictionaryConfigKeyUses(aConfig);
 
   // Step 3. Set sanitizer's configuration to configuration.
   // Note: This was already done in CanonicalizeConfiguration.
@@ -1013,6 +1095,17 @@ void Sanitizer::Get(SanitizerConfig& aConfig) {
 // https://wicg.github.io/sanitizer-api/#sanitizerconfig-allow-an-element
 bool Sanitizer::AllowElement(
     const StringOrSanitizerElementNamespaceWithAttributes& aElement) {
+  if (!AllowElementInternal(aElement)) {
+    return false;
+  }
+
+  RecordConfigChange(eUseCounter_custom_SanitizerConfigElements);
+  RecordElementAttributeKeyUses(aElement);
+  return true;
+}
+
+bool Sanitizer::AllowElementInternal(
+    const StringOrSanitizerElementNamespaceWithAttributes& aElement) {
   MaybeMaterializeDefaultConfig();
 
   // Step 1. Set element to the result of canonicalize a sanitizer element
@@ -1185,11 +1278,9 @@ bool Sanitizer::AllowElement(
        !elementAttributes.mRemoveAttributes->IsEmpty())) {
     // Step 3.1.1. The user agent may report a warning to the console that this
     // operation is not supported.
-    if (auto* win = mGlobal->GetAsInnerWindow()) {
-      nsContentUtils::ReportToConsole(
-          nsIScriptError::warningFlag, "Sanitizer"_ns, win->GetDoc(),
-          PropertiesFile::SECURITY_PROPERTIES, "SanitizerAllowElementIgnored2");
-    }
+    nsContentUtils::ReportToConsole(
+        nsIScriptError::warningFlag, "Sanitizer"_ns, mWindow->GetDoc(),
+        PropertiesFile::SECURITY_PROPERTIES, "SanitizerAllowElementIgnored2");
 
     // Step 3.1.2. Return false.
     return false;
@@ -1229,7 +1320,11 @@ bool Sanitizer::RemoveElement(
   // with element.
   CanonicalElement element = CanonicalizeElement(aElement);
 
-  return RemoveElementCanonical(std::move(element));
+  if (!RemoveElementCanonical(std::move(element))) {
+    return false;
+  }
+  RecordConfigChange(eUseCounter_custom_SanitizerConfigRemoveElements);
+  return true;
 }
 
 bool Sanitizer::RemoveElementCanonical(CanonicalElement&& aElement) {
@@ -1319,6 +1414,8 @@ bool Sanitizer::ReplaceElementWithChildren(
   mReplaceWithChildrenElements->Insert(std::move(element));
 
   // Step 9. Return true.
+  RecordConfigChange(
+      eUseCounter_custom_SanitizerConfigReplaceWithChildrenElements);
   return true;
 }
 
@@ -1340,7 +1437,12 @@ bool Sanitizer::AllowProcessingInstruction(
     // Step 4.2. Append pi to configuration["processingInstructions"].
     //
     // Step 4.3. Return true.
-    return mProcessingInstructions->EnsureInserted(pi);
+    if (!mProcessingInstructions->EnsureInserted(pi)) {
+      return false;
+    }
+    RecordConfigChange(
+        eUseCounter_custom_SanitizerConfigProcessingInstructions);
+    return true;
   }
 
   // Step 5. Otherwise:
@@ -1349,6 +1451,8 @@ bool Sanitizer::AllowProcessingInstruction(
     // Step 5.1.1. Remove pi from configuration["removeProcessingInstructions"].
     mRemoveProcessingInstructions->Remove(pi);
     // Step 5.1.2. Return true.
+    RecordConfigChange(
+        eUseCounter_custom_SanitizerConfigProcessingInstructions);
     return true;
   }
 
@@ -1373,6 +1477,8 @@ bool Sanitizer::RemoveProcessingInstruction(
       // Step 4.1.1. Remove pi from configuration["processingInstructions"].
       mProcessingInstructions->Remove(pi);
       // Step 4.1.2. Return true.
+      RecordConfigChange(
+          eUseCounter_custom_SanitizerConfigRemoveProcessingInstructions);
       return true;
     }
 
@@ -1384,7 +1490,12 @@ bool Sanitizer::RemoveProcessingInstruction(
   // Step 5.1. If configuration["removeProcessingInstructions"] contains pi,
   // then return false. Step 5.2. Append pi to
   // configuration["removeProcessingInstructions"]. Step 5.3. Return true.
-  return mRemoveProcessingInstructions->EnsureInserted(pi);
+  if (!mRemoveProcessingInstructions->EnsureInserted(pi)) {
+    return false;
+  }
+  RecordConfigChange(
+      eUseCounter_custom_SanitizerConfigRemoveProcessingInstructions);
+  return true;
 }
 
 // https://wicg.github.io/sanitizer-api/#sanitizer-allow-an-attribute
@@ -1443,6 +1554,7 @@ bool Sanitizer::AllowAttribute(
     mAttributes->Insert(std::move(attribute));
 
     // Step 2.7. Return true.
+    RecordConfigChange(eUseCounter_custom_SanitizerConfigAttributes);
     return true;
   }
 
@@ -1462,6 +1574,7 @@ bool Sanitizer::AllowAttribute(
   mRemoveAttributes->Remove(attribute);
 
   // Step 3.4. Return true.
+  RecordConfigChange(eUseCounter_custom_SanitizerConfigAttributes);
   return true;
 }
 
@@ -1475,7 +1588,11 @@ bool Sanitizer::RemoveAttribute(
   // with attribute.
   CanonicalAttribute attribute = CanonicalizeAttribute(aAttribute);
 
-  return RemoveAttributeCanonical(std::move(attribute));
+  if (!RemoveAttributeCanonical(std::move(attribute))) {
+    return false;
+  }
+  RecordConfigChange(eUseCounter_custom_SanitizerConfigRemoveAttributes);
+  return true;
 }
 
 bool Sanitizer::RemoveAttributeCanonical(CanonicalAttribute&& aAttribute) {
@@ -1581,6 +1698,7 @@ bool Sanitizer::SetComments(bool aAllow) {
   mComments = aAllow;
 
   // Step 3. Return true.
+  RecordConfigChange(eUseCounter_custom_SanitizerConfigComments);
   return true;
 }
 
@@ -1635,6 +1753,7 @@ bool Sanitizer::SetDataAttributes(bool aAllow) {
   mDataAttributes = Some(aAllow);
 
   // Step 5. Return true.
+  RecordConfigChange(eUseCounter_custom_SanitizerConfigDataAttributes);
   return true;
 }
 
@@ -1652,6 +1771,7 @@ bool Sanitizer::SetJavascriptURLs(bool aAllow) {
   mJavascriptURLs = aAllow;
 
   // Step 5. Return true.
+  RecordConfigChange(eUseCounter_custom_SanitizerConfigJavascriptURLs);
   return true;
 }
 
@@ -1716,6 +1836,11 @@ bool Sanitizer::RemoveUnsafe() {
     // Step 6.2. Set configuration["javascriptURLs"] to false.
     mJavascriptURLs = false;
   }
+
+  if (result) {
+    mCountsAsDefaultConfig = false;
+  }
+
   // Step 7. Return result.
   return result;
 }
@@ -1734,6 +1859,8 @@ void Sanitizer::Sanitize(nsINode* aNode, bool aSafe, ErrorResult& aRv) {
   // here, so we instead explictly remove the handful elements and
   // attributes that are part of "remove unsafe" in the
   // SanitizeChildren() and SanitizeAttributes() methods.
+
+  RecordSanitizeUse();
 
   // Step 3. Call sanitize core on node, configuration, and with
   // handleJavascriptNavigationUrls set to safe.

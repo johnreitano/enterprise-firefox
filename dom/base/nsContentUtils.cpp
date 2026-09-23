@@ -6900,13 +6900,14 @@ static void SetAndFilterHTML(
 
   // Step 2. Let sanitizer be the result of calling get a sanitizer instance
   // from options with options and safe.
-  nsCOMPtr<nsIGlobalObject> global = aTarget->GetRelevantGlobal();
-  if (!global) {
+  nsCOMPtr<nsPIDOMWindowInner> window =
+      do_QueryInterface(aTarget->GetRelevantGlobal());
+  if (!window) {
     aError.ThrowInvalidStateError("Missing owner global.");
     return;
   }
   RefPtr<Sanitizer> sanitizer =
-      Sanitizer::GetInstance(global, aSanitizerOptions, aSafe, aError);
+      Sanitizer::GetInstance(window, aSanitizerOptions, aSafe, aError);
   if (aError.Failed()) {
     return;
   }

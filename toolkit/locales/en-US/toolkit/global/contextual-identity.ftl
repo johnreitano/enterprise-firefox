@@ -26,10 +26,6 @@ user-context-manage-containers2 =
 # The below strings need separate messages for use in panel-list implementations,
 # which take their label from the message value rather than a .label attribute.
 
-user-context-personal2-panel-item = Personal
-user-context-work2-panel-item = Work
-user-context-banking2-panel-item = Banking
-user-context-shopping2-panel-item = Shopping
 user-context-new-tab2-panel-item = New Tab
 user-context-add-container2-panel-item = Add new container
 user-context-manage-containers2-panel-item = Manage containers

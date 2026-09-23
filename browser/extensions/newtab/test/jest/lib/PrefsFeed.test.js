@@ -58,9 +58,6 @@ describe("PrefsFeed", () => {
       ["baz", { value: 1, skipBroadcast: true }],
       ["qux", { value: 1, skipBroadcast: true, alsoToPreloaded: true }],
     ]);
-    // Services.vc.compare defaults to 0, i.e. a supported (>= 155) host, so
-    // that the theme-picker backward-compat gate lets the existing
-    // browserNovaEnabled assertions hold.
     services = mockServices(["prefs", "obs", "vc"]);
     nimbusFeatures = mockNimbusFeatures();
     region = { home: "US", REGION_TOPIC: "browser-region-updated" };
@@ -324,9 +321,8 @@ describe("PrefsFeed", () => {
         })
       );
     });
-    it("keeps browserNovaEnabled false on hosts older than 155 even when the pref is on", () => {
-      services.prefs.getBoolPref.mockReturnValue(true);
-      services.vc.compare.mockReturnValue(-1);
+    it("broadcasts browserNovaEnabled false when browser.nova.enabled is off", () => {
+      services.prefs.getBoolPref.mockReturnValue(false);
       feed.observe(null, "nsPref:changed", "browser.nova.enabled");
       expect(feed.store.dispatch).toHaveBeenCalledWith(
         ac.BroadcastToContent({
@@ -573,6 +569,38 @@ describe("PrefsFeed", () => {
 
       expect(calledNames(feed._prefs.set)).not.toContain(
         "spaces.storiesOptOut"
+      );
+    });
+
+    // Bug 2068165: the control reads an override, so it shows the space as on
+    // while the pref is already off. Switching it off writes the value the pref
+    // already holds, the branch observer never fires, and without mirroring
+    // from the write itself the override survives and the control goes inert.
+    it("should opt out when SET_PREF writes the value the pref already holds", () => {
+      FAKE_PREFS.set("feeds.section.topstories", false);
+
+      feed.onAction({
+        type: at.SET_PREF,
+        data: { name: "feeds.section.topstories", value: false },
+      });
+
+      expect(feed._prefs.set).toHaveBeenCalledWith(
+        "spaces.storiesOptOut",
+        true
+      );
+    });
+
+    it("should opt out when SET_MULTIPLE_PREFS writes an unchanged value", () => {
+      FAKE_PREFS.set("widgets.enabled", false);
+
+      feed.onAction({
+        type: at.SET_MULTIPLE_PREFS,
+        data: { values: { "widgets.enabled": false } },
+      });
+
+      expect(feed._prefs.set).toHaveBeenCalledWith(
+        "spaces.widgetsOptOut",
+        true
       );
     });
 

@@ -2206,6 +2206,7 @@ nsresult nsHttpChannel::InitTransaction() {
 
   HttpTrafficCategory category = CreateTrafficCategory();
   mTransaction->SetIsForWebTransport(!!mWebTransportSessionEventListener);
+  mTransaction->SetRequestBodyIsStreaming(LoadUploadStreamIsStreaming());
 
   RefPtr<mozilla::dom::BrowsingContext> bc;
   mLoadInfo->GetBrowsingContext(getter_AddRefs(bc));
@@ -3501,6 +3502,15 @@ nsresult nsHttpChannel::ContinueProcessResponse3(nsresult rv) {
         // It's up to the consumer to re-try w/o setting a custom
         // auth header if cached credentials should be attempted.
         rv = NS_ERROR_FAILURE;
+      } else if (httpStatus == 401 && LoadUploadStreamIsStreaming() &&
+                 !(mLoadFlags & LOAD_ANONYMOUS)) {
+        // A body whose source is null cannot be resubmitted with credentials,
+        // so this is a network error rather than an auth prompt. Ahead of the
+        // frame-ancestor check, which would still deliver the 401. Still too
+        // broad for mode "cors" with credentials "include", which the channel
+        // cannot tell apart from the cases the spec fails here.
+        // https://fetch.spec.whatwg.org/#concept-http-network-or-cache-fetch
+        rv = NS_ERROR_NET_BODY_NOT_REPLAYABLE;
       } else if (httpStatus == 401 &&
                  !nsContentSecurityUtils::CheckCSPFrameAncestorAndXFO(this)) {
         // CSP Frame Ancestor and X-Frame-Options check has failed
@@ -3545,7 +3555,8 @@ nsresult nsHttpChannel::ContinueProcessResponse3(nsresult rv) {
         if (mTransaction && mTransaction->ProxyConnectFailed()) {
           return ProcessFailedProxyConnect(httpStatus);
         }
-        if (rv == NS_ERROR_BASIC_HTTP_AUTH_DISABLED) {
+        if (rv == NS_ERROR_BASIC_HTTP_AUTH_DISABLED ||
+            rv == NS_ERROR_NET_BODY_NOT_REPLAYABLE) {
           mStatus = rv;
         }
         rv = ProcessNormal();
@@ -6520,8 +6531,9 @@ bool nsHttpChannel::ParseDictionary(nsICacheEntry* aEntry,
     uint32_t expTime = 0;
     (void)GetCacheTokenExpirationTime(&expTime);
 
+    RefPtr<LoadContextInfo> lci = GetLoadContextInfo(this);
     dicts->AddEntry(mURI, key, matchVal, matchDestItems, matchIdVal, Some(hash),
-                    aModified, expTime, getter_AddRefs(mDictSaving));
+                    aModified, expTime, lci, getter_AddRefs(mDictSaving));
     // If this was 304 Not Modified, then we don't need the dictionary data
     // (though we may update the dictionary entry if the match/id/etc changed).
     // If this is 304, mDictSaving will be cleared by AddEntry.
@@ -6741,7 +6753,8 @@ nsresult nsHttpChannel::DoInstallCacheListener(bool aSaveDecompressed,
              LoadHasAppliedConversion(), this));
         MOZ_DIAGNOSTIC_ASSERT(false, "Can't save dictionary uncompressed");
         mCacheEntry->SetDictionary(nullptr);
-        DictionaryCache::RemoveDictionary(nsCString(mDictSaving->GetURI()));
+        DictionaryCache::RemoveDictionary(nsCString(mDictSaving->GetURI()),
+                                          mDictSaving->GetLoadContextInfo());
         mDictSaving = nullptr;
       }
     }
@@ -8518,14 +8531,23 @@ void nsHttpChannel::MaybeStartDNSPrefetch() {
                                         });
     }
 
-    // Issue per-family prefetches (A and AAAA) so Happy Eyeballs can reuse
-    // them instead of starting its own lookups. Skip a family that won't be
-    // queried; with IPv6 disabled the AAAA request collapses to A, so skip it
-    // to avoid a duplicate.
-    bool skipIPv4 = mCaps & NS_HTTP_DISABLE_IPV4;
-    bool skipIPv6 = (mCaps & NS_HTTP_DISABLE_IPV6) ||
-                    StaticPrefs::network_dns_disableIPv6();
-    (void)mDNSPrefetch->PrefetchHighPerFamily(dnsFlags, skipIPv4, skipIPv6);
+    if (StaticPrefs::network_http_happy_eyeballs_enabled()) {
+      // Happy Eyeballs connects per-family, so issue per-family prefetches
+      // (A and AAAA) that it can reuse instead of starting its own lookups.
+      // Skip a family that won't be queried; with IPv6 disabled the AAAA
+      // request collapses to A, so skip it to avoid a duplicate.
+      bool skipIPv4 = mCaps & NS_HTTP_DISABLE_IPV4;
+      bool skipIPv6 = (mCaps & NS_HTTP_DISABLE_IPV6) ||
+                      StaticPrefs::network_dns_disableIPv6();
+      (void)mDNSPrefetch->PrefetchHighPerFamily(dnsFlags, skipIPv4, skipIPv6);
+    } else {
+      if (mCaps & NS_HTTP_DISABLE_IPV4) {
+        dnsFlags |= nsIDNSService::RESOLVE_DISABLE_IPV4;
+      } else if (mCaps & NS_HTTP_DISABLE_IPV6) {
+        dnsFlags |= nsIDNSService::RESOLVE_DISABLE_IPV6;
+      }
+      (void)mDNSPrefetch->PrefetchHigh(dnsFlags);
+    }
   }
 }
 

@@ -1673,6 +1673,7 @@ class StyleRuleActor extends Actor {
    *   `20`,
    * ]
    *
+   * @param {string} property: The CSS property the expression is applied to
    * @param {string} expression: The CSS expression to be explained
    * @param {string} pseudo: An optional pseudo-element type in cases when the CSS
    *        rule applies to a pseudo-element.
@@ -1680,7 +1681,7 @@ class StyleRuleActor extends Actor {
    *        If not passed, this.currentlySelectedElement will be used instead.
    * @returns Array<string>
    */
-  getCssExplainersData(expression, pseudo, inheritedNode) {
+  getCssExplainersData(property, expression, pseudo, inheritedNode) {
     let element = inheritedNode?.rawNode || this.currentlySelectedElement;
     // If we have a pseudo element, we want to pass its binding element
     // to the InspectorUtils method
@@ -1688,7 +1689,12 @@ class StyleRuleActor extends Actor {
       element =
         SharedCssLogic.getBindingElementAndPseudo(element).bindingElement;
     }
-    return InspectorUtils.getComputationSteps(expression, element, pseudo);
+    return InspectorUtils.getComputationSteps(
+      property,
+      expression,
+      element,
+      pseudo
+    );
   }
 }
 exports.StyleRuleActor = StyleRuleActor;

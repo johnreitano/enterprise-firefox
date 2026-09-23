@@ -11,6 +11,7 @@
 #include "mozilla/ContentBlockingNotifier.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/StaticPrefs_beacon.h"
 #include "mozilla/StaticPrefs_dom.h"
 #include "mozilla/dom/BodyExtractor.h"
 #include "mozilla/dom/FetchBinding.h"
@@ -1202,6 +1203,21 @@ bool Navigator::SendBeacon(const nsAString& aUrl,
     return SendBeaconInternal(aUrl, nullptr, eBeaconTypeOther, aRv);
   }
 
+  // A beacon request has keepalive set, and extracting a body from a
+  // ReadableStream with keepalive throws.
+  // https://fetch.spec.whatwg.org/#concept-bodyinit-extract step 10
+  if (StaticPrefs::dom_fetch_streaming_upload()) {
+    if (aData.Value().IsReadableStream()) {
+      aRv.ThrowTypeError("sendBeacon cannot send a ReadableStream body");
+      return false;
+    }
+  } else if (aData.Value().IsReadableStream()) {
+    // Preserve previous behaviour when the pref is false.
+    nsAutoString stringified(u"[object ReadableStream]"_ns);
+    BodyExtractor<const nsAString> body(&stringified);
+    return SendBeaconInternal(aUrl, &body, eBeaconTypeOther, aRv);
+  }
+
   if (aData.Value().IsArrayBuffer()) {
     BodyExtractor<const ArrayBuffer> body(&aData.Value().GetAsArrayBuffer());
     return SendBeaconInternal(aUrl, &body, eBeaconTypeArrayBuffer, aRv);
@@ -1294,6 +1310,12 @@ bool Navigator::SendBeaconInternal(const nsAString& aUrl,
     securityFlags |= nsILoadInfo::SEC_REQUIRE_CORS_INHERITS_SEC_CONTEXT;
   } else {
     securityFlags |= nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_INHERITS_SEC_CONTEXT;
+  }
+
+  // Bail out only after the spec-mandated validation above, so that a disabled
+  // beacon is indistinguishable from a successful one to content.
+  if (!StaticPrefs::beacon_enabled()) {
+    return true;
   }
 
   nsCOMPtr<nsIChannel> channel;

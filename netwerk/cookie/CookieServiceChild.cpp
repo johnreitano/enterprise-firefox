@@ -363,8 +363,7 @@ CookieServiceChild::RecordDocumentCookie(Cookie* aCookie,
     }
   }
 
-  int64_t currentTimeInMSec = PR_Now() / PR_USEC_PER_MSEC;
-  if (aCookie->ExpiryInMSec() <= currentTimeInMSec) {
+  if (aCookie->IsExpired()) {
     return cookieFound ? CookieNotificationAction::CookieDeleted
                        : CookieNotificationAction::NoActionNeeded;
   }
@@ -404,8 +403,15 @@ void CookieServiceChild::GetCookiesFromHost(
   CookiesList* cookiesList = nullptr;
   mCookiesMap.Get(key, &cookiesList);
 
-  if (cookiesList) {
-    aCookies.AppendElements(*cookiesList);
+  if (!cookiesList) {
+    return;
+  }
+
+  int64_t currentTimeInMSec = PR_Now() / PR_USEC_PER_MSEC;
+  for (Cookie* cookie : *cookiesList) {
+    if (!cookie->IsExpired(currentTimeInMSec)) {
+      aCookies.AppendElement(cookie);
+    }
   }
 }
 
@@ -421,7 +427,18 @@ bool CookieServiceChild::HasExistingCookies(
   CookieKey key(aBaseDomain, aOriginAttributes);
   mCookiesMap.Get(key, &cookiesList);
 
-  return cookiesList ? cookiesList->Length() : false;
+  if (!cookiesList) {
+    return false;
+  }
+
+  int64_t currentTimeInMSec = PR_Now() / PR_USEC_PER_MSEC;
+  for (Cookie* cookie : *cookiesList) {
+    if (!cookie->IsExpired(currentTimeInMSec)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 void CookieServiceChild::AddCookieFromDocument(

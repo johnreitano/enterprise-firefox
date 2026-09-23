@@ -899,13 +899,6 @@ const POLICIES_TESTS = [
     },
   },
 
-  // POLICY: EnterpriseStorageEncryption
-
-  {
-    policies: { EnterpriseStorageEncryption: true },
-    lockedPrefs: { "security.storage.encryption.enabled": true },
-  },
-
   // POLICY: PDFjs
 
   {
@@ -1509,6 +1502,58 @@ const POLICIES_TESTS = [
     lockedPrefs: {
       "browser.contentanalysis.enterprise.telemetry.enabled": false,
       "browser.contentanalysis.enterprise.telemetry.urlLogging": "none",
+    },
+  },
+
+  // POLICY: SignOut
+  {
+    policies: {
+      SignOut: {
+        Shutdown: {
+          Action: "lock",
+        },
+      },
+    },
+    // Locking on shutdown persists the session behind OS auth instead of signing out.
+    lockedPrefs: {
+      "enterprise.locking.shutdown": true,
+    },
+  },
+  {
+    policies: {
+      SignOut: {
+        Shutdown: {
+          Action: "signout",
+        },
+      },
+    },
+    lockedPrefs: {
+      "enterprise.locking.shutdown": false,
+    },
+  },
+  {
+    policies: {
+      SignOut: {
+        Restart: {
+          Action: "lock",
+        },
+      },
+    },
+    // Locking on restart persists the session behind OS auth instead of signing out.
+    lockedPrefs: {
+      "enterprise.locking.restart": true,
+    },
+  },
+  {
+    policies: {
+      SignOut: {
+        Restart: {
+          Action: "signout",
+        },
+      },
+    },
+    lockedPrefs: {
+      "enterprise.locking.restart": false,
     },
   },
 ];

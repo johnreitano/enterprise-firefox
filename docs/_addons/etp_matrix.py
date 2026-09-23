@@ -231,7 +231,7 @@ FEATURES = [
         "pb_code": None,
         "pref_normal": "privacy.bounceTrackingProtection.mode",
         "pref_pb": None,
-        "desc": "Clears state for sites used as bounce trackers. See [Bounce Tracking Protection docs](../bounce-tracking-protection) for mode values.",
+        "desc": "Clears state for sites used as bounce trackers. See [Bounce Tracking Protection docs](/toolkit/components/antitracking/anti-tracking/bounce-tracking-protection/index.md) for mode values.",
     },
     {
         "name": "Local Network Access Blocking",

@@ -156,7 +156,7 @@ async function run_test_1() {
   Assert.equal(cv.result, Ci.nsICookieValidation.eOK, "Valid cookie");
 
   // Check that the cookie service accepted the new cookie.
-  Assert.equal(Services.cookies.countCookiesFromHost(cookie.host), 1);
+  Assert.equal(Services.cookies.countCookiesFromHost(cookie.host, {}), 1);
 
   let isRebuildingDone = false;
   let rebuildingObserve = function () {
@@ -170,7 +170,7 @@ async function run_test_1() {
   // cookie thread. Trigger some access of cookies to ensure we won't crash in
   // the chaos status.
   for (let i = 0; i < 10; ++i) {
-    Assert.equal(Services.cookies.countCookiesFromHost(cookie.host), 1);
+    Assert.equal(Services.cookies.countCookiesFromHost(cookie.host, {}), 1);
     await new Promise(resolve => executeSoon(resolve));
   }
 
@@ -183,8 +183,8 @@ async function run_test_1() {
   await new Promise(resolve => executeSoon(resolve));
 
   // At this point, the cookies should still be in memory.
-  Assert.equal(Services.cookies.countCookiesFromHost("foo.com"), 1);
-  Assert.equal(Services.cookies.countCookiesFromHost(cookie.host), 1);
+  Assert.equal(Services.cookies.countCookiesFromHost("foo.com", {}), 1);
+  Assert.equal(Services.cookies.countCookiesFromHost(cookie.host, {}), 1);
   Assert.equal(do_count_cookies(), 2);
 
   // Close the profile.
@@ -200,7 +200,7 @@ async function run_test_1() {
   // Load the profile, and check that it contains the new cookie.
   do_load_profile();
 
-  Assert.equal(Services.cookies.countCookiesFromHost("foo.com"), 1);
+  Assert.equal(Services.cookies.countCookiesFromHost("foo.com", {}), 1);
   let cookies = Services.cookies.getCookiesFromHost(cookie.host, {});
   Assert.equal(cookies.length, 1);
   let dbcookie = cookies[0];
@@ -252,7 +252,7 @@ async function run_test_2() {
   Assert.ok(!do_get_backup_file().exists());
 
   // Recreate a new database since it was corrupted
-  Assert.equal(Services.cookies.countCookiesFromHost("0.com"), 0);
+  Assert.equal(Services.cookies.countCookiesFromHost("0.com", {}), 0);
   Assert.equal(do_count_cookies(), 0);
 
   // Close the profile.
@@ -265,7 +265,7 @@ async function run_test_2() {
   db.close();
 
   do_load_profile();
-  Assert.equal(Services.cookies.countCookiesFromHost("0.com"), 0);
+  Assert.equal(Services.cookies.countCookiesFromHost("0.com", {}), 0);
   Assert.equal(do_count_cookies(), 0);
 
   // Close the profile.
@@ -328,8 +328,8 @@ async function run_test_3() {
   Assert.ok(!do_get_backup_file().exists());
 
   // Recreate a new database since it was corrupted
-  Assert.equal(Services.cookies.countCookiesFromHost("hither.com"), 0);
-  Assert.equal(Services.cookies.countCookiesFromHost("haithur.com"), 0);
+  Assert.equal(Services.cookies.countCookiesFromHost("hither.com", {}), 0);
+  Assert.equal(Services.cookies.countCookiesFromHost("haithur.com", {}), 0);
 
   // Close the profile.
   await promise_close_profile();
@@ -406,7 +406,7 @@ async function run_test_4() {
   Assert.ok(!do_get_backup_file().exists());
 
   // Recreate a new database since it was corrupted
-  Assert.equal(Services.cookies.countCookiesFromHost("0.com"), 0);
+  Assert.equal(Services.cookies.countCookiesFromHost("0.com", {}), 0);
 
   // Queue up an INSERT for the same base domain. This should also go into
   // memory and be written out during database rebuild.
@@ -416,7 +416,7 @@ async function run_test_4() {
   );
 
   // At this point, the cookies should still be in memory.
-  Assert.equal(Services.cookies.countCookiesFromHost("0.com"), 1);
+  Assert.equal(Services.cookies.countCookiesFromHost("0.com", {}), 1);
   Assert.equal(do_count_cookies(), 1);
 
   // Close the profile.
@@ -428,7 +428,7 @@ async function run_test_4() {
 
   // Load the profile, and check that it contains the new cookie.
   do_load_profile();
-  Assert.equal(Services.cookies.countCookiesFromHost("0.com"), 1);
+  Assert.equal(Services.cookies.countCookiesFromHost("0.com", {}), 1);
   Assert.equal(do_count_cookies(), 1);
 
   // Close the profile.
@@ -480,8 +480,8 @@ async function run_test_5() {
   Assert.ok(!do_get_backup_file().exists());
 
   // Recreate a new database since it was corrupted
-  Assert.equal(Services.cookies.countCookiesFromHost("bar.com"), 0);
-  Assert.equal(Services.cookies.countCookiesFromHost("0.com"), 0);
+  Assert.equal(Services.cookies.countCookiesFromHost("bar.com", {}), 0);
+  Assert.equal(Services.cookies.countCookiesFromHost("0.com", {}), 0);
   Assert.equal(do_count_cookies(), 0);
   Assert.ok(do_get_backup_file().exists());
   Assert.equal(do_get_backup_file().fileSize, size);
@@ -499,8 +499,8 @@ async function run_test_5() {
   Assert.ok(do_get_backup_file().exists());
   Assert.equal(do_get_backup_file().fileSize, size);
 
-  Assert.equal(Services.cookies.countCookiesFromHost("bar.com"), 0);
-  Assert.equal(Services.cookies.countCookiesFromHost("0.com"), 0);
+  Assert.equal(Services.cookies.countCookiesFromHost("bar.com", {}), 0);
+  Assert.equal(Services.cookies.countCookiesFromHost("0.com", {}), 0);
   Assert.equal(do_count_cookies(), 0);
 
   // Close the profile. We do not need to wait for completion, because the

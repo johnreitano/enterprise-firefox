@@ -187,7 +187,7 @@ EXPORTS.mozilla += [
     "DimensionRequest.h",
     "EventClassList.inc",
     "EventForwards.h",
-    "EventMessageList.h",
+    "EventMessageList.inc",
     "FontRange.h",
     "LookAndFeel.h",
     "MiscEvents.h",

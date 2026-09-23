@@ -1155,7 +1155,7 @@ parent:
     async SessionHistoryEntryWireframe(MaybeDiscardedBrowsingContext aContext,
                                        Wireframe aWireframe);
 
-    async GetLoadingSessionHistoryInfoFromParent(MaybeDiscardedBrowsingContext aContext)
+    async AdoptChildSHEntry(MaybeDiscardedBrowsingContext aContext)
         returns (LoadingSessionHistoryInfo? aLoadingInfo);
 
     async SynchronizeNavigationAPIState(MaybeDiscardedBrowsingContext aContext,
@@ -1816,7 +1816,7 @@ parent:
     async HistoryReload(MaybeDiscardedBrowsingContext aContext, uint32_t aReloadFlags);
 
     async NotifyOnHistoryReload(MaybeDiscardedBrowsingContext aContext,
-                                bool aForceReload)
+                                uint32_t aReloadFlags)
             returns (bool canReload, nsDocShellLoadState? loadState,
                      bool? reloadActiveEntry);
 

@@ -27,31 +27,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "adblock"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "698c1e831aaee3d583efe775790acc7d59fd99d8060e7385b99d2d369a5cdca8"
-dependencies = [
- "arrayvec",
- "base64 0.22.1",
- "bitflags 2.10.0",
- "flatbuffers",
- "idna",
- "itertools 0.13.0",
- "memchr",
- "once_cell",
- "percent-encoding",
- "precomputed-hash",
- "regex",
- "rustc-hash 1.999.999",
- "seahash",
- "serde",
- "serde_json",
- "thiserror 1.999.999",
- "url",
-]
-
-[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1150,11 +1125,12 @@ dependencies = [
 name = "content_classifier_engine"
 version = "0.0.1"
 dependencies = [
- "adblock",
  "cstr",
+ "etp_engine",
  "nserror",
  "nsstring",
  "thin-vec",
+ "wr_malloc_size_of",
  "xpcom",
 ]
 
@@ -1985,6 +1961,7 @@ dependencies = [
  "nsstring",
  "serde",
  "serde_json",
+ "thin-vec",
 ]
 
 [[package]]
@@ -2244,6 +2221,30 @@ dependencies = [
  "euclid",
  "serde",
  "svg_fmt",
+]
+
+[[package]]
+name = "etp_engine"
+version = "0.1.0"
+dependencies = [
+ "arrayvec",
+ "base64 0.22.1",
+ "bitflags 2.10.0",
+ "flatbuffers",
+ "idna",
+ "itertools 0.13.0",
+ "memchr",
+ "once_cell",
+ "percent-encoding",
+ "precomputed-hash",
+ "regex",
+ "rustc-hash 1.999.999",
+ "seahash",
+ "serde",
+ "serde_json",
+ "thiserror 1.999.999",
+ "url",
+ "wr_malloc_size_of",
 ]
 
 [[package]]
@@ -3015,7 +3016,6 @@ version = "0.1.0"
 dependencies = [
  "aa-stroke",
  "abridged_certs",
- "adblock",
  "app_collator_glue",
  "audio_thread_priority",
  "audioipc2-client",
@@ -3045,6 +3045,7 @@ dependencies = [
  "dom_speculationrules",
  "encoding_glue",
  "etagere",
+ "etp_engine",
  "felt",
  "fluent",
  "fluent-fallback",
@@ -3090,6 +3091,7 @@ dependencies = [
  "mp4parse_capi",
  "neqo_glue",
  "netwerk_helper",
+ "noise",
  "nserror",
  "nsstring",
  "oblivious_http",
@@ -3186,9 +3188,9 @@ dependencies = [
 
 [[package]]
 name = "glean"
-version = "70.0.0"
+version = "70.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f549f249ef23f8ff7c32474eb52d83f38724bd8d53cb6f705a384daa5971401"
+checksum = "d8032ff773d88bbfee2a14b4fe3a875adb10068695d3ea0f3ce2aa33efaf9b28"
 dependencies = [
  "crossbeam-channel",
  "glean-core",
@@ -3209,9 +3211,9 @@ dependencies = [
 
 [[package]]
 name = "glean-core"
-version = "70.0.0"
+version = "70.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4268c25e83ff4d4497818a78aff3e7e547fc574922b6b6a25cba3fb0619109e"
+checksum = "c976fc97fd10188c77961b748e446170acb0bbecbc4aa74ca9a3602197d38a2a"
 dependencies = [
  "android_logger",
  "bincode",
@@ -3225,7 +3227,6 @@ dependencies = [
  "oslog",
  "rkv",
  "rmp-serde",
- "rusqlite 0.37.0",
  "serde",
  "serde_json",
  "thiserror 2.0.12",
@@ -4205,9 +4206,9 @@ dependencies = [
 
 [[package]]
 name = "jxl"
-version = "0.7.3"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35aca5f134772b17dd8361cc73e25454e2420a7230afaeece1d476b1949d0193"
+checksum = "43b041e4bd5bb931cf73b271bc3304eb135bb473914877d64bf77fdf5b4d4687"
 dependencies = [
  "array-init",
  "byteorder",
@@ -4232,9 +4233,9 @@ dependencies = [
 
 [[package]]
 name = "jxl_macros"
-version = "0.7.3"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b80e14920b09c3ee9c1e7b73958326515e4c07f14d569a28f657d0301a214c7"
+checksum = "7401c9c53e44e2efa17d7562c613f0972b93cf134aa91f08c14e00c8278ce663"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4243,16 +4244,16 @@ dependencies = [
 
 [[package]]
 name = "jxl_simd"
-version = "0.7.3"
+version = "0.7.4"
 dependencies = [
  "rustversion",
 ]
 
 [[package]]
 name = "jxl_transforms"
-version = "0.7.3"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f8bdfa4b7b3465e54beb39fe0f37e8d8d74225ef8a36f6870b1cbc4081ec808"
+checksum = "8f72e196c6c1e938a4c7e2175d7c83464fa9e7f587224d310cac15d83fc80a37"
 dependencies = [
  "jxl_simd",
 ]
@@ -5020,8 +5021,8 @@ dependencies = [
 
 [[package]]
 name = "mls-platform-api"
-version = "0.2.0"
-source = "git+https://github.com/mozilla/mls-platform-api?rev=eb1c880304127bcb7d0ee6d701fd4ca9ebc73403#eb1c880304127bcb7d0ee6d701fd4ca9ebc73403"
+version = "0.42.0"
+source = "git+https://github.com/mozilla/mls-platform-api?tag=0.42.0#6e6d1ad67f957faf64823d703fc32885c90115cf"
 dependencies = [
  "bincode",
  "hex",
@@ -5030,15 +5031,14 @@ dependencies = [
  "mls-rs-provider-sqlite",
  "serde",
  "serde_json",
- "sha2",
  "thiserror 2.0.12",
 ]
 
 [[package]]
 name = "mls-rs"
-version = "0.54.0"
+version = "0.56.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "210707fc5b5109801dc32cff1563f7d56568f04757bf92df9c23b2de8c2caacf"
+checksum = "4392c3b3ed7d835ca8f318f85ca65d3f0d3e879538d6e70679827a2f3af72029"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -5088,9 +5088,9 @@ dependencies = [
 
 [[package]]
 name = "mls-rs-core"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a39fcfdd769f82037ef92052b6cfc3061822f220767227b56bda73208cc59a7e"
+checksum = "e282079e5bd2fe95a009ac8af6a8e510924d876234ee494cd97f15f52de53cb0"
 dependencies = [
  "async-trait",
  "hex",
@@ -5105,9 +5105,9 @@ dependencies = [
 
 [[package]]
 name = "mls-rs-crypto-hpke"
-version = "0.20.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c1f63b7c46e7f40b6ca6ef3a14362abc5617048d6e9f24ea53c7a4922d7fbcf"
+checksum = "b53db9a20568dec53e4f280ec8152c862b98efe105894e378d996be3305f32f2"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -5121,16 +5121,15 @@ dependencies = [
 [[package]]
 name = "mls-rs-crypto-nss"
 version = "0.2.1"
-source = "git+https://github.com/mozilla/mls-platform-api?rev=eb1c880304127bcb7d0ee6d701fd4ca9ebc73403#eb1c880304127bcb7d0ee6d701fd4ca9ebc73403"
+source = "git+https://github.com/mozilla/mls-platform-api?tag=0.42.0#6e6d1ad67f957faf64823d703fc32885c90115cf"
 dependencies = [
- "getrandom 0.2.999",
+ "getrandom 0.3.3",
  "hex",
  "maybe-async",
  "mls-rs-core",
  "mls-rs-crypto-hpke",
  "mls-rs-crypto-traits",
  "nss-rs",
- "rand_core",
  "serde",
  "thiserror 2.0.12",
  "zeroize",
@@ -5138,9 +5137,9 @@ dependencies = [
 
 [[package]]
 name = "mls-rs-crypto-traits"
-version = "0.21.0"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d70626f39505eaeda9b90429665cb8fdc56538a0b3e357a636125662b6cb80ab"
+checksum = "49171fd5c7c77cd29ec452dcc6f537b8c568084b97023dcc5c0d41140da8ceb4"
 dependencies = [
  "async-trait",
  "maybe-async",
@@ -5150,9 +5149,9 @@ dependencies = [
 
 [[package]]
 name = "mls-rs-identity-x509"
-version = "0.20.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6ab2bf0bae192901fc53a87536381c5d26263cfe1bb0907ee88675998469ffc"
+checksum = "ec1ecb6a61a296b8240cea19171477293663dcc6540353dc8cbcda2d9f61039b"
 dependencies = [
  "async-trait",
  "maybe-async",
@@ -5163,8 +5162,8 @@ dependencies = [
 
 [[package]]
 name = "mls-rs-provider-sqlite"
-version = "0.22.0"
-source = "git+https://github.com/mozilla/mls-platform-api?rev=eb1c880304127bcb7d0ee6d701fd4ca9ebc73403#eb1c880304127bcb7d0ee6d701fd4ca9ebc73403"
+version = "0.23.0"
+source = "git+https://github.com/mozilla/mls-platform-api?tag=0.42.0#6e6d1ad67f957faf64823d703fc32885c90115cf"
 dependencies = [
  "async-trait",
  "hex",
@@ -5455,7 +5454,7 @@ dependencies = [
 [[package]]
 name = "mp4parse"
 version = "0.17.0"
-source = "git+https://github.com/mozilla/mp4parse-rust?rev=215e238e633fa0df42cc25bfcf43a0f902692691#215e238e633fa0df42cc25bfcf43a0f902692691"
+source = "git+https://github.com/mozilla/mp4parse-rust?rev=f0c80783227a1fb46f34cb04e10607045eac4297#f0c80783227a1fb46f34cb04e10607045eac4297"
 dependencies = [
  "bitreader",
  "byteorder",
@@ -5472,7 +5471,7 @@ version = "0.1.0"
 [[package]]
 name = "mp4parse_capi"
 version = "0.17.0"
-source = "git+https://github.com/mozilla/mp4parse-rust?rev=215e238e633fa0df42cc25bfcf43a0f902692691#215e238e633fa0df42cc25bfcf43a0f902692691"
+source = "git+https://github.com/mozilla/mp4parse-rust?rev=f0c80783227a1fb46f34cb04e10607045eac4297#f0c80783227a1fb46f34cb04e10607045eac4297"
 dependencies = [
  "byteorder",
  "fallible_collections",
@@ -5805,6 +5804,20 @@ dependencies = [
  "serde_json",
  "tempfile",
  "url",
+]
+
+[[package]]
+name = "noise"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "mozbuild",
+ "nserror",
+ "nss-rs",
+ "sha2",
+ "thin-vec",
+ "thiserror 2.0.12",
+ "xpcom",
 ]
 
 [[package]]
@@ -6762,6 +6775,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "fnv",
+ "mozbuild",
  "mozilla-central-workspace-hack",
  "windows-sys",
 ]
@@ -8228,9 +8242,9 @@ dependencies = [
 
 [[package]]
 name = "thin-vec"
-version = "0.2.16"
+version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "259cdf8ed4e4aca6f1e9d011e10bd53f524a2d0637d7b28450f6c64ac298c4c6"
+checksum = "4568d7e143ec86d2021c338bae2afa88699e84b8e0af523626654fe6f03a1748"
 dependencies = [
  "serde",
 ]

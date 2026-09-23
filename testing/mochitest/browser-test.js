@@ -767,6 +767,49 @@ Tester.prototype = {
     }
   },
 
+  // The harness only collects the data the leak check needs on some build
+  // configurations; elsewhere neither the teardown below nor the collections
+  // have anything to report to.
+  get _shouldCheckForLeaks() {
+    return (
+      AppConstants.RELEASE_OR_BETA ||
+      AppConstants.DEBUG ||
+      AppConstants.MOZ_CODE_COVERAGE ||
+      AppConstants.ASAN ||
+      AppConstants.TSAN
+    );
+  },
+
+  // Releases the frames and browsers intentionally kept alive until shutdown.
+  _releaseResourcesKeptAliveUntilShutdown() {
+    if (gConfig.testRoot != "browser") {
+      return;
+    }
+
+    // Skip if SeaMonkey
+    if (AppConstants.MOZ_APP_NAME != "seamonkey") {
+      // Replace the document currently loaded in the browser's sidebar.
+      // This will prevent false positives for tests that were the last
+      // to touch the sidebar. They will thus not be blamed for leaking
+      // a document.
+      let sidebar = document.getElementById("sidebar");
+      if (sidebar) {
+        sidebar.setAttribute("src", "about:blank");
+        sidebar.docShell?.createAboutBlankDocumentViewer(null, null);
+      }
+    }
+
+    // Destroy BackgroundPageThumbs resources.
+    let { BackgroundPageThumbs } = ChromeUtils.importESModule(
+      "resource://gre/modules/BackgroundPageThumbs.sys.mjs"
+    );
+    BackgroundPageThumbs._destroy();
+
+    if (window.gBrowser) {
+      NewTabPagePreloading.removePreloadedBrowser(window);
+    }
+  },
+
   _shutdownCleanup(aCallback) {
     let start = ChromeUtils.now();
     Cu.schedulePreciseShrinkingGC(() => {
@@ -781,6 +824,19 @@ Tester.prototype = {
       });
       aCallback();
     });
+  },
+
+  // Runs the collections that reclaim what the tests and
+  // _releaseResourcesKeptAliveUntilShutdown released, then reports what
+  // survived them.
+  async _collectAndCheckForLeakedWindows(excludeCurrentTest = false) {
+    await new Promise(resolve => this._shutdownCleanup(resolve));
+    // The first round of collections leaves what it released behind as garbage
+    // cycles that only the next round reclaims.
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => this._shutdownCleanup(resolve));
+
+    await this._checkForLeakedWindows(excludeCurrentTest);
   },
 
   async _checkForLeakedWindows(excludeCurrentTest = false) {
@@ -1404,44 +1460,12 @@ Tester.prototype = {
     // Make sure the window is raised before starting the next test.
     this.SimpleTest.waitForFocus(() => {
       if (this.done) {
-        if (
-          !AppConstants.RELEASE_OR_BETA &&
-          !AppConstants.DEBUG &&
-          !AppConstants.MOZ_CODE_COVERAGE &&
-          !AppConstants.ASAN &&
-          !AppConstants.TSAN
-        ) {
+        if (!this._shouldCheckForLeaks) {
           this.finish();
           return;
         }
 
-        // Uninitialize a few things explicitly so that they can clean up
-        // frames and browser intentionally kept alive until shutdown to
-        // eliminate false positives.
-        if (gConfig.testRoot == "browser") {
-          // Skip if SeaMonkey
-          if (AppConstants.MOZ_APP_NAME != "seamonkey") {
-            // Replace the document currently loaded in the browser's sidebar.
-            // This will prevent false positives for tests that were the last
-            // to touch the sidebar. They will thus not be blamed for leaking
-            // a document.
-            let sidebar = document.getElementById("sidebar");
-            if (sidebar) {
-              sidebar.setAttribute("src", "about:blank");
-              sidebar.docShell?.createAboutBlankDocumentViewer(null, null);
-            }
-          }
-
-          // Destroy BackgroundPageThumbs resources.
-          let { BackgroundPageThumbs } = ChromeUtils.importESModule(
-            "resource://gre/modules/BackgroundPageThumbs.sys.mjs"
-          );
-          BackgroundPageThumbs._destroy();
-
-          if (window.gBrowser) {
-            NewTabPagePreloading.removePreloadedBrowser(window);
-          }
-        }
+        this._releaseResourcesKeptAliveUntilShutdown();
 
         // Schedule GC and CC runs before finishing in order to detect
         // DOM windows leaked by our tests or the tested code. Note that we
@@ -1468,14 +1492,7 @@ Tester.prototype = {
         barrier.wait().then(() => {
           Services.ppmm.broadcastAsyncMessage("browser-test:collect-request");
 
-          this._shutdownCleanup(() => {
-            setTimeout(() => {
-              this._shutdownCleanup(async () => {
-                await this._checkForLeakedWindows();
-                this.finish();
-              });
-            }, 1000);
-          });
+          this._collectAndCheckForLeakedWindows().then(() => this.finish());
         });
 
         return;
@@ -1870,13 +1887,16 @@ Tester.prototype = {
                 "PASS",
                 "Test timed out"
               );
-              // nextTest, which normally does this, doesn't run for a test that
-              // timed out.
+              // nextTest, which normally does these, doesn't run for a test
+              // that timed out. Its shutdown-leaks barrier is not repeated
+              // here: waiting on TabDestroyObserver can hang a session that
+              // has already timed out.
               self.ClickChecks.forgetMouseDownState();
-              self._shutdownCleanup(async () => {
-                await self._checkForLeakedWindows(true);
-                self.finish();
-              });
+              if (self._shouldCheckForLeaks) {
+                self._releaseResourcesKeptAliveUntilShutdown();
+                await self._collectAndCheckForLeakedWindows(true);
+              }
+              self.finish();
             }
           },
           gTimeoutSeconds * 1000,

@@ -1,10 +1,6 @@
 
 # cargo-vet imports lock
 
-[[unpublished.cssparser]]
-version = "0.38.0"
-audited_as = "0.37.0"
-
 [[publisher.aho-corasick]]
 version = "1.1.0"
 when = "2023-09-18"
@@ -272,15 +268,15 @@ user-login = "jrmuizel"
 user-name = "Jeff Muizelaar"
 
 [[publisher.glean]]
-version = "70.0.0"
-when = "2026-08-20"
+version = "70.2.0"
+when = "2026-09-21"
 user-id = 48
 user-login = "badboy"
 user-name = "Jan-Erik Rediger"
 
 [[publisher.glean-core]]
-version = "70.0.0"
-when = "2026-08-20"
+version = "70.2.0"
+when = "2026-09-21"
 user-id = 48
 user-login = "badboy"
 user-name = "Jan-Erik Rediger"
@@ -1222,12 +1218,6 @@ delta = "0.9.0 -> 0.10.2"
 who = "Pat Hickey <phickey@fastly.com>"
 criteria = "safe-to-deploy"
 version = "1.1.4"
-
-[[audits.bytecode-alliance.audits.cargo-platform]]
-who = "Pat Hickey <phickey@fastly.com>"
-criteria = "safe-to-deploy"
-version = "0.1.2"
-notes = "no build, no ambient capabilities, no unsafe"
 
 [[audits.bytecode-alliance.audits.cargo_metadata]]
 who = "Pat Hickey <phickey@fastly.com>"
@@ -2653,28 +2643,28 @@ aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_p
 [[audits.google.audits.jxl]]
 who = "Luca Versari <veluca@chromium.org>"
 criteria = "safe-to-deploy"
-version = "0.7.3"
-notes = "Delta review from v0.7.2: no unsafe-relevant changes"
+version = "0.7.4"
+notes = "Delta review from v0.7.3: no unsafe-relevant changes"
 aggregated-from = "https://raw.githubusercontent.com/google/rust-crate-audits/main/manual-sources/additional-audits.toml"
 
 [[audits.google.audits.jxl_macros]]
 who = "Luca Versari <veluca@chromium.org>"
 criteria = "safe-to-deploy"
-version = "0.7.3"
+version = "0.7.4"
 notes = "No unsafe code, no fs access"
 aggregated-from = "https://raw.githubusercontent.com/google/rust-crate-audits/main/manual-sources/additional-audits.toml"
 
 [[audits.google.audits.jxl_simd]]
 who = "Luca Versari <veluca@chromium.org>"
 criteria = "safe-to-deploy"
-version = "0.7.3"
-notes = "Delta review from v0.7.2: no unsafe-relevant changes"
+version = "0.7.4"
+notes = "Delta review from v0.7.3: no unsafe-relevant changes"
 aggregated-from = "https://raw.githubusercontent.com/google/rust-crate-audits/main/manual-sources/additional-audits.toml"
 
 [[audits.google.audits.jxl_transforms]]
 who = "Luca Versari <veluca@chromium.org>"
 criteria = "safe-to-deploy"
-version = "0.7.3"
+version = "0.7.4"
 notes = "No unsafe code, no fs access"
 aggregated-from = "https://raw.githubusercontent.com/google/rust-crate-audits/main/manual-sources/additional-audits.toml"
 

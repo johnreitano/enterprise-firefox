@@ -179,7 +179,7 @@ const BASE_MESSAGES = () => [
       },
     },
     targeting:
-      "'browser.nova.enabled'|preferenceValue != true && source == 'app_menu' && os.isWindows && os.windowsVersion >= 10 && !isDefaultBrowser && !hasActiveEnterprisePolicies && 'browser.newtabpage.activity-stream.asrouter.userprefs.cfr.features' | preferenceValue != false",
+      "'browser.nova.enabled'|preferenceValue != true && source == 'app_menu' && os.isWindows && os.windowsVersion >= 10 && !isDefaultBrowser && !hasAttemptedSetDefault && !hasActiveEnterprisePolicies && 'browser.newtabpage.activity-stream.asrouter.userprefs.cfr.features' | preferenceValue != false",
     trigger: {
       id: "menuOpened",
     },
@@ -232,7 +232,7 @@ const BASE_MESSAGES = () => [
       },
     },
     targeting:
-      "'browser.nova.enabled'|preferenceValue != true && source == 'app_menu' && os.isMac && !isDefaultBrowser && !hasActiveEnterprisePolicies && 'browser.newtabpage.activity-stream.asrouter.userprefs.cfr.features' | preferenceValue != false",
+      "'browser.nova.enabled'|preferenceValue != true && source == 'app_menu' && os.isMac && !isDefaultBrowser && !hasAttemptedSetDefault && !hasActiveEnterprisePolicies && 'browser.newtabpage.activity-stream.asrouter.userprefs.cfr.features' | preferenceValue != false",
     trigger: {
       id: "menuOpened",
     },
@@ -285,7 +285,7 @@ const BASE_MESSAGES = () => [
       },
     },
     targeting:
-      "'browser.nova.enabled'|preferenceValue == true && source == 'app_menu' && os.isWindows && os.windowsVersion >= 10 && !isDefaultBrowser && !hasActiveEnterprisePolicies && 'browser.newtabpage.activity-stream.asrouter.userprefs.cfr.features'| preferenceValue != false",
+      "'browser.nova.enabled'|preferenceValue == true && source == 'app_menu' && os.isWindows && os.windowsVersion >= 10 && !isDefaultBrowser && !hasAttemptedSetDefault && !hasActiveEnterprisePolicies && 'browser.newtabpage.activity-stream.asrouter.userprefs.cfr.features'| preferenceValue != false",
     trigger: {
       id: "menuOpened",
     },
@@ -340,7 +340,7 @@ const BASE_MESSAGES = () => [
       },
     },
     targeting:
-      "'browser.nova.enabled'|preferenceValue == true && source == 'app_menu' && os.isMac && !isDefaultBrowser && !hasActiveEnterprisePolicies && 'browser.newtabpage.activity-stream.asrouter.userprefs.cfr.features'| preferenceValue != false",
+      "'browser.nova.enabled'|preferenceValue == true && source == 'app_menu' && os.isMac && !isDefaultBrowser && !hasAttemptedSetDefault && !hasActiveEnterprisePolicies && 'browser.newtabpage.activity-stream.asrouter.userprefs.cfr.features'| preferenceValue != false",
     trigger: {
       id: "menuOpened",
     },
@@ -1327,7 +1327,7 @@ const BASE_MESSAGES = () => [
             },
             progress_bar: "true",
             background:
-              "url('chrome://activity-stream/content/data/content/assets/mr-pintaskbar.svg') var(--mr-secondary-position) no-repeat var(--mr-screen-background-color)",
+              "url('chrome://activity-stream/content/data/content/assets/br-set-default-fox-heart.svg') var(--mr-secondary-position) no-repeat light-dark(rgba(252, 245, 240, 1), rgba(33, 3, 64, 1))",
             logo: {},
             title: {
               string_id: "mr2022-onboarding-existing-pin-header",
@@ -1403,7 +1403,7 @@ const BASE_MESSAGES = () => [
             },
             progress_bar: "true",
             background:
-              "url('chrome://activity-stream/content/data/content/assets/mr-settodefault.svg') var(--mr-secondary-position) no-repeat var(--mr-screen-background-color)",
+              "url('chrome://activity-stream/content/data/content/assets/br-gratitude-fox-rock.svg') var(--mr-secondary-position) no-repeat light-dark(rgba(252, 245, 240, 1), rgba(33, 3, 64, 1)",
             logo: {},
             title: {
               string_id: "mr2022-onboarding-set-default-title",
@@ -1441,9 +1441,15 @@ const BASE_MESSAGES = () => [
               string_id: "mr2022-onboarding-import-image-alt",
             },
             background:
-              "url('chrome://activity-stream/content/data/content/assets/mr-import.svg') var(--mr-secondary-position) no-repeat var(--mr-screen-background-color)",
+              "url('chrome://activity-stream/content/data/content/assets/br-import-fox-house.svg') var(--mr-secondary-position) no-repeat light-dark(rgba(252, 245, 240, 1), rgba(33, 3, 64, 1)",
             progress_bar: true,
             hide_secondary_section: "responsive",
+            title: {
+              string_id: "onboarding-refresh-import-title",
+            },
+            subtitle: {
+              string_id: "onboarding-refresh-import-subtitle",
+            },
             migrate_start: {
               action: {},
             },
@@ -1472,7 +1478,7 @@ const BASE_MESSAGES = () => [
               string_id: "mr2022-onboarding-mobile-download-image-alt",
             },
             background:
-              "url('chrome://activity-stream/content/data/content/assets/mr-mobilecrosspromo.svg') var(--mr-secondary-position) no-repeat var(--mr-screen-background-color)",
+              "url('chrome://activity-stream/content/data/content/assets/backdrop-adaptive.svg') no-repeat center / cover",
             progress_bar: true,
             logo: {},
             title: {
@@ -1520,7 +1526,7 @@ const BASE_MESSAGES = () => [
             },
             progress_bar: "true",
             background:
-              "url('chrome://activity-stream/content/data/content/assets/mr-pinprivate.svg') var(--mr-secondary-position) no-repeat var(--mr-screen-background-color)",
+              "url('https://firefox-settings-attachments.cdn.mozilla.net/main-workspace/ms-images/20260630170340--kit-lock-hold--ee927c95-6161-4aa0-9b3a-12dec66b7cad.svg') var(--mr-secondary-position) no-repeat light-dark(rgba(252, 245, 240, 1), rgba(33, 3, 64, 1)",
             logo: {},
             title: {
               string_id: "mr2022-upgrade-onboarding-pin-private-window-header",
@@ -1563,7 +1569,7 @@ const BASE_MESSAGES = () => [
             },
             progress_bar: "true",
             background:
-              "url('chrome://activity-stream/content/data/content/assets/mr-privacysegmentation.svg') var(--mr-secondary-position) no-repeat var(--mr-screen-background-color)",
+              "url('chrome://activity-stream/content/data/content/assets/br-migration-fox-juggle.svg') var(--mr-secondary-position) no-repeat light-dark(rgba(252, 245, 240, 1), rgba(33, 3, 64, 1)",
             logo: {},
             title: {
               string_id: "mr2022-onboarding-privacy-segmentation-title",
@@ -1621,7 +1627,7 @@ const BASE_MESSAGES = () => [
               string_id: "mr2022-onboarding-gratitude-image-alt",
             },
             background:
-              "url('chrome://activity-stream/content/data/content/assets/mr-gratitude.svg') var(--mr-secondary-position) no-repeat var(--mr-screen-background-color)",
+              "url('chrome://activity-stream/content/data/content/assets/br-kit-with-heart.svg') var(--mr-secondary-position) no-repeat light-dark(rgba(252, 245, 240, 1), rgba(33, 3, 64, 1)",
             logo: {},
             title: {
               string_id: "mr2022-onboarding-gratitude-title",
@@ -1797,7 +1803,7 @@ const BASE_MESSAGES = () => [
               {
                 type: "OPEN_URL",
                 data: {
-                  args: "https://relay.firefox.com/",
+                  args: "https://relay.firefox.com/?utm_medium=referral&utm_source=firefox-desktop&utm_campaign=pbw&utm_content=prevent-inbox-spam-global",
                   where: "tabshifted",
                 },
               },
@@ -1823,6 +1829,206 @@ const BASE_MESSAGES = () => [
       lifetime: 12,
     },
     targeting: "'browser.privateWindowRedesign.enabled'|preferenceValue",
+  },
+  {
+    id: "PRIVATE_WINDOW_BASICS_SPOTLIGHT",
+    template: "spotlight",
+    trigger: {
+      id: "privateWindowBasicsLinkClick",
+    },
+    targeting: "'browser.privateWindowRedesign.enabled'|preferenceValue",
+    content: {
+      template: "multistage",
+      id: "PRIVATE_WINDOW_BASICS_SPOTLIGHT",
+      modal: "tab",
+      screens: [
+        {
+          id: "PRIVATE_WINDOW_BASICS_SCREEN",
+          force_hide_steps_indicator: true,
+          content: {
+            position: "center",
+            background: "var(--color-violet-desaturated-60)",
+            zap_border: true,
+            zap_shadow: true,
+            zap_border_gradient:
+              "linear-gradient(95.54deg, #B89CFF 20.68%, #764EDD 79.34%)",
+            screen_style: {
+              width: "639px",
+            },
+            dismiss_button: { size: "small", action: { dismiss: true } },
+            title: {
+              string_id: "about-private-browsing-spotlight-basics-title",
+              letterSpacing: "revert",
+              lineHeight: "20px",
+              marginBlockStart: "30px",
+              marginBlockEnd: "13px",
+              fontSize: "20px",
+            },
+            subtitle: {
+              string_id: "about-private-browsing-spotlight-basics-subtitle",
+              fontSize: "14px",
+              letterSpacing: "revert",
+              marginInline: "30px",
+              textAlign: "left",
+              fontWeight: "200",
+              color: "var(--text-color-deemphasized)",
+            },
+            tiles: {
+              type: "single-select",
+              selected: "all",
+              action: {
+                picker: "<event>",
+              },
+              data: [
+                {
+                  inert: true,
+                  type: "backup",
+                  style: {
+                    border: "none",
+                    width: "100%",
+                    marginBlockStart: "-80px",
+                  },
+                  id: "all",
+                  body: {
+                    items: [
+                      {
+                        text: {
+                          string_id:
+                            "about-private-browsing-spotlight-basics-what-to-know",
+                          marginBlockStart: "38px",
+                          fontSize: "15px",
+                          fontWeight: "600",
+                          color: "var(--text-color-deemphasized)",
+                        },
+                      },
+                      {
+                        style: {
+                          display: "list-item",
+                          listStyle: "disc",
+                          marginInlineStart: "30px",
+                        },
+                        text: {
+                          string_id:
+                            "about-private-browsing-spotlight-basics-activity-seen",
+                          fontSize: "14px",
+                          fontWeight: "200",
+                          color: "var(--text-color-deemphasized)",
+                          marginBlockStart: "-10px",
+                        },
+                      },
+                      {
+                        style: {
+                          display: "list-item",
+                          listStyle: "disc",
+                          marginInlineStart: "30px",
+                        },
+                        text: {
+                          string_id:
+                            "about-private-browsing-spotlight-basics-bookmarks-downloads",
+                          fontSize: "14px",
+                          fontWeight: "200",
+                          color: "var(--text-color-deemphasized)",
+                          marginBlockStart: "-10px",
+                          marginBlockEnd: "18px",
+                        },
+                      },
+                      {
+                        text: {
+                          string_id:
+                            "about-private-browsing-spotlight-basics-more-privacy",
+                          fontSize: "15px",
+                          fontWeight: "600",
+                          color: "var(--text-color-deemphasized)",
+                        },
+                      },
+                      {
+                        style: {
+                          display: "list-item",
+                          listStyle: "disc",
+                          marginInlineStart: "30px",
+                        },
+                        text: {
+                          string_id:
+                            "about-private-browsing-spotlight-basics-malware-alerts",
+                          fontSize: "14px",
+                          fontWeight: "200",
+                          color: "var(--text-color-deemphasized)",
+                          marginBlockStart: "-10px",
+                        },
+                      },
+                      {
+                        style: {
+                          display: "list-item",
+                          listStyle: "disc",
+                          marginInlineStart: "30px",
+                        },
+                        text: {
+                          string_id:
+                            "about-private-browsing-spotlight-basics-no-sell-data",
+                          fontSize: "14px",
+                          fontWeight: "200",
+                          color: "var(--text-color-deemphasized)",
+                          marginBlockStart: "-10px",
+                        },
+                      },
+                      {
+                        style: {
+                          display: "list-item",
+                          listStyle: "disc",
+                          marginInlineStart: "30px",
+                        },
+                        text: {
+                          string_id:
+                            "about-private-browsing-spotlight-basics-vpn",
+                          fontSize: "14px",
+                          fontWeight: "200",
+                          color: "var(--text-color-deemphasized)",
+                          marginBlockStart: "-10px",
+                        },
+                      },
+                      {
+                        style: {
+                          display: "list-item",
+                          listStyle: "disc",
+                          marginInlineStart: "30px",
+                        },
+                        text: {
+                          string_id:
+                            "about-private-browsing-spotlight-basics-strict-tracking",
+                          fontSize: "14px",
+                          fontWeight: "200",
+                          color: "var(--text-color-deemphasized)",
+                          marginBlockStart: "-10px",
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+            additional_button: {
+              style: "link",
+              label: {
+                string_id: "about-private-browsing-spotlight-basics-learn-more",
+                fontSize: "15px",
+                minHeight: "24px",
+                minWidth: "revert",
+                lineHeight: "100%",
+                color: "var(--link-color, #EADDFF)",
+              },
+              action: {
+                type: "OPEN_URL",
+                navigate: true,
+                data: {
+                  args: "https://support.mozilla.org/1/firefox/%VERSION%/%OS%/%LOCALE%/common-myths-about-private-browsing",
+                  where: "tabshifted",
+                },
+              },
+            },
+          },
+        },
+      ],
+    },
   },
   {
     id: "RESTORE_FROM_BACKUP",

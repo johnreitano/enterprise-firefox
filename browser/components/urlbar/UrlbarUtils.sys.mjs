@@ -947,8 +947,8 @@ export var UrlbarUtils = {
    *
    * @param {string} url
    *   The URL whose block is being cleared.
-   * @returns {?{blockedAt: number, level: "origin" | "url"}}
-   *   The matching timestamp and level if a fresh block existed,
+   * @returns {?{blockedAt: number}}
+   *   The matching timestamp if a fresh block existed,
    *   null otherwise.
    */
   getBackspaceBlock(url) {
@@ -970,9 +970,7 @@ export var UrlbarUtils = {
     if (ageHours > this._BACKSPACE_BLOCK_MAX_AGE_HOURS) {
       return null;
     }
-    /** @type {"origin" | "url"} */
-    let level = UrlbarShared.isOriginUrl(url) ? "origin" : "url";
-    return { blockedAt: entry.blockedAt, level };
+    return { blockedAt: entry.blockedAt };
   },
 
   /**
@@ -1022,7 +1020,7 @@ export var UrlbarUtils = {
    *
    * @param {string} url
    *   The URL being re-integrated.
-   * @returns {Promise<{wasBlocked: boolean, level: "origin" | "url", backspaceBlock: ?{blockedAt: number, level: "origin" | "url"}}>}
+   * @returns {Promise<{wasBlocked: boolean, level: "origin" | "url", backspaceBlock: ?{blockedAt: number}}>}
    *   `wasBlocked` is whether a database block was actually cleared, `level`
    *   the scope it was cleared at, and `backspaceBlock` the consumed backspace
    *   block, if the URL had one.

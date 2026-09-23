@@ -141,6 +141,8 @@ pub unsafe extern "C" fn crash_generator_logic_android(
     minidump_path: *const c_char,
     pipe: crash_helper_common::RawIPCConnector,
 ) {
+    use crash_helper_common::{FromRawProcessHandle, ProcessHandle};
+
     logging::init();
 
     let build_id = unsafe { CStr::from_ptr(build_id) }
@@ -149,7 +151,7 @@ pub unsafe extern "C" fn crash_generator_logic_android(
         .unwrap();
     initialize_static_annotations(&ApplicationInfo::new(
         build_id,
-        Some(crash_helper_common::ProcessHandle(pid)),
+        Some(ProcessHandle::from_raw_handle(pid)),
     ));
 
     let breakpad_data = BreakpadData::new(breakpad_data);

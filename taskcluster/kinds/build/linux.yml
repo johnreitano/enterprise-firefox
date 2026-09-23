@@ -672,7 +672,6 @@ linux64-devedition/opt:
             - builds/releng_base_linux_64_builds.py
             - taskcluster_nightly.py
         extra-config:
-            stage_platform: 'linux64-devedition'
             max_build_output_timeout: 3600
         script: "mozharness/scripts/fx_desktop_build.py"
         secrets: true
@@ -1768,6 +1767,7 @@ linux64-aarch64/opt:
             - sysroot-aarch64-linux-gnu
             - sysroot-x86_64-linux-gnu
             - sysroot-wasm32-wasi
+            - onnxruntime-aarch64-linux-gnu
 
 linux64-aarch64/debug:
     description: "Linux AArch64 (a.k.a. ARM64) Debug"
@@ -1813,6 +1813,7 @@ linux64-aarch64/debug:
             - sysroot-aarch64-linux-gnu
             - sysroot-x86_64-linux-gnu
             - sysroot-wasm32-wasi
+            - onnxruntime-aarch64-linux-gnu
 
 linux64-aarch64-shippable/opt:
     description: "Linux AArch64 (a.k.a. ARM64) Shippable"
@@ -1865,6 +1866,7 @@ linux64-aarch64-shippable/opt:
             - sysroot-aarch64-linux-gnu
             - sysroot-x86_64-linux-gnu
             - sysroot-wasm32-wasi
+            - onnxruntime-aarch64-linux-gnu
 
 linux64-aarch64-enterprise-shippable/opt:
     description: "Linux AArch64 (a.k.a. ARM64) Shippable Enterprise"
@@ -1954,7 +1956,6 @@ linux64-aarch64-devedition/opt:
             - builds/releng_base_linux_64_builds.py
             - taskcluster_nightly.py
         extra-config:
-            stage_platform: 'linux64-aarch64-devedition'
             max_build_output_timeout: 3600
             extra_mozconfig_content:
                 - ac_add_options --target=aarch64
@@ -1975,3 +1976,4 @@ linux64-aarch64-devedition/opt:
             - sysroot-aarch64-linux-gnu
             - sysroot-x86_64-linux-gnu
             - sysroot-wasm32-wasi
+            - onnxruntime-aarch64-linux-gnu

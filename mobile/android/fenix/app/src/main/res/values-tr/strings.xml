@@ -150,7 +150,7 @@
 
     Header text on the homescreen for continuing to browse the most recent browser tab
   -->
-  <string name="recent_tabs_header_2">İleri</string>
+  <string name="recent_tabs_header_2">Devam et</string>
   <!-- Button text for showing all the tabs in the tabs tray -->
   <string name="recent_tabs_show_all">Tümünü göster</string>
   <!-- Text for button in synced tab card that opens synced tabs tray -->
@@ -287,8 +287,12 @@
   <string name="browser_menu_summarize_page">Sayfayı özetle</string>
   <!-- Browser menu badge text for summarization feature -->
   <string name="browser_menu_summarize_page_badge">YENİ</string>
+  <!-- Browser menu badge text for new, highlighted feature -->
+  <string name="browser_menu_page_badge_text">Yeni</string>
   <!-- Browser menu label for navigating to the Web Compat Reporter feature, which provides users the ability to send bug reports for broken sites. -->
   <string name="browser_menu_webcompat_reporter_2">Bozuk siteyi rapor et</string>
+  <!-- Browser menu label for adding a tab to a tab group -->
+  <string name="browser_menu_add_to_tab_group">Gruba ekle</string>
   <!-- Browser menu label that is displayed when the current page has been translated by the translation feature. -->
   <string name="browser_menu_translated">Çevrildi</string>
   <!-- Browser menu label for the print feature -->
@@ -977,7 +981,7 @@
   -->
   <string name="customize_toggle_privacy_report">Gizlilik raporu</string>
   <!-- Title for a customize home screen section. Continue is a section that displays the most recent browser tab, so users can continue browsing where they left off. -->
-  <string name="customize_toggle_continue">İleri</string>
+  <string name="customize_toggle_continue">Devam et</string>
   <!-- Title for the customize home screen section with bookmarks. -->
   <string name="customize_toggle_bookmarks">Yer imleri</string>
   <!--
@@ -1172,7 +1176,7 @@
 
     Name of the "receive tabs" notification channel. Displayed in the "App notifications" system settings for the app
   -->
-  <string name="fxa_received_tab_channel_name">Alınan sekmeler</string>
+  <string name="fxa_received_tab_channel_name">Gelen sekmeler</string>
   <!-- Description of the "receive tabs" notification channel. Displayed in the "App notifications" system settings for the app -->
   <string name="fxa_received_tab_channel_description" tools:ignore="BrandUsage">Diğer Firefox cihazlarından gelen sekmelerin bildirimleri.</string>
   <!-- The body for these is the URL of the tab received -->
@@ -1309,6 +1313,12 @@
     Preferences for showing tab strip
   -->
   <string name="preference_tab_strip_show">Sekme çubuğunu göster</string>
+  <!-- Preference for tab bar placement (top or bottom of the screen) -->
+  <string name="preference_tab_strip_location_header">Sekme çubuğu konumu</string>
+  <!-- Preference for using top tab strip -->
+  <string name="preference_top_tab_strip">Üstte</string>
+  <!-- Preference for using bottom tab strip -->
+  <string name="preference_bottom_tab_strip">Altta</string>
   <!--
     Gestures Preferences
 
@@ -1411,6 +1421,8 @@
   <string name="preference_auto_close_tabs" tools:ignore="UnusedResources">Açık sekmeleri otomatik kapat</string>
   <!-- Content description (not visible, for screen readers etc.): Close tab button -->
   <string name="tab_manager_close_tabs">Kapat</string>
+  <!-- Content description for the media playback indicator in the tabs tray. -->
+  <string name="tab_indicator_media_playing">Medya oynatılıyor</string>
   <!--
     Opening screen
 
@@ -2621,7 +2633,7 @@
   <!-- Text shown on the trackers blocked card when no trackers have been blocked yet -->
   <string name="trackers_blocked_empty">Koruma altındasınız</string>
   <!-- Text shown below the trackers blocked card with typing animation -->
-  <string name="help_catch_trackers">Takip kodlarını birlikte avlayalım</string>
+  <string name="help_catch_trackers">Takip kodlarını avla</string>
   <!-- Preference for enhanced tracking protection for the standard protection settings -->
   <string name="preference_enhanced_tracking_protection_standard_default_1">Standart (varsayılan)</string>
   <!-- Preference description for enhanced tracking protection for the standard protection settings -->

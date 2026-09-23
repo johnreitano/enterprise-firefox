@@ -1017,11 +1017,16 @@ Key::SetFromJSVal(JSContext* aCx, JS::Handle<JS::Value> aVal,
 
   const bool shouldInactivate = aTransaction && aTransaction->IsActive();
   if (shouldInactivate) {
-    aTransaction->TransitionToInactive();
+    aTransaction->TransitionToInactiveWithDeferral();
   }
   auto guard = MakeScopeExit([&]() {
-    if (shouldInactivate && !aTransaction->IsAborted()) {
-      aTransaction->TransitionToActive();
+    if (shouldInactivate) {
+      if (!aTransaction->IsAborted()) {
+        aTransaction->TransitionToActive();
+      } else {
+        aTransaction->DeactivateDeferral();
+        aTransaction->DrainDeferredResponses();
+      }
     }
   });
 

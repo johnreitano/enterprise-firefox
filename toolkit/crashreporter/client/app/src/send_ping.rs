@@ -42,7 +42,7 @@ pub fn main() {
     // from the console address in AutoConfig (or, on generic builds, the
     // environment variable or felt.json).
     #[cfg(all(not(mock), feature = "enterprise"))]
-    options.set_server_url(
+    options.set_server_endpoint(
         crate::enterprise_prefs::console_glean_url(None, app_data_dir.as_deref())
             .expect("failed to resolve the enterprise telemetry endpoint"),
     );
@@ -72,7 +72,7 @@ pub fn cleanup_main() {
     #[cfg_attr(any(mock, not(feature = "enterprise")), allow(unused_mut))]
     let mut options = glean::InitOptions::new(data_path.into()).with_profile_dir(profile_dir);
     #[cfg(all(not(mock), feature = "enterprise"))]
-    options.set_server_url(
+    options.set_server_endpoint(
         crate::enterprise_prefs::console_glean_url(None, app_data_dir.as_deref())
             .expect("failed to resolve the enterprise telemetry endpoint"),
     );

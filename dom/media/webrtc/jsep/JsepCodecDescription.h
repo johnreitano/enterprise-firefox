@@ -9,7 +9,10 @@
 #include <set>
 #include <string>
 
+#include "mozilla/Casting.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/media/webrtc/AV1FmtpParser.h"
+#include "mozilla/media/webrtc/H264FmtpParser.h"
 #include "mozilla/net/DataChannelProtocol.h"
 #include "nsCRT.h"
 #include "nsString.h"
@@ -1093,8 +1096,9 @@ class JsepVideoCodecDescription final : public JsepCodecDescription {
 
       // Level is negotiated symmetrically if level asymmetry is disallowed
       if (!h264Params.level_asymmetry_allowed) {
-        SetSaneH264Level(std::min(GetSaneH264Level(h264Params.profile_level_id),
-                                  GetSaneH264Level(mProfileLevelId)),
+        SetSaneH264Level(ClampToSupportedH264Level(std::min(
+                             GetSaneH264Level(h264Params.profile_level_id),
+                             GetSaneH264Level(mProfileLevelId))),
                          &mProfileLevelId);
       }
 
@@ -1108,8 +1112,26 @@ class JsepVideoCodecDescription final : public JsepCodecDescription {
         mSpropParameterSets = h264Params.sprop_parameter_sets;
         // Only do this if we didn't symmetrically negotiate above
         if (h264Params.level_asymmetry_allowed) {
-          SetSaneH264Level(GetSaneH264Level(h264Params.profile_level_id),
+          SetSaneH264Level(ClampToSupportedH264Level(
+                               GetSaneH264Level(h264Params.profile_level_id)),
                            &mProfileLevelId);
+        }
+        // The negotiated level implies a macroblocks-per-frame/-second cap
+        // (Annex A Table A-1) even when the remote didn't explicitly signal
+        // max-fs/max-mbps (the common case). Combine with any explicit
+        // signal by taking the tighter of the two, so we never ask the
+        // encoder for more than the level permits.
+        if (Maybe<H264MacroblockLimits> levelLimits =
+                H264MacroblockLimitsForLevel(SaneH264LevelToH264Level(
+                    GetSaneH264Level(mProfileLevelId)))) {
+          if (!mConstraints.maxFs ||
+              mConstraints.maxFs > levelLimits->mMaxMacroblocksPerFrame) {
+            mConstraints.maxFs = levelLimits->mMaxMacroblocksPerFrame;
+          }
+          if (!mConstraints.maxMbps ||
+              mConstraints.maxMbps > levelLimits->mMaxMacroblocksPerSecond) {
+            mConstraints.maxMbps = levelLimits->mMaxMacroblocksPerSecond;
+          }
         }
       } else {
         // TODO(bug 1143709): max-recv-level support
@@ -1136,6 +1158,15 @@ class JsepVideoCodecDescription final : public JsepCodecDescription {
       // what we ourselves declare, and is not derived from the remote side.
       if (mDirection == sdp::kSend) {
         mAv1Config = Av1Config(GetAv1Parameters(mDefaultPt, remoteMsection));
+        // The negotiated level implies a block-count/rate cap (Annex A.3)
+        // that we need to respect when encoding, so we never ask the
+        // encoder for more than the remote declared it can receive.
+        if (Maybe<AV1BlockLimits> levelLimits =
+                AV1BlockLimitsForLevel(mAv1Config.LevelIdxOrDefault())) {
+          mConstraints.maxFs = levelLimits->mMaxFs;
+          mConstraints.maxMbps =
+              SaturatingCast<uint32_t>(levelLimits->mMaxBlocksPerSecond);
+        }
       }
     }
 
@@ -1199,6 +1230,31 @@ class JsepVideoCodecDescription final : public JsepCodecDescription {
     }
 
     *profileLevelId = (*profileLevelId & ~levelMask) | level;
+  }
+
+  // Converts a "sane" H264 level (see GetSaneH264Level) to the H264_LEVEL
+  // enum used by H264FmtpParser's Annex A Table A-1 data.
+  static H264_LEVEL SaneH264LevelToH264Level(uint32_t saneLevel) {
+    if (saneLevel == 0xAB) {
+      return H264_LEVEL::H264_LEVEL_1_b;
+    }
+    return static_cast<H264_LEVEL>(saneLevel >> 4);
+  }
+
+  // A remote peer can declare an H264 level (e.g. 6.0+) that exceeds what
+  // libwebrtc's own H264Level enum (and our Annex A Table A-1 data, which
+  // mirrors it) can represent. Rather than adopt an unrepresentable level,
+  // clamp down to the highest level we can actually express: since higher
+  // H.264 levels are strict supersets of lower levels' capability
+  // requirements, encoding at our highest representable level is always
+  // acceptable to a decoder that declared support for a higher one.
+  static uint32_t ClampToSupportedH264Level(uint32_t aSaneLevel) {
+    if (H264MacroblockLimitsForLevel(SaneH264LevelToH264Level(aSaneLevel))) {
+      return aSaneLevel;
+    }
+    // 0x640034 -- high, level 5.2. The highest level our Annex A Table A-1
+    // data (and libwebrtc's H264Level enum) covers.
+    return GetSaneH264Level(0x640034);
   }
 
   enum Subprofile {

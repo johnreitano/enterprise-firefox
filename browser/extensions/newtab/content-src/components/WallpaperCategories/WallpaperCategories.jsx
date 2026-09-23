@@ -204,13 +204,15 @@ export class _WallpaperCategories extends React.PureComponent {
     // An upload or a removal changes the library, so the thumbnails for it are
     // stale. Compared by filename, so a fresh array holding the same images
     // does not ask forever. The applied pref is the second trigger: a page
-    // restored from the startup cache never sees the library broadcast.
+    // restored from the startup cache never sees the library broadcast. Only
+    // when there is nothing to show, because applying leaves the library alone
+    // and re-fetched bytes mint new blob URLs that every tile has to reload.
     const appliedFilename =
       this.props.Prefs.values["newtabWallpapers.customWallpaper.uuid"] || "";
     const prevAppliedFilename =
       prevProps.Prefs.values["newtabWallpapers.customWallpaper.uuid"] || "";
     if (
-      appliedFilename !== prevAppliedFilename ||
+      (appliedFilename !== prevAppliedFilename && !this.hasThumbnails()) ||
       this.libraryFilenames(this.props.Wallpapers.customWallpapers) !==
         this.libraryFilenames(prevProps.Wallpapers.customWallpapers)
     ) {
@@ -404,6 +406,14 @@ export class _WallpaperCategories extends React.PureComponent {
 
   // The library lives in a folder the page cannot load from, so the picker asks
   // for the thumbnail bytes and turns them into object URLs here.
+  // A startup cache restore leaves this empty, or holding plain objects that
+  // createObjectURL rejects. Either way there is nothing to paint.
+  hasThumbnails() {
+    return (this.props.Wallpapers.customWallpaperThumbnails || []).some(
+      ({ file }) => file instanceof globalThis.Blob
+    );
+  }
+
   requestThumbnails() {
     // The picker is mounted on every new tab, so asking on mount would read the
     // whole library once per tab, for a panel nobody opened.

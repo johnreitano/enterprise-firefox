@@ -454,6 +454,16 @@ describe("ActivityStream", () => {
       expect(PREFS_CONFIG.get(PREF).value).toBe("medium");
     });
   });
+  describe("newtabWallpapers.customWallpaper.library.enabled", () => {
+    // firefox.js turns the library on from 158. Turning it on here as well
+    // would reach a train-hopped host whose backup keeps one wallpaper.
+    it("should default to false", () => {
+      expect(
+        PREFS_CONFIG.get("newtabWallpapers.customWallpaper.library.enabled")
+          .value
+      ).toBe(false);
+    });
+  });
   describe("showTopicsSelection", () => {
     let getStringPrefStub;
     const FEATURE_ENABLED_PREF = "discoverystream.topicSelection.enabled";

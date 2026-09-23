@@ -13,6 +13,7 @@
 #include "mozilla/UniquePtrExtensions.h"
 #include "mozilla/WidgetUtils.h"
 #include "mozilla/GeckoArgs.h"
+#include "nsCRTGlue.h"
 #include "nsNetUtil.h"
 #include "nsProfileLock.h"
 #include "nsStringFwd.h"

@@ -29,6 +29,8 @@ run-if = ["enterprise"]
 
 ["test_clear_blocked_cookies.js"]
 
+["test_clear_on_shutdown.js"]
+
 ["test_containers.js"]
 
 ["test_defaultbrowsercheck.js"]
@@ -94,6 +96,8 @@ run-if = ["enterprise"]
 ["test_simple_pref_policies.js"]
 
 ["test_sitepolicies.js"]
+
+["test_sitepolicies_container.js"]
 
 ["test_sorted_alphabetically.js"]
 

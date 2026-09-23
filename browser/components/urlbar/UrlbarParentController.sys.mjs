@@ -567,7 +567,7 @@ export class UrlbarParentController {
 
     // For backspace-induced blocks, record the unblock delay: fast unblocks
     // suggest the original block was accidental.
-    if (backspaceBlock?.level === level) {
+    if (backspaceBlock) {
       Glean.urlbarAutofill.reintegrationAfterBackspace[
         level
       ].accumulateSingleSample(Date.now() - backspaceBlock.blockedAt);

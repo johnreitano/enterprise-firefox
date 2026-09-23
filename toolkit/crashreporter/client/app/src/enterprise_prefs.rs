@@ -22,12 +22,8 @@ use enterprise_console::{
     console_address_from_autoconfig, resolve_console_address, CONSOLE_ADDRESS_ENV,
     CONSOLE_ADDRESS_PREF, FELT_STORAGE_FILENAME,
 };
+use mozbuild::config::MOZ_APP_NAME;
 use url::Url;
-
-/// The enterprise AutoConfig file name. Enterprise builds point
-/// `general.config.filename` at this (set in `firefox-branding.js`); it is not
-/// a default value anywhere else.
-const ENTERPRISE_AUTOCONFIG_FILENAME: &str = "firefox.cfg";
 
 /// Path appended to the console address to form the crash submission endpoint.
 const CRASH_SUBMIT_PATH: &str = "api/browser/crash-reports/submit";
@@ -136,7 +132,7 @@ fn console_base(server_url: Option<&str>, app_data_dir: Option<&Path>) -> anyhow
 /// Read the console address (or the generic build placeholder) out of the
 /// installation's AutoConfig file.
 fn autoconfig_console_address() -> anyhow::Result<String> {
-    let path = installation_resource_path().join(ENTERPRISE_AUTOCONFIG_FILENAME);
+    let path = installation_resource_path().join(format!("{}.cfg", MOZ_APP_NAME));
     let contents = crate::std::fs::read(&path)?;
     console_address_from_autoconfig(&contents).with_context(|| {
         format!(
@@ -165,7 +161,7 @@ mod test {
     fn with_autoconfig<R>(body: impl FnOnce() -> R) -> R {
         let mock_files = MockFiles::new();
         mock_files.add_dir("work_dir");
-        mock_files.add_file("work_dir/firefox.cfg", encode(CFG));
+        mock_files.add_file(format!("work_dir/{}.cfg", MOZ_APP_NAME), encode(CFG));
         mock::builder()
             .set(MockFS, mock_files.clone())
             .set(
@@ -185,7 +181,10 @@ mod test {
     ) -> R {
         let mock_files = MockFiles::new();
         mock_files.add_dir("work_dir");
-        mock_files.add_file("work_dir/firefox.cfg", encode(GENERIC_CFG));
+        mock_files.add_file(
+            format!("work_dir/{}.cfg", MOZ_APP_NAME),
+            encode(GENERIC_CFG),
+        );
         mock_files.add_dir("app_data");
         if let Some(felt_json) = felt_json {
             mock_files.add_file("app_data/felt.json", felt_json);

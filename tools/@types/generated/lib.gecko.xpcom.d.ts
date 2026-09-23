@@ -1757,7 +1757,7 @@ interface nsIAppStartup extends nsISupports, Enums<typeof nsIAppStartup_IDLShutd
   /** <!-- binding_to(idl, method, XPIDL_nsIAppStartup_trackStartupCrashEnd) --> */
   trackStartupCrashEnd(): void;
   /** <!-- binding_to(idl, method, XPIDL_nsIAppStartup_quit) --> */
-  quit(aMode: u32, aExitCode?: i32): boolean;
+  quit(aMode: u32, aExitCode?: i32): void;
   /** <!-- binding_to(idl, method, XPIDL_nsIAppStartup_advanceShutdownPhase) --> */
   advanceShutdownPhase(aPhase: nsIAppStartup.IDLShutdownPhase): void;
   /** <!-- binding_to(idl, method, XPIDL_nsIAppStartup_setImpendingShutdown) --> */
@@ -15600,11 +15600,11 @@ interface nsIWebSocketEventListener extends nsISupports {
   /** <!-- binding_to(idl, method, XPIDL_nsIWebSocketEventListener_webSocketMessageAvailable) --> */
   webSocketMessageAvailable(aWebSocketSerialID: u32, aMessage: string, aType: u16): void;
   /** <!-- binding_to(idl, method, XPIDL_nsIWebSocketEventListener_webSocketClosed) --> */
-  webSocketClosed(aWebSocketSerialID: u32, aWasClean: boolean, aCode: u16, aReason: string): void;
+  webSocketClosed(aWebSocketSerialID: u32, aHttpChannelId: u64, aWasClean: boolean, aCode: u16, aReason: string): void;
   /** <!-- binding_to(idl, method, XPIDL_nsIWebSocketEventListener_frameReceived) --> */
-  frameReceived(aWebSocketSerialID: u32, aFrame: nsIWebSocketFrame): void;
+  frameReceived(aWebSocketSerialID: u32, aHttpChannelId: u64, aFrame: nsIWebSocketFrame): void;
   /** <!-- binding_to(idl, method, XPIDL_nsIWebSocketEventListener_frameSent) --> */
-  frameSent(aWebSocketSerialID: u32, aFrame: nsIWebSocketFrame): void;
+  frameSent(aWebSocketSerialID: u32, aHttpChannelId: u64, aFrame: nsIWebSocketFrame): void;
 }
 
 /** <!-- binding_to(idl, interface_name, XPIDL_nsIWebSocketEventService) --> */

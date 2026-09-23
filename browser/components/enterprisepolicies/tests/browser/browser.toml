@@ -81,8 +81,8 @@ skip-if = ["enterprise"] # Applies DisableMasterPasswordCreation, unsupported in
 
 ["browser_policy_disable_popup_blocker_locked.js"]
 support-files = [
-  "!/browser/base/content/test/popups/popup_blocker2.html",
-  "!/browser/base/content/test/popups/popup_blocker_a.html",
+  "!/browser/base/content/test/browser-popups/popup_blocker2.html",
+  "!/browser/base/content/test/browser-popups/popup_blocker_a.html",
 ]
 
 ["browser_policy_disable_privatebrowsing.js"]
@@ -159,7 +159,7 @@ skip-if = ["enterprise"] # Applies Extensions, unsupported in enterprise builds
 
 ["browser_policy_search_engine.js"]
 support-files = [
-  "!/browser/base/content/test/contextMenu/subtst_contextmenu_add_search_engine.html",
+  "!/browser/base/content/test/browser-contextMenu/subtst_contextmenu_add_search_engine.html",
 ]
 
 ["browser_policy_searchbar.js"]
@@ -167,6 +167,8 @@ support-files = [
 ["browser_policy_set_homepage.js"]
 
 ["browser_policy_set_startpage.js"]
+
+["browser_policy_sitepolicies_container.js"]
 
 ["browser_policy_sitepolicies_https.js"]
 https_first_disabled = true

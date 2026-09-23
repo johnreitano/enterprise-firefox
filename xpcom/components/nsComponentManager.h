@@ -159,7 +159,7 @@ class nsComponentManagerImpl final : public nsIComponentManager,
 
   bool mJSLoaderReady = false;
 
-  size_t SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const;
+  size_t SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf);
 
  private:
   ~nsComponentManagerImpl();

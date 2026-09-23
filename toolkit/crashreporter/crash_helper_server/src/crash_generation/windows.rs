@@ -5,8 +5,10 @@
 use super::{BreakpadProcessId, CrashGenerator};
 
 use anyhow::Result;
-use crash_helper_common::{crash_annotations::CrashAnnotation, messages, ApplicationInfo};
-use mozannotation_server::CAnnotation;
+use crash_helper_common::{
+    crash_annotations::CrashAnnotation, messages, ApplicationInfo, ExtraCrashData,
+};
+use mozannotation_server::{AnnotationData, CAnnotation};
 use std::{
     convert::TryInto,
     fs::{create_dir_all, File},
@@ -76,12 +78,19 @@ impl CrashGenerator {
 
         if res != FALSE {
             let process_id = BreakpadProcessId { pid, handle };
+            let extra_data = ExtraCrashData {
+                error: None,
+                annotations: vec![CAnnotation {
+                    id: CrashAnnotation::WindowsErrorReporting as u32,
+                    data: AnnotationData::ByteBuffer(vec![1]),
+                }],
+            };
 
             self.finalize_crash_report(
-                process_id,
-                None,
+                process_id.get_native(),
+                Some(&extra_data),
                 &path,
-                super::MinidumpOrigin::WindowsErrorReporting,
+                super::ProcessType::Child,
             );
         }
 
@@ -114,7 +123,7 @@ impl CrashGenerator {
             .as_hyphenated()
             .encode_lower(&mut Uuid::encode_buffer())
             .to_string();
-        let path = PathBuf::from(self.minidump_path.clone()).join(uuid + ".dmp");
+        let path = self.minidump_path.clone().join(uuid + ".dmp");
         let file = File::create(&path).map_err(|_| ())?;
         Ok((file, path))
     }

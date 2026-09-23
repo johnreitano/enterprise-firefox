@@ -47,7 +47,7 @@
 #include "archivereader.h"
 #include "readstrings.h"
 #include "updatererrors.h"
-
+#include "elevation_type.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -168,26 +168,6 @@ BOOL PathGetSiblingFilePath(LPWSTR destinationBuffer, LPCWSTR siblingFilePath,
 //-----------------------------------------------------------------------------
 
 /**
- * This enum and its related functions are intended for interpreting the passed
- * parameter and using it to determine whether this is the first or second
- * invocation of the updater.
- */
-enum class UpdaterInvocation {
-  // The initial invocation of the updater. This may apply the update, or it may
-  // start the second invocation of the updater to update depending on whether
-  // elevation is required.
-  // This invocation always does all modifications of the update directory and
-  // calls the callback application, even if another updater is launched.
-  First,
-  // The second invocation of the updater. This basically applies the update to
-  // the installation directory, calls PostUpdate (on Windows) and exits.
-  Second,
-  // It cannot be determined that we are doing either of the above invocations.
-  // This generally represents an uninitialized value or an error.
-  Unknown,
-};
-
-/**
  * This enum is used to indicate on Windows why the post-updater is running.
  *
  * If the updater elevates, the post-updater runs twice: once as the system
@@ -207,37 +187,7 @@ enum class PostUpdateTarget {
   CurrentUser,
 };
 
-/**
- * Returns a human-readable representation of an `UpdaterInvocation`.
- */
-const char* getUpdaterInvocationString(UpdaterInvocation value) {
-  switch (value) {
-    case UpdaterInvocation::First:
-      return "UpdaterInvocation::First";
-    case UpdaterInvocation::Second:
-      return "UpdaterInvocation::Second";
-    case UpdaterInvocation::Unknown:
-      return "UpdaterInvocation::Unknown";
-  }
-  MOZ_CRASH("impossible value for UpdaterInvocation");
-}
-
-const NS_tchar* firstUpdateInvocationArg = NS_T("first");
-const NS_tchar* secondUpdateInvocationArg = NS_T("second");
-
-/**
- * Gets which updater invocation this is based on the value passed to this
- * function by the caller.
- */
-static UpdaterInvocation getUpdaterInvocationFromArg(const NS_tchar* argument) {
-  if (NS_tstrcmp(argument, firstUpdateInvocationArg) == 0) {
-    return UpdaterInvocation::First;
-  }
-  if (NS_tstrcmp(argument, secondUpdateInvocationArg) == 0) {
-    return UpdaterInvocation::Second;
-  }
-  return UpdaterInvocation::Unknown;
-}
+static ElevationType sElevationType = ElevationType::Unknown;
 
 //-----------------------------------------------------------------------------
 
@@ -363,7 +313,6 @@ constinit static ArchiveReader gArchiveReader;
 static bool gSucceeded = false;
 static bool sStagedUpdate = false;
 static bool sReplaceRequest = false;
-static bool sUsingService = false;
 // When the updater needs to elevate, we generally run the updater again with
 // elevation. These two invocations differ in many important ways. The elevated
 // updater doesn't touch any files that don't require that elevation, it
@@ -471,13 +420,6 @@ static NS_tchar* mstrtok(const NS_tchar* delims, NS_tchar** str) {
   *str = nullptr;
   return ret;
 }
-
-#if defined(TEST_UPDATER) || defined(XP_WIN) || defined(XP_MACOSX)
-static bool EnvHasValue(const char* name) {
-  const char* val = getenv(name);
-  return (val && *val);
-}
-#endif
 
 static const NS_tchar* UpdateLogFilename() {
   if (gInvocation == UpdaterInvocation::Second) {
@@ -2693,7 +2635,7 @@ bool LaunchWinPostProcess(const WCHAR* installationDir,
   }
 
 #  if !defined(TEST_UPDATER) && defined(MOZ_MAINTENANCE_SERVICE)
-  if (sUsingService &&
+  if (sElevationType == ElevationType::ElevatedByMMS &&
       !DoesBinaryMatchAllowedCertificates(installationDir, exefullpath)) {
     LOG(
         ("LaunchWinPostProcess failed because the binary doesn't match the "
@@ -3496,7 +3438,9 @@ static void UpdateThreadFunc(void* param) {
     // updater application again in order to apply the update without
     // staging.
     if (sReplaceRequest) {
-      WriteStatusFile(sUsingService ? "pending-service" : "pending");
+      WriteStatusFile(sElevationType == ElevationType::ElevatedByMMS
+                          ? "pending-service"
+                          : "pending");
     } else {
       WriteStatusFile(rv);
     }
@@ -3607,7 +3551,7 @@ int LaunchCallbackAndPostProcessApps(int argc, NS_tchar** argv
       // service if the service failed to apply the update. We want to update
       // the service to a newer version in that case. If we are not running
       // through the service, then MOZ_USING_SERVICE will not exist.
-      if (!sUsingService) {
+      if (sElevationType != ElevationType::ElevatedByMMS) {
         LOG(("Starting Service Update before launching callback app"));
         StartServiceUpdate(gInstallDirPath);
       } else {
@@ -3635,9 +3579,10 @@ int LaunchCallbackAndPostProcessApps(int argc, NS_tchar** argv
 
     raii_output_finish.call();
     LaunchCallbackApp(argv[kCallbackWorkingDirIndex], argc - kCallbackIndex,
-                      argv + kCallbackIndex, sUsingService);
+                      argv + kCallbackIndex,
+                      sElevationType == ElevationType::ElevatedByMMS);
 #ifdef XP_MACOSX
-  } else {  // isElevated
+  } else {  // isElevationTypeElevated(sElevationType)
     LOG(
         ("This is the second instance. Skipping LaunchMacPostProcess and "
          "LaunchCallbackApp"));
@@ -3689,10 +3634,12 @@ int NS_main(int argc, NS_tchar** argv) {
     suiArgv.get()[argIndex] = argv[argIndex];
   }
 
-#ifdef MOZ_MAINTENANCE_SERVICE
-  sUsingService = EnvHasValue("MOZ_USING_SERVICE");
-  putenv(const_cast<char*>("MOZ_USING_SERVICE="));
-#endif
+  sElevationType = getElevationType(argc, argv);
+  if (sElevationType == ElevationType::Error ||
+      sElevationType == ElevationType::Unknown) {
+    fprintf(stderr, "Can't determine elevation state. Exiting.\n");
+    return 1;
+  }
 
   if (argc == 2 && NS_tstrcmp(argv[1], NS_T("--channels-allowed")) == 0) {
 #ifdef MOZ_VERIFY_MAR_SIGNATURE
@@ -3739,50 +3686,8 @@ int NS_main(int argc, NS_tchar** argv) {
   mozilla::UniquePtr<UmaskContext> umaskContext(new UmaskContext(0));
 #endif
 
-#ifdef XP_WIN
-  auto isAdmin = mozilla::UserHasAdminPrivileges();
-  if (isAdmin.isErr()) {
-    fprintf(stderr,
-            "Failed to query if the current process has admin privileges.\n");
-    return 1;
-  }
-  auto isLocalSystem = mozilla::UserIsLocalSystem();
-  if (isLocalSystem.isErr()) {
-    fprintf(
-        stderr,
-        "Failed to query if the current process has LocalSystem privileges.\n");
-    return 1;
-  }
-#endif
-
-  // Indicates that we are running with elevated privileges.
-  // This is only ever true on macOS and Windows. We don't currently have a
-  // way of elevating on other platforms.
-  // Note that this should not be used to determine whether this is the first or
-  // second invocation of the updater, even though the first invocation will
-  // _usually_ be unelevated and the second invocation should always be
-  // elevated. `gInvocation` can be used for that purpose.
-  bool isElevated =
-#ifdef XP_WIN
-      // While is it technically redundant to check LocalSystem in addition to
-      // Admin given the former contains privileges of the latter, we have opt
-      // to verify both. A few reasons for this decision include the off chance
-      // that the Windows security model changes in the future and weird system
-      // setups where someone has modified the group lists in surprising ways.
-      //
-      // We use this to detect if we were launched from the Maintenance Service
-      // under LocalSystem or UAC under the user's account, and therefore can
-      // proceed with an install to `Program Files` or `Program Files(x86)`.
-      isAdmin.unwrap() || isLocalSystem.unwrap();
-#elif defined(XP_MACOSX)
-        strstr(argv[0], "/Library/PrivilegedHelperTools/org.mozilla.updater") !=
-        nullptr;
-#else
-      false;
-#endif
-
 #ifdef XP_MACOSX
-  if (isElevated) {
+  if (isElevationTypeElevated(sElevationType)) {
     LogToOS(NS_T("Updater is elevated"));
     if (!ObtainUpdaterArguments(&argc, &argv, &gMARStrings)) {
       // Won't actually get here because ObtainUpdaterArguments will terminate
@@ -3793,7 +3698,7 @@ int NS_main(int argc, NS_tchar** argv) {
 
   if (argc == 4 && (strstr(argv[1], "-dmgInstall") != nullptr)) {
     isDMGInstall = true;
-    if (isElevated) {
+    if (isElevationTypeElevated(sElevationType)) {
       freeArguments(argc, argv);
       CleanupElevatedMacUpdate(true);
       return 0;
@@ -3836,7 +3741,7 @@ int NS_main(int argc, NS_tchar** argv) {
               "which-invocation [wait-pid [callback-working-dir callback-path "
               "args...]]\n");
 #ifdef XP_MACOSX
-      if (isElevated) {
+      if (isElevationTypeElevated(sElevationType)) {
         freeArguments(argc, argv);
         CleanupElevatedMacUpdate(true);
       }
@@ -3857,23 +3762,33 @@ int NS_main(int argc, NS_tchar** argv) {
 
     gInvocation = getUpdaterInvocationFromArg(argv[kWhichInvocationIndex]);
     switch (gInvocation) {
-      case UpdaterInvocation::Unknown:
-        fprintf(stderr, "Invalid which-invocation value: " LOG_S "\n",
-                argv[kWhichInvocationIndex]);
-        return 1;
       case UpdaterInvocation::First:
+        // We are in the first invocation, which means the next will be the
+        // second invocation.
         suiArgv.get()[kWhichInvocationIndex] = secondUpdateInvocationArg;
         break;
-      default:
-        // There is no good reason we should be launching a third updater, but
-        // assign something recognizable and unlikely to be used in the future
-        // to make any bugs here a bit easier to understand.
-        suiArgv.get()[kWhichInvocationIndex] = NS_T("third???");
+      case UpdaterInvocation::Second:
+        // We are in the second invocation. Ensure that we don't start a
+        // third invocation.
+        suiArgv.get()[kWhichInvocationIndex] =
+            NS_T("SHOULD_NOT_CALL_THIRD_INSTANCE");
         break;
+      case UpdaterInvocation::Error:
+        fprintf(stderr, "Error invocation of updater.exe\n");
+        return 1;
+      default:
+        fprintf(stderr, "Unknown invocation of updater.exe\n");
+        return 1;
     }
   } else { /* else if (isDMGInstall) */
     // We already exited in the other case.
     gInvocation = UpdaterInvocation::First;
+  }
+  if (!isValidInvocationForElevationType(gInvocation, sElevationType)) {
+    fprintf(stderr, "Error: invocation <%s> not valid with elevation type %s\n",
+            updaterInvocationToString(gInvocation),
+            elevationTypeToString(sElevationType));
+    return 1;
   }
 
   // The directory containing the update information.
@@ -3891,7 +3806,7 @@ int NS_main(int argc, NS_tchar** argv) {
               "application (" LOG_S ")\n",
               argv[kPatchDirIndex]);
 #ifdef XP_MACOSX
-      if (isElevated) {
+      if (isElevationTypeElevated(sElevationType)) {
         freeArguments(argc, argv);
         CleanupElevatedMacUpdate(true);
       }
@@ -3908,7 +3823,7 @@ int NS_main(int argc, NS_tchar** argv) {
               "application (" LOG_S ")\n",
               argv[kInstallDirIndex]);
 #ifdef XP_MACOSX
-      if (isElevated) {
+      if (isElevationTypeElevated(sElevationType)) {
         freeArguments(argc, argv);
         CleanupElevatedMacUpdate(true);
       }
@@ -4015,7 +3930,7 @@ int NS_main(int argc, NS_tchar** argv) {
               "application (" LOG_S ")\n",
               argv[kApplyToDirIndex]);
 #ifdef XP_MACOSX
-      if (isElevated) {
+      if (isElevationTypeElevated(sElevationType)) {
         freeArguments(argc, argv);
         CleanupElevatedMacUpdate(true);
       }
@@ -4041,7 +3956,7 @@ int NS_main(int argc, NS_tchar** argv) {
                 "application (" LOG_S ")\n",
                 argv[kCallbackIndex]);
 #ifdef XP_MACOSX
-        if (isElevated) {
+        if (isElevationTypeElevated(sElevationType)) {
           freeArguments(argc, argv);
           CleanupElevatedMacUpdate(true);
         }
@@ -4059,7 +3974,7 @@ int NS_main(int argc, NS_tchar** argv) {
                 "installation directory (" LOG_S ")\n",
                 argv[kCallbackIndex]);
 #ifdef XP_MACOSX
-        if (isElevated) {
+        if (isElevationTypeElevated(sElevationType)) {
           freeArguments(argc, argv);
           CleanupElevatedMacUpdate(true);
         }
@@ -4075,14 +3990,14 @@ int NS_main(int argc, NS_tchar** argv) {
 
   if (!sUpdateSilently && !isDMGInstall
 #ifdef XP_MACOSX
-      && !isElevated
+      && !isElevationTypeElevated(sElevationType)
 #endif
   ) {
     InitProgressUI(&argc, &argv);
   }
 
 #ifdef XP_MACOSX
-  if (!isElevated &&
+  if (!isElevationTypeElevated(sElevationType) &&
       (!IsRecursivelyWritable(argv[kInstallDirIndex]) || isDMGInstall)) {
     // If the app directory isn't recursively writeable or if this is a DMG
     // install, an elevated helper process is required.
@@ -4165,19 +4080,21 @@ int NS_main(int argc, NS_tchar** argv) {
 #endif
     LogInit(logFilePath);
 
-    LOG(("sUsingService=%s", sUsingService ? "true" : "false"));
+    LOG(("sElevationType == ElevationType::ElevatedByMMS=%s",
+         sElevationType == ElevationType::ElevatedByMMS ? "true" : "false"));
     LOG(("sUpdateSilently=%s", sUpdateSilently ? "true" : "false"));
 #ifdef XP_WIN
     // Note that this is not the final value of useService
     LOG(("useService=%s", useService ? "true" : "false"));
 #endif
-    LOG(("isElevated=%s", isElevated ? "true" : "false"));
-    LOG(("gInvocation=%s", getUpdaterInvocationString(gInvocation)));
+    LOG(("isElevationTypeElevated(sElevationType)=%s",
+         isElevationTypeElevated(sElevationType) ? "true" : "false"));
+    LOG(("gInvocation=%s", updaterInvocationToString(gInvocation)));
 
     if (!WriteStatusFile("applying")) {
       LOG(("failed setting status to 'applying'"));
 #ifdef XP_MACOSX
-      if (isElevated) {
+      if (isElevationTypeElevated(sElevationType)) {
         freeArguments(argc, argv);
         CleanupElevatedMacUpdate(true);
       }
@@ -4278,7 +4195,7 @@ int NS_main(int argc, NS_tchar** argv) {
     // Check whether a second instance of the updater should be launched by the
     // maintenance service or with the 'runas' verb when write access is denied
     // to the installation directory.
-    if (!sUsingService &&
+    if (sElevationType != ElevationType::ElevatedByMMS &&
         (argc > kCallbackIndex || sStagedUpdate || sReplaceRequest)) {
       LOG(("Checking whether elevation is needed"));
 
@@ -4332,7 +4249,7 @@ int NS_main(int argc, NS_tchar** argv) {
       // updater, then we drop the permissions here. We do not drop the
       // permissions on the originally called updater because we use its token
       // to start the callback application.
-      if (isElevated) {
+      if (isElevationTypeElevated(sElevationType)) {
         // Disable every privilege we don't need. Processes started using
         // CreateProcess will use the same token as this process.
         UACHelper::DisablePrivileges(nullptr);
@@ -4443,6 +4360,14 @@ int NS_main(int argc, NS_tchar** argv) {
         // If we still want to use the service try to launch the service
         // command for the update.
         if (useService) {
+          if (gInvocation != UpdaterInvocation::First) {
+            // We're in an unexpected state. There should not be any further
+            // invocations, but one has been requested.
+            LOG(
+                ("Unexpected case! We're in the second updater invocation and "
+                 "about to start a third. Bailing out"));
+            return 1;
+          }
           // Get the secure ID before trying to update so it is possible to
           // determine if the updater or the maintenance service has created a
           // new one.
@@ -4570,7 +4495,7 @@ int NS_main(int argc, NS_tchar** argv) {
 
           LaunchCallbackApp(argv[kCallbackWorkingDirIndex],
                             argc - kCallbackIndex, argv + kCallbackIndex,
-                            sUsingService);
+                            sElevationType == ElevationType::ElevatedByMMS);
           return 0;
         }
 
@@ -4624,6 +4549,7 @@ int NS_main(int argc, NS_tchar** argv) {
           } else {
             sinfo.lpVerb = L"runas";
           }
+
           sinfo.nShow = SW_SHOWNORMAL;
 
           auto cmdLine =
@@ -4723,7 +4649,7 @@ int NS_main(int argc, NS_tchar** argv) {
         if (argc > kCallbackIndex) {
           LaunchCallbackApp(argv[kCallbackWorkingDirIndex],
                             argc - kCallbackIndex, argv + kCallbackIndex,
-                            sUsingService);
+                            sElevationType == ElevationType::ElevatedByMMS);
         }
         return 0;
 
@@ -4770,7 +4696,7 @@ int NS_main(int argc, NS_tchar** argv) {
       int rv = NS_tmkdir(gWorkingDirPath, 0755);
       if (rv != OK && errno != EEXIST) {
 #ifdef XP_MACOSX
-        if (isElevated) {
+        if (isElevationTypeElevated(sElevationType)) {
           freeArguments(argc, argv);
           CleanupElevatedMacUpdate(true);
         }
@@ -4791,7 +4717,8 @@ int NS_main(int argc, NS_tchar** argv) {
       EXIT_IF_SECOND_UPDATER_INSTANCE(updateLockFileHandle, 1);
       if (argc > kCallbackIndex) {
         LaunchCallbackApp(argv[kCallbackWorkingDirIndex], argc - kCallbackIndex,
-                          argv + kCallbackIndex, sUsingService);
+                          argv + kCallbackIndex,
+                          sElevationType == ElevationType::ElevatedByMMS);
       }
       return 1;
     }
@@ -4846,7 +4773,7 @@ int NS_main(int argc, NS_tchar** argv) {
         if (argc > kCallbackIndex) {
           LaunchCallbackApp(argv[kCallbackWorkingDirIndex],
                             argc - kCallbackIndex, argv + kCallbackIndex,
-                            sUsingService);
+                            sElevationType == ElevationType::ElevatedByMMS);
         }
         return 1;
       }
@@ -4912,7 +4839,7 @@ int NS_main(int argc, NS_tchar** argv) {
           EXIT_IF_SECOND_UPDATER_INSTANCE(updateLockFileHandle, 1);
           LaunchCallbackApp(argv[kCallbackWorkingDirIndex],
                             argc - kCallbackIndex, argv + kCallbackIndex,
-                            sUsingService);
+                            sElevationType == ElevationType::ElevatedByMMS);
           return 1;
         }
 
@@ -4988,7 +4915,7 @@ int NS_main(int argc, NS_tchar** argv) {
             EXIT_IF_SECOND_UPDATER_INSTANCE(updateLockFileHandle, 1);
             LaunchCallbackApp(argv[kCallbackWorkingDirIndex],
                               argc - kCallbackIndex, argv + kCallbackIndex,
-                              sUsingService);
+                              sElevationType == ElevationType::ElevatedByMMS);
             return 1;
           }
 
@@ -5029,7 +4956,7 @@ int NS_main(int argc, NS_tchar** argv) {
     if (t.Run(UpdateThreadFunc, nullptr) == 0) {
       if (!sStagedUpdate && !sReplaceRequest && !sUpdateSilently
 #ifdef XP_MACOSX
-          && !isElevated
+          && !isElevationTypeElevated(sElevationType)
 #endif
       ) {
         ShowProgressUI();
@@ -5079,7 +5006,7 @@ int NS_main(int argc, NS_tchar** argv) {
   }  // if (!isDMGInstall)
 
 #ifdef XP_MACOSX
-  if (isElevated) {
+  if (isElevationTypeElevated(sElevationType)) {
     SetGroupOwnershipAndPermissions(gInstallDirPath);
     freeArguments(argc, argv);
     CleanupElevatedMacUpdate(false);

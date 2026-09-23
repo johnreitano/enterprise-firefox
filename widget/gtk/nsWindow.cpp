@@ -1204,14 +1204,6 @@ bool nsWindow::WorkspaceManagementDisabled() {
   return desktop.EqualsLiteral("bspwm") || desktop.EqualsLiteral("i3");
 }
 
-void nsWindow::GetWorkspaceID(nsAString& workspaceID) {
-  workspaceID.Truncate();
-}
-
-void nsWindow::MoveToWorkspace(const nsAString& workspaceIDStr) {
-  LOG("  MoveToWorkspace disabled, quit");
-}
-
 void nsWindow::SetUserTimeAndStartupTokenForActivatedWindow() {
   nsGTKToolkit* toolkit = nsGTKToolkit::GetToolkit();
   if (!toolkit) {
@@ -3264,10 +3256,12 @@ bool nsWindow::DispatchCommandEvent(nsAtom* aCommand) {
   return true;
 }
 
-bool nsWindow::DispatchContentCommandEvent(EventMessage aMsg) {
-  WidgetContentCommandEvent event(true, aMsg, this);
-  DispatchEvent(&event);
-  return true;
+Result<bool, nsresult> nsWindow::DispatchContentCommandEvent(
+    EventMessage aMsg) {
+  if (TextEventDispatcher* const dispatcher = GetTextEventDispatcher()) {
+    return dispatcher->DispatchContentCommandEvent(aMsg);
+  }
+  return Err(NS_ERROR_NOT_AVAILABLE);
 }
 
 WidgetEventTime nsWindow::GetWidgetEventTime(guint32 aEventTime) {
@@ -7583,11 +7577,11 @@ void nsWindow::InsertEmoji(RefPtr<nsWindow> aToplevelWindow) {
                          return;
                        }
                        LOGW("[%p] nsWindow::Emoji() insert_text", window);
-                       WidgetContentCommandEvent insertTextEvent(
-                           true, eContentCommandInsertText, window);
-                       NS_ConvertUTF8toUTF16 str(text);
-                       insertTextEvent.mString.emplace(str);
-                       window->DispatchEvent(&insertTextEvent);
+                       if (TextEventDispatcher* const dispatcher =
+                               window->GetTextEventDispatcher()) {
+                         (void)dispatcher->DispatchInsertTextCommandEvent(
+                             NS_ConvertUTF8toUTF16(text));
+                       }
                      }),
                      aToplevelWindow);
   }

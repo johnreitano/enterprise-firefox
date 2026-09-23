@@ -49,7 +49,7 @@ use api::{FilterOpGraphPictureBufferId, SVGFE_GRAPH_MAX};
 use api::channel::{unbounded_channel, Receiver, Sender};
 use api::units::*;
 use api::prim_geometry::{
-    conic_gradient_prim, image_stretch_size, linear_gradient_prim, radial_gradient_prim,
+    conic_gradient_prim, linear_gradient_prim, radial_gradient_prim,
     simplify_repeated_primitive,
 };
 use crate::box_shadow::BLUR_SAMPLE_SCALE;
@@ -79,7 +79,7 @@ use crate::prim_store::borders::ImageBorder;
 use crate::prim_store::gradient::{
     GradientStopKey,
 };
-use crate::prim_store::image::{Image, StretchSizeKey, YuvImage};
+use crate::prim_store::image::{Image, StretchSizeKey, SubRectKey, YuvImage};
 use crate::prim_store::line_dec::LineDecoration;
 use crate::prim_store::picture::{Picture, PictureKey};
 use crate::picture_composite_mode::{PictureCompositeKey, PictureCompositeMode};
@@ -593,7 +593,7 @@ impl<'a> SceneBuilder<'a> {
             &builder.spatial_tree,
             &builder.prim_instances,
             &mut builder.clip_tree_builder,
-            &builder.interners,
+            &builder.interners.clip,
         );
 
         for pic_index in &builder.snapshot_pictures {
@@ -1350,36 +1350,7 @@ impl<'a> SceneBuilder<'a> {
                     spatial_node_index,
                     clip_node_id,
                     &layout,
-                    StretchSizeKey::fills_prim(),
-                    LayoutSize::zero(),
-                    info.image_key,
-                    info.image_rendering,
-                    info.alpha_type,
-                    info.color,
-                );
-            }
-            DisplayItem::RepeatingImage(ref info) => {
-                tracy_rs::profile_scope!("repeating_image");
-
-                if !validate_image_key(info.image_key, namespace) {
-                    return;
-                }
-
-                let (layout, spatial_node_index, clip_node_id) = self.process_common_properties_with_bounds(
-                    &info.common,
-                    info.bounds,
-                );
-
-                let stretch_size = image_stretch_size(
-                    &layout.rect,
                     info.stretch_size,
-                );
-
-                self.add_image(
-                    spatial_node_index,
-                    clip_node_id,
-                    &layout,
-                    stretch_size,
                     info.tile_spacing,
                     info.image_key,
                     info.image_rendering,
@@ -1449,14 +1420,25 @@ impl<'a> SceneBuilder<'a> {
 
                 layout.transformed_aa_edges &= info.transformed_aa_edges;
 
-                self.add_primitive(
-                    spatial_node_index,
-                    clip_node_id,
-                    &layout,
-                    RectanglePrim {
-                        color: info.color.into(),
-                    },
-                );
+                // The display list builder drops every other fully transparent
+                // rectangle at record time, but records a checkerboard
+                // background whatever its colour, since the barrier below is
+                // keyed off the flag alone. Such a rectangle draws nothing.
+                // Tested on the quantized colour, as the primitive stores it.
+                let visible = match info.color {
+                    PropertyBinding::Value(color) => api::ColorU::from(color).a > 0,
+                    PropertyBinding::Binding(..) => true,
+                };
+                if visible {
+                    self.add_primitive(
+                        spatial_node_index,
+                        clip_node_id,
+                        &layout,
+                        RectanglePrim {
+                            color: info.color.into(),
+                        },
+                    );
+                }
 
                 if info.common.flags.contains(PrimitiveFlags::CHECKERBOARD_BACKGROUND) {
                     self.add_tile_cache_barrier_if_needed(SliceFlags::empty());
@@ -1528,8 +1510,8 @@ impl<'a> SceneBuilder<'a> {
 
                 if let Some(prim_key_kind) = linear_gradient_prim(
                     layout.rect,
-                    info.gradient.start_point,
-                    info.gradient.end_point,
+                    info.gradient.start,
+                    info.gradient.end,
                     read_gradient_stops(item.gradient_stops()),
                     info.gradient.extend_mode,
                     info.tile_size,
@@ -1842,19 +1824,17 @@ impl<'a> SceneBuilder<'a> {
         prim: P,
     )
     where
-        P: InternablePrimitive + IsVisible,
+        P: InternablePrimitive,
         Interners: AsMut<Interner<P>>,
     {
-        if prim.is_visible() {
-            self.clip_tree_builder.debug_check_clip_stack(clip_node_id);
+        self.clip_tree_builder.debug_check_clip_stack(clip_node_id);
 
-            self.add_prim_to_draw_list(
-                info,
-                spatial_node_index,
-                clip_node_id,
-                prim,
-            );
-        }
+        self.add_prim_to_draw_list(
+            info,
+            spatial_node_index,
+            clip_node_id,
+            prim,
+        );
     }
 
 
@@ -2074,7 +2054,7 @@ impl<'a> SceneBuilder<'a> {
         // If this stacking context has any complex clips, we need to draw it
         // to an off-screen surface.
         if let Some(clip_chain_id) = clip_chain_id {
-            if self.clip_tree_builder.clip_chain_has_complex_clips(clip_chain_id, &self.interners) {
+            if self.clip_tree_builder.clip_chain_has_complex_clips(clip_chain_id, &self.interners.clip) {
                 // At the root level, if all complex clips are fixed-position
                 // rounded rectangles, we can skip the intermediate surface.
                 // The clips will be promoted to compositor clips on the tile
@@ -2090,7 +2070,7 @@ impl<'a> SceneBuilder<'a> {
                    !self.sc_stack.is_empty() ||
                    !self.clip_tree_builder.clip_chain_complex_clips_are_promotable(
                        clip_chain_id,
-                       &self.interners,
+                       &self.interners.clip,
                        &self.spatial_tree,
                    )
                 {
@@ -2127,7 +2107,7 @@ impl<'a> SceneBuilder<'a> {
                 // and use that slice as the backing surface for the blend container
                 if self.tile_cache_builder.is_current_slice_empty() &&
                    self.spatial_tree.is_root_coord_system(spatial_node_index) &&
-                   !self.clip_tree_builder.clip_node_has_complex_clips(clip_node_id, &self.interners)
+                   !self.clip_tree_builder.clip_node_has_complex_clips(clip_node_id, &self.interners.clip)
                 {
                     self.add_tile_cache_barrier_if_needed(SliceFlags::IS_ATOMIC);
                     self.tile_cache_builder.make_current_slice_atomic();
@@ -2776,8 +2756,8 @@ impl<'a> SceneBuilder<'a> {
                     NinePatchBorderSource::Gradient(gradient) => {
                         let prim = match linear_gradient_prim(
                             info.rect,
-                            gradient.start_point,
-                            gradient.end_point,
+                            gradient.start,
+                            gradient.end,
                             read_gradient_stops(gradient_stops),
                             gradient.extend_mode,
                             LayoutSize::new(border.height as f32, border.width as f32),
@@ -2958,6 +2938,53 @@ impl<'a> SceneBuilder<'a> {
             .. *info
         };
 
+        // Only part of the image may be visible, as with a CSS sprite sheet
+        // positioned by a negative background-position. Restrict sampling to
+        // that part, so that filtering cannot pull in the neighbouring cells.
+        //
+        // The visible part is what the item's clip rect leaves of its bounds, so
+        // it is already implied by the item and does not need sending. Recorded
+        // as a fraction of the image because the size the image is rasterized at
+        // is not known until frame build.
+        //
+        // Only for an image that covers its rect once. When the pattern repeats,
+        // each repetition samples the whole image, so a single fraction is
+        // meaningless.
+        let repeats = stretch.width < prim_rect.width()
+            || stretch.height < prim_rect.height()
+            || tile_spacing != LayoutSize::zero();
+        // The image is mapped onto the stretch size anchored at the prim rect's
+        // origin, which is not the prim rect: Gecko trims the rect of a
+        // repeating background to the fill area while leaving the origin on the
+        // first tile, so it can be narrower than one repetition (bug 2068996).
+        // Take the fraction of this rect, the same rect `prepare_image_quads`
+        // resolves the fraction back against.
+        let image_rect = LayoutRect::from_origin_and_size(
+            prim_rect.min,
+            stretch,
+        );
+        let visible = info.clip_rect.intersection_unchecked(&prim_rect);
+        let sub_rect = if repeats
+            || visible.is_empty()
+            || image_rect.width() <= 0.0
+            || image_rect.height() <= 0.0
+            || visible.contains_box(&prim_rect)
+        {
+            None
+        } else {
+            let fraction = |v: f32, min: f32, extent: f32| ((v - min) / extent).clamp(0.0, 1.0);
+            Some(SubRectKey {
+                min: api::key_types::PointKey {
+                    x: fraction(visible.min.x, image_rect.min.x, image_rect.width()),
+                    y: fraction(visible.min.y, image_rect.min.y, image_rect.height()),
+                },
+                max: api::key_types::PointKey {
+                    x: fraction(visible.max.x, image_rect.min.x, image_rect.width()),
+                    y: fraction(visible.max.y, image_rect.min.y, image_rect.height()),
+                },
+            })
+        };
+
         self.add_primitive(
             spatial_node_index,
             clip_node_id,
@@ -2969,6 +2996,7 @@ impl<'a> SceneBuilder<'a> {
                 color: color.into(),
                 image_rendering,
                 alpha_type,
+                sub_rect,
             },
         );
     }
@@ -3739,11 +3767,6 @@ impl<'a> SceneBuilder<'a> {
 
         source
     }
-}
-
-
-pub trait IsVisible {
-    fn is_visible(&self) -> bool;
 }
 
 /// A primitive instance + some extra information about the primitive. This is

@@ -405,6 +405,18 @@ impl FeltXPCOM {
         }
     }
 
+    fn SetShutdownLockIntent(&self, lock_intent: bool) -> nserror::nsresult {
+        trace!("FeltXPCOM::SetShutdownLockIntent({})", lock_intent);
+        crate::SHUTDOWN_LOCK_INTENT.store(lock_intent, Ordering::Relaxed);
+        NS_OK
+    }
+
+    fn SetRestartLockIntent(&self, lock_intent: bool) -> nserror::nsresult {
+        trace!("FeltXPCOM::SetRestartLockIntent({})", lock_intent);
+        crate::RESTART_LOCK_INTENT.store(lock_intent, Ordering::Relaxed);
+        NS_OK
+    }
+
     xpcom_method!(ipc_channel => IpcChannel(pid: u32));
     fn ipc_channel(&self, expected_pid: u32) -> Result<(), nserror::nsresult> {
         let felt_server = match self.one_shot_server.take() {
@@ -469,13 +481,19 @@ impl FeltXPCOM {
                 if let Some(rx) = rx_clone {
                     loop {
                         match rx.recv() {
-                            Ok(FeltMessage::Restarting) => {
-                                trace!("FeltServerThread::felt_server::ipc_loop(): Restarting");
-                                crate::utils::notify_observers("felt-firefox-restarting".to_string());
+                            Ok(FeltMessage::Restarting(lock_intent)) => {
+                                trace!("FeltServerThread::felt_server::ipc_loop(): Restarting (lock_intent={})", lock_intent);
+                                crate::utils::notify_observers_with_payload(
+                                    "felt-firefox-restarting".to_string(),
+                                    Some(lock_intent.to_string()),
+                                );
                             },
-                            Ok(FeltMessage::Exiting) => {
-                                trace!("FeltServerThread::felt_server::ipc_loop(): Exiting");
-                                crate::utils::notify_observers("felt-firefox-exiting".to_string());
+                            Ok(FeltMessage::Exiting(lock_intent)) => {
+                                trace!("FeltServerThread::felt_server::ipc_loop(): Exiting, lock_intent={}", lock_intent);
+                                crate::utils::notify_observers_with_payload(
+                                    "felt-firefox-exiting".to_string(),
+                                    Some(lock_intent.to_string()),
+                                );
                             },
                             Ok(FeltMessage::FeltReady) => {
                                 trace!("FeltServerThread::felt_server::ipc_loop(): FeltReady");

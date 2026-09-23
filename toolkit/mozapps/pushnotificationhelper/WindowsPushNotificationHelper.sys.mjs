@@ -6,6 +6,11 @@ const BINARY_NAME = "notification-helper.exe";
 
 const lazy = {};
 
+ChromeUtils.defineESModuleGetters(lazy, {
+  PushNotificationHelperRegistry:
+    "resource://gre/modules/PushNotificationHelperRegistry.sys.mjs",
+});
+
 ChromeUtils.defineLazyGetter(lazy, "log", () =>
   console.createInstance({
     maxLogLevel: "Error",
@@ -18,16 +23,15 @@ ChromeUtils.defineLazyGetter(lazy, "log", () =>
  * Launches the helper.
  *
  * @param {string[]} args - full argument list for the helper.
+ * @returns {boolean} whether the helper was launched.
  */
 function launch(args) {
   const exe = Services.dirsvc.get("GreBinD", Ci.nsIFile);
   exe.append(BINARY_NAME);
 
   if (!exe.exists()) {
-    // TODO: Bug 2067701 packages the helper. Until then its absence is
-    // expected, so this must stay below the error level.
-    lazy.log.warn(`${BINARY_NAME} is not installed`);
-    return;
+    lazy.log.error(`${BINARY_NAME} is not installed`);
+    return false;
   }
 
   const process = Cc["@mozilla.org/process/util;1"].createInstance(
@@ -38,6 +42,8 @@ function launch(args) {
   process.startHidden = true;
   process.noShell = true;
   process.runw(false, args, args.length);
+
+  return true;
 }
 
 /**
@@ -57,17 +63,27 @@ export const WindowsPushNotificationHelper = {
   },
 
   /**
-   * Starts the push notification helper for the current running profile.
+   * Starts the push notification helper for the current running profile and
+   * records it in the registry.
    */
   start() {
-    launch(this.profileArgs);
+    if (launch(this.profileArgs)) {
+      lazy.PushNotificationHelperRegistry.add();
+    }
+    lazy.PushNotificationHelperRegistry.prune();
   },
 
   /**
    * Asks this profile's helper to exit, including one left behind by an
-   * earlier Firefox session.
+   * earlier Firefox session, and removes it from the registry. Does nothing
+   * when no helper was recorded, so a profile that never had one does not
+   * launch a --stop process on every startup.
    */
   stop() {
-    launch(["--stop", ...this.profileArgs]);
+    if (lazy.PushNotificationHelperRegistry.has()) {
+      launch(["--stop", ...this.profileArgs]);
+      lazy.PushNotificationHelperRegistry.remove();
+    }
+    lazy.PushNotificationHelperRegistry.prune();
   },
 };

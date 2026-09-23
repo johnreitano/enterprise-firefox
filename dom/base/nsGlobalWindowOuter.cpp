@@ -6047,6 +6047,17 @@ void nsGlobalWindowOuter::CloseOuter(bool aTrustedCaller) {
     return;
   }
 
+  // Check allow-top-navigation sandbox flags
+  if (RefPtr<nsGlobalWindowInner> callerInner =
+          nsContentUtils::IncumbentInnerWindow()) {
+    if (BrowsingContext* callerBC = callerInner->GetBrowsingContext()) {
+      if (NS_FAILED(mBrowsingContext->EnsureSourceSandboxAllowsNavigation(
+              callerBC, true))) {
+        return;
+      }
+    }
+  }
+
   // Don't allow scripts from content to close non-neterror windows that
   // were not opened by script.
   if (mDoc) {
@@ -6054,26 +6065,17 @@ void nsGlobalWindowOuter::CloseOuter(bool aTrustedCaller) {
     nsresult rv = mDoc->GetURL(url);
     NS_ENSURE_SUCCESS_VOID(rv);
 
-    RefPtr<ChildSHistory> csh =
-        nsDocShell::Cast(mDocShell)->GetSessionHistory();
-
     if (!StringBeginsWith(url, u"about:neterror"_ns) &&
-        !mBrowsingContext->GetTopLevelCreatedByWebContent() &&
-        !aTrustedCaller && csh && csh->Count() > 1) {
-      bool allowClose =
-          mAllowScriptsToClose ||
-          Preferences::GetBool("dom.allow_scripts_to_close_windows", true);
-      if (!allowClose) {
-        // We're blocking the close operation
-        // report localized error msg in JS console
-        nsContentUtils::ReportToConsole(nsIScriptError::warningFlag,
-                                        "DOM Window"_ns,
-                                        mDoc,  // Better name for the category?
-                                        PropertiesFile::DOM_PROPERTIES,
-                                        "WindowCloseByScriptBlockedWarning");
-
-        return;
-      }
+        !mBrowsingContext->IsScriptClosable() && !aTrustedCaller &&
+        !mAllowScriptsToClose &&
+        !Preferences::GetBool("dom.allow_scripts_to_close_windows", true)) {
+      // We're blocking the close operation
+      // report localized error msg in JS console
+      nsContentUtils::ReportToConsole(
+          nsIScriptError::warningFlag, "DOM Window"_ns,
+          mDoc,  // Better name for the category?
+          PropertiesFile::DOM_PROPERTIES, "WindowCloseByScriptBlockedWarning");
+      return;
     }
   }
 

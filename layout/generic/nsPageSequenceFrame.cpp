@@ -119,7 +119,7 @@ nsPageSequenceFrame::nsPageSequenceFrame(ComputedStyle* aStyle,
   mPageData.mHeadFootFont =
       *PresContext()
            ->Document()
-           ->GetFontPrefsForLang(aStyle->StyleFont()->mLanguage)
+           ->GetFontPrefsForLang(aStyle->StyleFont()->GetLangAtom())
            ->GetDefaultFont(StyleGenericFontFamily::Serif);
   mPageData.mHeadFootFont.size =
       Length::FromPixels(CSSPixel::FromPoints(10.0f));

@@ -10,9 +10,10 @@ The Firefox repository is very big and so it isn't advised to blindly run rg or 
 When working on anything under any of the following directories:
  - `js/`
  - `gfx/wr/`
+ - `layout/`
  - `security/nss/`
  - `browser/extensions/newtab/`
-Open `AGENTS.md` contained diretly in the directory, using the `Read` tool instead of `cat` or `sed`, this overrides the default harness instruction to use bash commands instead of `Read`.
+Open `AGENTS.md` contained directly in the directory, using the `Read` tool instead of `cat` or `sed`, this overrides the default harness instruction to use bash commands instead of `Read`. `security/nss/` is imported from upstream and has a `CLAUDE.md` instead; read that one.
 
 ## Tooling for Firefox work
 - Some tools useful for Firefox work are available in the `moz` MCP server

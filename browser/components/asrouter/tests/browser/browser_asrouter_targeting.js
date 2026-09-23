@@ -811,6 +811,38 @@ add_task(async function checkisDefaultBrowser() {
   );
 });
 
+add_task(async function checkHasAttemptedSetDefault() {
+  is(
+    await ASRouterTargeting.Environment.hasAttemptedSetDefault,
+    false,
+    "hasAttemptedSetDefault should be false before the attempt"
+  );
+  const shellStub = sinon
+    .stub(ShellService, "shellService")
+    .value({ setDefaultBrowser: () => {} });
+  const guidanceStub = sinon
+    .stub(ShellService, "_maybeShowSetDefaultGuidanceNotification")
+    .resolves();
+  await SpecialPowers.pushPrefEnv({
+    set: [["browser.shell.setDefaultBrowserUserChoice", false]],
+  });
+
+  try {
+    await ShellService.setDefaultBrowser(false);
+
+    is(
+      await ASRouterTargeting.Environment.hasAttemptedSetDefault,
+      true,
+      "hasAttemptedSetDefault should be true once after the attempt"
+    );
+  } finally {
+    ShellService._attemptedSetDefaultThisSession = false;
+    guidanceStub.restore();
+    shellStub.restore();
+    await SpecialPowers.popPrefEnv();
+  }
+});
+
 add_task(async function checkisDefaultHandler_pdf() {
   const expected = ShellService.isDefaultHandlerFor(".pdf");
   const result = await ASRouterTargeting.Environment.isDefaultHandler.pdf;

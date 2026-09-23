@@ -326,12 +326,15 @@ newtab-custom-widget-sports-toggle2 =
   .label = Sports
 newtab-custom-widget-privacy-toggle =
   .label = Privacy
+# Crossword is a widget on New Tab that shows a daily crossword puzzle.
+newtab-custom-widget-crossword-toggle =
+  .label = Crossword
 newtab-custom-widget-stocks-toggle =
   .label = Stocks
 newtab-custom-widget-picture-toggle =
   .label = Picture of the day
-newtab-custom-widget-recent-searches-toggle =
-  .label = Recent searches
+newtab-custom-widget-search-toggle =
+  .label = Search
 newtab-custom-widget-section-title = Widgets
 newtab-custom-widget-section-toggle =
     .label = Widgets
@@ -1377,12 +1380,12 @@ newtab-clock-widget-custom-zone-results =
 newtab-clock-widget-custom-zone-no-results = No matching time zones
 # Returns from the custom clock form back to the city search.
 newtab-clock-widget-custom-back = Back
-# "Open menu for clock" is an icon-only button in the widget toolbar — the
+# "Clock options" is an icon-only button in the widget toolbar — the
 # attributes are consumed as tooltip/screen-reader label only. The button
 # never renders visible text.
-newtab-clock-widget-menu-button =
-    .title = Open menu for clock
-    .aria-label = Open menu for clock
+newtab-clock-widget-menu-button2 =
+    .title = Clock options
+    .aria-label = Clock options
 # $nickname (String) - The user-defined nickname for a saved clock location (e.g., "Home", "Office").
 newtab-clock-widget-label-nickname-with-value = Nickname: { $nickname }
 
@@ -1619,6 +1622,13 @@ newtab-privacy-widget-label =
 # Context menu item linking to more information about the Privacy widget.
 newtab-privacy-menu-learn-more = Learn more
 
+# "Privacy options" is an icon-only button in the widget toolbar — the
+# attributes are consumed as tooltip/screen-reader label only. The button
+# never renders visible text.
+newtab-privacy-widget-menu-button =
+    .title = Privacy options
+    .aria-label = Privacy options
+
 ## Privacy widget — count readout
 
 # Label shown under the large tracker-count number, appearing like:
@@ -1809,6 +1819,26 @@ newtab-stocks-widget-menu-button =
     .title = Stocks widget options
     .aria-label = Stocks widget options
 
+# Toolbar button that opens the stock search. It shows only the icon until it is
+# hovered or focused, then the .label as well; "Search" is a verb. .title and
+# .aria-label name it for tooltips and screen readers.
+newtab-stocks-search-button =
+    .label = Search
+    .title = Search by name or symbol
+    .aria-label = Search by name or symbol
+
+# Shown on the Watchlist while the user has no stocks in it, above a button that
+# opens the stock search.
+newtab-stocks-watchlist-empty = Start watching stocks that matter to you
+
+# Button under the empty-watchlist message that opens the stock search. Shown
+# with a magnifying-glass icon and the .label, where "Search" is a verb; .title
+# and .aria-label name it the same way as the toolbar search button.
+newtab-stocks-watchlist-empty-search =
+    .label = Search
+    .title = Search by name or symbol
+    .aria-label = Search by name or symbol
+
 ## Screen-reader summary of a stock ticker.
 ## Variables:
 ##   $name (String) - the full fund/ETF name, e.g. "SPDR S&P 500 ETF Trust".
@@ -1869,6 +1899,10 @@ newtab-stocks-search-input =
 # search. It means "results of the search", not "search within the results".
 newtab-stocks-search-results =
     .aria-label = Search results
+
+# Shown in the search panel, where the results will appear, until the user
+# has searched.
+newtab-stocks-search-hint = Search for symbols or companies to add to your watchlist
 
 # "Back" is an icon-only button in the search panel header that returns to the
 # widget — the attributes are consumed as tooltip/screen-reader label only. The

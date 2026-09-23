@@ -48,7 +48,11 @@ describe("Smart Form Fill initialization", () => {
 
     beforeEach(async () => {
       await SpecialPowers.pushPrefEnv({
-        set: [[SMART_FORM_FILL_PREF, true]],
+        set: [
+          [SMART_FORM_FILL_PREF, true],
+          // Keep being outside a Smart Window the only reason to not register.
+          [MIN_FORM_FIELDS_PREF, 1],
+        ],
       });
       normalTab = await BrowserTestUtils.openNewForegroundTab(
         gBrowser,
@@ -163,10 +167,10 @@ describe("Smart Form Fill initialization", () => {
 
       it("only registers and classifies supported fields", async () => {
         await promiseNavigateAndLoad(browser, SUPPORTED_FIELDS_URL);
-        await waitForSmartFormFillProvider(browser, "#search");
+        await waitForSmartFormFillProvider(browser, "#text");
 
         for (const selector of [
-          "#search",
+          "#text",
           "#number",
           "#month",
           "#notes",
@@ -193,13 +197,13 @@ describe("Smart Form Fill initialization", () => {
 
         const request = await captureClassificationRequest(
           win,
-          "#search",
+          "#text",
           mockEngineManager
         );
 
         Assert.deepEqual(
           request.fields.map(field => field.name),
-          ["search", "number", "month", "notes", "city", "address"],
+          ["text", "number", "month", "notes", "city", "address"],
           "Only supported fields should be classified"
         );
       });

@@ -1093,8 +1093,10 @@ class Window extends WindowBase {
     })();
 
     const initialState = window.windowState;
-    // window.fullScreen is checked too, so that we still have work to do below
-    // when DOM and widget disagree on the fullscreen state (bug 2066805).
+    // window.fullScreen is checked too, because it is set as soon as a
+    // fullscreen change is requested, while window.windowState only follows
+    // when the widget reports the change. A request arriving while an earlier
+    // one is still running would otherwise return here and do nothing.
     if (
       expectedState == initialState &&
       window.fullScreen == (expectedState == window.STATE_FULLSCREEN)

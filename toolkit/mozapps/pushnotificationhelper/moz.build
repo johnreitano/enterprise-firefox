@@ -11,6 +11,7 @@ RUST_PROGRAMS += [
 
 EXTRA_JS_MODULES += [
     "PushNotificationHelper.sys.mjs",
+    "PushNotificationHelperRegistry.sys.mjs",
     "WindowsPushNotificationHelper.sys.mjs",
 ]
 

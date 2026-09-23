@@ -792,6 +792,7 @@ def rust_search_path(rust_path, original_path):
     rust_search_path,
     target,
     original_path,
+    ios_sdk,
 )
 @imports("os")
 @imports(_from="mach.util", _import="get_virtualenv_base_dir")
@@ -802,6 +803,7 @@ def altered_path(
     rust_search_path,
     target,
     original_path,
+    ios_sdk,
 ):
     # Trim trailing empty entries so a stray `;;` in the input doesn't
     # surface as a blank PATH entry.
@@ -820,6 +822,9 @@ def altered_path(
         path = strip_trailing_empty_entries(original_path)
     # cargo needs the rust search path to find cargo-$subcommand.
     path.extend(strip_trailing_empty_entries(rust_search_path))
+    # Put build/macosx/xcrun first in PATH.
+    if ios_sdk:
+        path.insert(0, os.path.join(build_env.topsrcdir, "build", "macosx"))
 
     # Bug 2040992: Strip mach virtualenv entries so any prepended venvs
     # (from intermediate ./mach activations along the build chain) don't
@@ -2825,6 +2830,43 @@ set_config("MOZ_UBSAN", any_ubsan)
 # We only want to include windows.configure when we are compiling on
 # Windows, or for Windows.
 include("windows.configure", when=is_windows)
+
+# llvm-dlltool (Windows only)
+# ==============================================================
+
+
+@depends(build_project, target, "--enable-compile-environment")
+def check_for_llvm_dlltool(build_project, target, compile_environment):
+    if build_project != "browser":
+        return
+
+    if target.os != "WINNT":
+        return
+
+    return compile_environment
+
+
+llvm_dlltool = check_prog(
+    "LLVM_DLLTOOL",
+    ("llvm-dlltool",),
+    what="llvm-dlltool",
+    when=check_for_llvm_dlltool,
+    paths=clang_search_path,
+)
+
+
+@depends(target, when=llvm_dlltool)
+def llvm_dlltool_flags(target):
+    arch = {
+        "x86": "i386",
+        "x86_64": "i386:x86-64",
+        "aarch64": "arm64",
+    }[target.cpu]
+
+    return ["-m", arch]
+
+
+set_config("LLVM_DLLTOOL_FLAGS", llvm_dlltool_flags)
 
 # Security Hardening
 # ==============================================================

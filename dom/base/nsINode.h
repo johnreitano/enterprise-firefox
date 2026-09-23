@@ -667,6 +667,13 @@ class nsINode : public mozilla::dom::EventTarget {
     return false;
   }
 
+  /**
+   * Return true if the concrete class inherits ScriptElement.
+   */
+  [[nodiscard]] bool IsScriptElement() const {
+    return IsHTMLElement(nsGkAtoms::script) || IsSVGElement(nsGkAtoms::script);
+  }
+
   // Returns non-null if this element subclasses `LinkStyle`.
   virtual const mozilla::dom::LinkStyle* AsLinkStyle() const { return nullptr; }
   mozilla::dom::LinkStyle* AsLinkStyle() {

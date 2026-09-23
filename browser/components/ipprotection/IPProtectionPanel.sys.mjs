@@ -56,8 +56,6 @@ const BANDWIDTH_WARNING_DISMISSED_PREF =
 const BANDWIDTH_RESET_DATE_PREF = "browser.ipProtection.bandwidthResetDate";
 const EGRESS_LOCATION_PREF = "browser.ipProtection.egressLocation";
 const USER_OPENED_PREF = "browser.ipProtection.everOpenedPanel";
-const OPENED_WITH_LOCATION_PREF =
-  "browser.ipProtection.openedPanelWithLocation";
 const LOCATION_BADGE_DISMISSED_PREF =
   "browser.ipProtection.locationButtonBadgeDismissed";
 const UPGRADE_NOT_AVAILABLE_PREF = "browser.ipProtection.upgradeNotAvailable";
@@ -654,13 +652,6 @@ export class IPProtectionPanel {
     if (!hasUserEverOpenedPanel) {
       Services.prefs.setBoolPref(USER_OPENED_PREF, true);
     }
-
-    let hasOpenedPanelWithLocation = Services.prefs.getBoolPref(
-      OPENED_WITH_LOCATION_PREF
-    );
-    if (!hasOpenedPanelWithLocation) {
-      Services.prefs.setBoolPref(OPENED_WITH_LOCATION_PREF, true);
-    }
   }
 
   /**
@@ -807,6 +798,7 @@ export class IPProtectionPanel {
     const result = await enrolling;
     Glean.ipprotection.enrollment.record({
       enrolled: result?.isEnrolledAndEntitled,
+      reason: result?.isEnrolledAndEntitled ? "" : (result?.error ?? ""),
     });
   }
 

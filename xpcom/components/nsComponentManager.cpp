@@ -1102,8 +1102,10 @@ nsComponentManagerImpl::CollectReports(nsIHandleReportCallback* aHandleReport,
 }
 
 size_t nsComponentManagerImpl::SizeOfIncludingThis(
-    mozilla::MallocSizeOf aMallocSizeOf) const {
+    mozilla::MallocSizeOf aMallocSizeOf) {
   size_t n = aMallocSizeOf(this);
+
+  MonitorAutoLock lock(mLock);
 
   n += mFactories.ShallowSizeOfExcludingThis(aMallocSizeOf);
   for (const auto& data : mFactories.Values()) {

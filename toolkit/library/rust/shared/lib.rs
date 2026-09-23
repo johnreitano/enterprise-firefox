@@ -50,6 +50,7 @@ extern crate mapped_hyph;
 extern crate mozurl;
 extern crate mp4parse_capi;
 extern crate netwerk_helper;
+extern crate noise;
 extern crate nserror;
 extern crate nsstring;
 extern crate prefs_parser;
@@ -165,8 +166,8 @@ extern crate uritemplate_glue;
 extern crate urlpattern;
 extern crate urlpattern_glue;
 
-extern crate adblock;
 extern crate content_classifier_engine;
+extern crate etp_engine;
 
 #[cfg(feature = "libz-rs-sys")]
 extern crate libz_rs_sys;

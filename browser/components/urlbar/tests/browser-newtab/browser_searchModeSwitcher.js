@@ -79,11 +79,7 @@ add_task(async function switcherEntersSearchMode() {
       isGeneralPurposeEngine: true,
     });
 
-    utils
-      .getUrlbar(content)
-      .querySelector(".searchmode-switcher-close")
-      .click();
-    await utils.assertSearchMode(content, null);
+    await utils.exitSearchMode(content, { waitForSearch: false });
   });
 
   BrowserTestUtils.removeTab(tab);

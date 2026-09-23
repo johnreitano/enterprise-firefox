@@ -613,31 +613,9 @@ void nsHTMLDocument::NamedGetter(JSContext* aCx, const nsAString& aName,
     return;
   }
 
-  bool collect = false;
 #ifdef NIGHTLY_BUILD
-  bool preventShadowing = false;
-  if (StaticPrefs::dom_document_name_getter_prevent_shadowing_enabled()) {
-    if (HTMLDocument_Binding::InterfaceHasProperty(aName)) {
-      preventShadowing = true;
-      collect = mShadowedHTMLDocumentProperties.Length() <= 10;
-    }
-  } else
-#endif
-  {
-    // To limit the possible performance/memory impact, only collect at most 10
-    // properties.
-    collect = mShadowedHTMLDocumentProperties.Length() <= 10 &&
-              HTMLDocument_Binding::InterfaceHasProperty(aName);
-  }
-
-  if (collect) {
-    if (!mShadowedHTMLDocumentProperties.Contains(aName)) {
-      mShadowedHTMLDocumentProperties.AppendElement(aName);
-    }
-  }
-
-#ifdef NIGHTLY_BUILD
-  if (preventShadowing) {
+  if (StaticPrefs::dom_document_name_getter_prevent_shadowing_enabled() &&
+      HTMLDocument_Binding::InterfaceHasProperty(aName)) {
     AutoTArray<nsString, 1> params;
     params.AppendElement(aName);
     nsContentUtils::ReportToConsole(nsIScriptError::warningFlag, "DOM"_ns, this,

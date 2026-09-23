@@ -1390,21 +1390,31 @@ tab-group > tab-split-view-wrapper {
   max-width: var(--tab-max-width);
   transition: var(--tab-width-transition);
 
+  .tabbrowser-tab {
+    --split-view-tab-strip-inset: calc(var(--tab-margin-block) + var(--split-view-padding-block));
+
+    margin-block: calc(-1 * var(--split-view-tab-strip-inset));
+    padding-block: var(--split-view-tab-strip-inset);
+  }
+
   .tab-group-line {
     inset-block-end: calc(var(--tab-group-line-toolbar-border-distance) - var(--tab-margin-block) - var(--split-view-padding-block));
+    /* The line is positioned against the stack, whose padding box includes
+       --split-view-tab-padding-inline here. */
+    inset-inline: calc(var(--split-view-tab-padding-inline) - var(--tab-margin-overflow-clip));
 
     @media not -moz-pref("browser.nova.enabled") {
-      inset-inline-start: calc(var(--space-small) * -2);
+      inset-inline-start: calc(var(--space-small) * -2 + var(--split-view-tab-padding-inline));
     }
     @media -moz-pref("browser.nova.enabled") {
-      inset-inline-end: calc(-1 * var(--tab-margin-overflow-clip) - var(--split-view-tab-padding-inline));
+      inset-inline-end: calc(-1 * var(--tab-margin-overflow-clip));
     }
   }
 
   &[last-tab-or-split-view] .tabbrowser-tab:last-child .tab-group-line {
-    inset-inline-end: calc(var(--tab-border-radius) / 2);
+    inset-inline-end: calc(var(--tab-border-radius) / 2 + var(--split-view-tab-padding-inline));
     @media -moz-pref("browser.nova.enabled") {
-      inset-inline-end: calc(-1 * var(--tab-margin-overflow-clip));
+      inset-inline-end: calc(var(--split-view-tab-padding-inline) - var(--tab-margin-overflow-clip));
     }
   }
 
@@ -1424,7 +1434,13 @@ tab-group > tab-split-view-wrapper {
   }
 
   .tabbrowser-tab {
-    padding-inline: var(--split-view-tab-padding-inline);
+    padding-inline: 0;
+
+    /* The stack gets the padding and the divider so that the tab's own box
+       can reach the edge of the tab strip. */
+    > .tab-stack {
+      padding-inline: var(--split-view-tab-padding-inline);
+    }
 
     .tab-background {
       min-height: var(--split-view-tab-height);
@@ -1516,8 +1532,6 @@ tab-group > tab-split-view-wrapper {
   }
 
   .tabbrowser-tab {
-    padding-block: 0 !important;
-
     :root[uidensity="compact"] & {
       --tab-collapsed-background-width: 24px;
     }
@@ -1619,11 +1633,11 @@ tab-group > tab-split-view-wrapper {
     }
   }
 
-  .tabbrowser-tab:last-child {
+  .tabbrowser-tab:last-child > .tab-stack {
     border-inline-start: 1px solid transparent;
   }
 
-  &:not([hasactivetab]) .tabbrowser-tab:last-child {
+  &:not([hasactivetab]) .tabbrowser-tab:last-child > .tab-stack {
     border-inline-start-color: var(--toolbarbutton-icon-fill);
   }
 }
@@ -1631,6 +1645,7 @@ tab-group > tab-split-view-wrapper {
 /* Overrides for split-view-wrapped tabs in a vertical tabstrip */
 #tabbrowser-tabs[orient="vertical"] tab-split-view-wrapper {
   --split-view-wrapper-inline-inset: calc(var(--tab-padding-inline) - var(--space-medium));
+  --split-view-tab-strip-inset: round(var(--split-view-wrapper-inline-inset), env(hairline));
 
   border-radius: var(--tab-border-radius);
   gap: var(--space-xsmall);
@@ -1638,7 +1653,30 @@ tab-group > tab-split-view-wrapper {
 
   /* Derive the margin from the snapped total inset and padding, so that the
    * difference remains device pixel aligned. */
-  margin-inline: calc(round(var(--split-view-wrapper-inline-inset), env(hairline)) - var(--split-view-wrapper-padding));
+  margin-inline: calc(var(--split-view-tab-strip-inset) - var(--split-view-wrapper-padding));
+
+  .tabbrowser-tab {
+    margin-inline: calc(-1 * var(--split-view-tab-strip-inset));
+    padding-inline: var(--split-view-tab-strip-inset);
+    /* Beats the vertical tab strip's padding-block rules, including the
+       :nth-child(1 of ...) one. */
+    padding-block: 0 !important;
+  }
+}
+
+/* Side by side, each tab only borders the tab strip on its own side. */
+:root:not([sidebar-expand-on-hover]) #tabbrowser-tabs[orient="vertical"][expanded] tab-split-view-wrapper {
+  @container vertical-tabs-container (min-width: 211px) {
+    .tabbrowser-tab:first-child {
+      margin-inline-end: 0;
+      padding-inline-end: 0;
+    }
+
+    .tabbrowser-tab:last-child {
+      margin-inline-start: 0;
+      padding-inline-start: 0;
+    }
+  }
 }
 
 #tabbrowser-tabs[orient="vertical"][expanded] tab-split-view-wrapper {
@@ -1652,13 +1690,13 @@ tab-group > tab-split-view-wrapper {
     }
 
     &:not([hasactivetab]) .tabbrowser-tab {
-      &:first-child {
+      &:first-child > .tab-stack {
         border-block-end: 1px solid var(--toolbarbutton-icon-fill);
         border-inline-end: transparent;
       }
     }
 
-    .tabbrowser-tab:last-child {
+    .tabbrowser-tab:last-child > .tab-stack {
       border-inline-start: none !important;
     }
   }
@@ -1673,12 +1711,12 @@ tab-group > tab-split-view-wrapper {
   }
 
   &:not([hasactivetab]) .tabbrowser-tab {
-    &:first-child {
+    &:first-child > .tab-stack {
       border-block-end: 1px solid var(--toolbarbutton-icon-fill);
       border-inline-end: transparent;
     }
 
-    &:last-child {
+    &:last-child > .tab-stack {
       border-inline-start: transparent !important;
     }
   }
@@ -1689,12 +1727,12 @@ tab-group > tab-split-view-wrapper {
   grid-template-columns: 1fr;
 
   &:not([hasactivetab]) .tabbrowser-tab {
-    &:first-child {
+    &:first-child > .tab-stack {
       border-block-end: 1px solid var(--toolbarbutton-icon-fill);
       border-inline-end: transparent;
     }
 
-    &:last-child {
+    &:last-child > .tab-stack {
       border-inline-start: transparent !important;
     }
   }
@@ -1713,12 +1751,12 @@ tab-group > tab-split-view-wrapper {
     margin-block-start: var(--space-xsmall);
   }
 
-  &:not([hasactivetab]) .tabbrowser-tab:first-child {
+  &:not([hasactivetab]) .tabbrowser-tab:first-child > .tab-stack {
     border-block-end: 1px solid var(--toolbarbutton-icon-fill);
     border-inline-end: transparent;
   }
 
-  .tabbrowser-tab:last-child {
+  .tabbrowser-tab:last-child > .tab-stack {
     border-inline-start-width: 0;
   }
 
@@ -2636,6 +2674,11 @@ tab-group {
   &:hover {
     background-color: var(--tab-background-color-hover);
     outline-color: var(--tab-border-color-hover);
+
+    &:active {
+      color: var(--button-text-color-ghost-active);
+      background-color: var(--button-background-color-ghost-active);
+    }
   }
 
   &:focus-visible {
@@ -2919,6 +2962,7 @@ tab-group {
         width: var(--icon-size);
         height: var(--icon-size);
         padding: 2px;
+        top: -2px;
         box-shadow: var(--box-shadow-level-1);
       }
 
@@ -3082,8 +3126,10 @@ toolbar:not(#TabsToolbar) #firefox-view-button {
 #alltabs-button {
   list-style-image: url("chrome://browser/skin/search-tabs.svg");
 
-  #TabsToolbar & {
-    list-style-image: url("chrome://global/skin/icons/arrow-down.svg");
+  @media not (-moz-platform: linux) {
+    #TabsToolbar & {
+      list-style-image: url("chrome://global/skin/icons/arrow-down.svg");
+    }
   }
 
   #tabbrowser-tabs[hiddensoundplaying] ~ & > .toolbarbutton-badge-stack > .toolbarbutton-badge {

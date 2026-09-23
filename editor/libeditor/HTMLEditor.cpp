@@ -42,7 +42,6 @@
 #include "mozilla/StaticPrefs_editor.h"
 #include "mozilla/StyleSheet.h"
 #include "mozilla/StyleSheetInlines.h"
-#include "mozilla/glean/EditorLibeditorMetrics.h"
 #include "mozilla/TextControlElement.h"
 #include "mozilla/TextEditor.h"
 #include "mozilla/TextEvents.h"
@@ -260,25 +259,6 @@ HTMLEditor::HTMLEditor(const Document& aDocument)
       mDefaultParagraphSeparator(ParagraphSeparator::div) {}
 
 HTMLEditor::~HTMLEditor() {
-  glean::htmleditors::with_beforeinput_listeners
-      .EnumGet(static_cast<glean::htmleditors::WithBeforeinputListenersLabel>(
-          MayHaveBeforeInputEventListenersForTelemetry() ? 1 : 0))
-      .Add();
-  glean::htmleditors::overridden_by_beforeinput_listeners
-      .EnumGet(static_cast<
-               glean::htmleditors::OverriddenByBeforeinputListenersLabel>(
-          mHasBeforeInputBeenCanceled ? 1 : 0))
-      .Add();
-  glean::htmleditors::with_mutation_observers_without_beforeinput_listeners
-      .EnumGet(static_cast<
-               glean::htmleditors::
-                   WithMutationObserversWithoutBeforeinputListenersLabel>(
-          !MayHaveBeforeInputEventListenersForTelemetry() &&
-                  MutationObserverHasObservedNodeForTelemetry()
-              ? 1
-              : 0))
-      .Add();
-
   mPendingStylesToApplyToNewContent = nullptr;
 
   if (mDisabledLinkHandling) {
@@ -5456,17 +5436,18 @@ Result<SplitNodeResult, nsresult> HTMLEditor::DoSplitNode(
                            "Text::SubstringData() failed, but ignored");
       error.SuppressException();
 
-      // XXX This call may destroy us.
-      DoDeleteText(MOZ_KnownLive(*originalTextNode), cutStartOffset, cutLength,
-                   error);
-      NS_WARNING_ASSERTION(!error.Failed(),
-                           "EditorBase::DoDeleteText() failed, but ignored");
-      error.SuppressException();
-
-      // XXX This call may destroy us.
-      DoSetText(MOZ_KnownLive(*newTextNode), movingText, error);
-      NS_WARNING_ASSERTION(!error.Failed(),
-                           "EditorBase::DoSetText() failed, but ignored");
+      nsresult rvDeleteText = DoDeleteText(MOZ_KnownLive(*originalTextNode),
+                                           cutStartOffset, cutLength);
+      // To avoid dataloss, we should keep setting to the new node.
+      nsresult rvSetText = DoSetText(MOZ_KnownLive(*newTextNode), movingText);
+      if (NS_FAILED(rvDeleteText)) [[unlikely]] {
+        NS_WARNING("EditorBase::DoDeleteText() failed");
+        return rvDeleteText;
+      }
+      if (NS_FAILED(rvSetText)) [[unlikely]] {
+        NS_WARNING("EditorBase::DoSetText() failed");
+        return rvSetText;
+      }
       return NS_OK;
     }
 
@@ -5817,15 +5798,13 @@ nsresult HTMLEditor::DoJoinNodes(nsIContent& aContentToKeep,
       }
       // Even if we've already destroyed, let's update aContentToKeep for
       // avoiding a dataloss bug.
-      IgnoredErrorResult ignoredError;
-      DoInsertText(MOZ_KnownLive(*aContentToKeep.AsText()),
-                   aContentToKeep.AsText()->TextDataLength(), rightText,
-                   ignoredError);
-      if (NS_WARN_IF(Destroyed())) {
-        return NS_ERROR_EDITOR_DESTROYED;
+      nsresult rv =
+          DoInsertText(MOZ_KnownLive(*aContentToKeep.AsText()),
+                       aContentToKeep.AsText()->TextDataLength(), rightText);
+      if (NS_FAILED(rv)) [[unlikely]] {
+        NS_WARNING("EditorBase::DoSetText() failed");
+        return rv;
       }
-      NS_WARNING_ASSERTION(!ignoredError.Failed(),
-                           "EditorBase::DoSetText() failed, but ignored");
       return NS_OK;
     }
     // Otherwise it's an interior node, so shuffle around the children.

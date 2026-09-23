@@ -568,6 +568,7 @@ class ChromeActions {
     // Avoid inline-image baseline space.
     img.style.display = "block";
     img.src = svgUrl;
+    return img;
   }
 
   #makeElementForText({ text, color, fontFamily, fontSize }, parent, doc) {
@@ -639,6 +640,7 @@ class ChromeActions {
       );
       iframeDoc.body.style.margin = "0";
 
+      const images = [];
       for (const pdfData of entries) {
         const { width: fieldWidth, height: fieldHeight } = pdfData;
         const pageDiv = iframeDoc.createElement("div");
@@ -666,10 +668,13 @@ class ChromeActions {
         if (typeof pdfData.text === "string" && pdfData.text !== "") {
           this.#makeElementForText(pdfData, div, iframeDoc);
         } else {
-          this.#makeElementForSVG(pdfData, div, iframeDoc);
+          images.push(this.#makeElementForSVG(pdfData, div, iframeDoc));
         }
       }
       iframeDoc.body.append(fragment);
+
+      // Prevent printing before SVG images finish decoding.
+      await Promise.all(images.map(img => img.decode()));
 
       const buffer = await actor.sendQuery("PDFJS:Parent:printToPDF", {
         id: iframeWindow.browsingContext.id,

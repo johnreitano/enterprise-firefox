@@ -8,6 +8,7 @@
 #include <cstdint>
 
 #include "mozilla/Assertions.h"
+#include "mozilla/Maybe.h"
 #include "mozilla/Result.h"
 #include "mozilla/ResultVariant.h"
 #include "nsStringFwd.h"
@@ -33,11 +34,26 @@ struct AV1FmtpParams {
   }
 };
 
+// AV1 Annex A.3 "Levels" block limits: maximum picture size and display
+// rate, expressed in 16x16-pixel blocks (the same unit H264/VP8/VP9 use for
+// their max-fs/max-mbps fmtp parameters), so callers can feed them directly
+// into VideoEncodingConstraints::maxFs/maxMbps.
+struct AV1BlockLimits {
+  uint32_t mMaxFs;
+  uint64_t mMaxBlocksPerSecond;
+};
+
 #ifdef MOZ_WEBRTC
 // Parse profile, level-idx and tier from a video/AV1 MIME content type.
 // Missing parameters return Err(NotPresent), present but unparseable or
 // unsupported values return Err(Invalid).
 AV1FmtpParams ParseAV1Fmtp(const nsACString& aMimeString);
+
+// The AV1 Annex A.3 MaxPicSize/MaxDisplayRate limits for aLevelIdx,
+// converted from samples to 16x16-pixel blocks. Nothing() for levels with no
+// defined caps (undefined, reserved, or unknown) and for level-idx 31
+// ("Maximum parameters", which imposes no cap).
+Maybe<AV1BlockLimits> AV1BlockLimitsForLevel(uint8_t aLevelIdx);
 
 // Whether the given resolution and framerate fit aLevelIdx's AV1 Annex A.3
 // MaxHSize/MaxVSize/MaxPicSize/MaxDisplayRate caps. False for levels with no
@@ -49,6 +65,11 @@ AV1FmtpParams ParseAV1Fmtp(const nsACString& aMimeString);
 inline AV1FmtpParams ParseAV1Fmtp(const nsACString&) {
   MOZ_ASSERT_UNREACHABLE("ParseAV1Fmtp called in non-MOZ_WEBRTC build");
   return {};
+}
+inline Maybe<AV1BlockLimits> AV1BlockLimitsForLevel(uint8_t) {
+  MOZ_ASSERT_UNREACHABLE(
+      "AV1BlockLimitsForLevel called in non-MOZ_WEBRTC build");
+  return Nothing();
 }
 inline bool AV1LevelFits(uint8_t, uint32_t, uint32_t, double) {
   MOZ_ASSERT_UNREACHABLE("AV1LevelFits called in non-MOZ_WEBRTC build");

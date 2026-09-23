@@ -22,6 +22,9 @@ use crate::std::{
 };
 use crate::ui::{self, test::model, ui_impl::Interact};
 
+#[cfg(feature = "enterprise")]
+use mozbuild::config::MOZ_APP_NAME;
+
 /// A simple thread-safe counter which can be used in tests to mark that certain code paths were
 /// hit.
 #[derive(Clone, Default)]
@@ -226,7 +229,7 @@ impl GuiTest {
         // point it at the report url used by the mocked crash annotations.
         #[cfg(feature = "enterprise")]
         mock_files.add_dir("work_dir").add_file(
-            "work_dir/firefox.cfg",
+            format!("work_dir/{}.cfg", MOZ_APP_NAME),
             enterprise_autoconfig("https://reports.example.com"),
         );
 
@@ -332,7 +335,7 @@ impl GuiTest {
         let mut inner = self.files.assert_files();
         // Part of the test setup rather than of what the application wrote.
         #[cfg(feature = "enterprise")]
-        inner.ignore("work_dir/firefox.cfg");
+        inner.ignore(format!("work_dir/{}.cfg", MOZ_APP_NAME));
         AssertFiles {
             data_dir: "data_dir".into(),
             events_dir: "events_dir".into(),
@@ -1733,6 +1736,8 @@ fn curl_binary_with_authorization_header() {
                     "--fail",
                     "--user-agent",
                     net::http::user_agent(),
+                    "--silent",
+                    "--show-error",
                     "--form",
                     "extra=@-;filename=extra.json;type=application/json",
                     "--form",
@@ -2069,6 +2074,8 @@ fn background_task_curl_fallback_with_authorization_header() {
                     "--fail",
                     "--user-agent",
                     net::http::user_agent(),
+                    "--silent",
+                    "--show-error",
                     "--form",
                     "extra=@-;filename=extra.json;type=application/json",
                     "--form",

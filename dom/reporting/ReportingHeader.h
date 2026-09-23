@@ -9,7 +9,6 @@
 #include "nsClassHashtable.h"
 #include "nsIObserver.h"
 #include "nsITimer.h"
-#include "nsTHashMap.h"
 #include "nsTObserverArray.h"
 
 class nsIChannel;
@@ -46,9 +45,10 @@ class ReportingHeader final : public nsIObserver,
   struct Endpoint {
     nsCOMPtr<nsIURI> mUrl;
     nsCString mEndpointName;
-    uint32_t mPriority;
-    uint32_t mWeight;
-    uint32_t mFailures;
+    // Initialize for default-construction in AppendElement()
+    uint32_t mPriority = 1;
+    uint32_t mWeight = 1;
+    uint32_t mFailures = 0;
     static Endpoint Create(already_AddRefed<nsIURI> aURL,
                            const nsACString& aEndpointName) {
       return Endpoint{aURL, nsCString{aEndpointName}, 1, 1, 0};
@@ -57,8 +57,8 @@ class ReportingHeader final : public nsIObserver,
 
   struct Group {
     nsCString mName;
-    bool mIncludeSubdomains;
-    int32_t mTTL;
+    bool mIncludeSubdomains = false;
+    int32_t mTTL = 0;
     TimeStamp mCreationTime;
     nsTObserverArray<Endpoint> mEndpoints;
   };

@@ -45,6 +45,8 @@ class AutocompleteTest : BaseSessionTest() {
     }
 
     val acceptDelay: Long = 100
+    // Never completed; a field so the prompt is not GC-dismissed while the test drives it.
+    private val pendingResponse = GeckoResult<PromptDelegate.PromptResponse>(Handler(Looper.getMainLooper()))
 
     // Controls how long a selection prompt is kept open after its field blurs.
     private val dismissDelayPref = "geckoview.autocomplete.selection_dismiss_delay_ms"
@@ -487,7 +489,7 @@ class AutocompleteTest : BaseSessionTest() {
                             acceptDelay,
                         )
 
-                    return GeckoResult()
+                    return pendingResponse
                 }
             }
         )
@@ -565,7 +567,7 @@ class AutocompleteTest : BaseSessionTest() {
                             acceptDelay,
                         )
                     // Leave the prompt open; do not confirm.
-                    return GeckoResult()
+                    return pendingResponse
                 }
             }
         )
@@ -670,7 +672,7 @@ class AutocompleteTest : BaseSessionTest() {
                             acceptDelay,
                         )
                     // Leave the prompt open; do not confirm.
-                    return GeckoResult()
+                    return pendingResponse
                 }
             }
         )
@@ -1070,7 +1072,7 @@ class AutocompleteTest : BaseSessionTest() {
                             acceptDelay,
                         )
 
-                    return GeckoResult()
+                    return pendingResponse
                 }
             }
         )
@@ -3047,7 +3049,7 @@ class AutocompleteTest : BaseSessionTest() {
                             acceptDelay,
                         )
 
-                    return GeckoResult()
+                    return pendingResponse
                 }
             }
         )

@@ -226,3 +226,28 @@ TEST(AV1LevelFits, MaximumParametersAlwaysFits)
 {
   EXPECT_TRUE(AV1LevelFits(31, 999999, 999999, 999));
 }
+
+TEST(AV1BlockLimitsForLevel, KnownLevel)
+{
+  // Level 2.0: MaxPicSize=147456 samples, MaxDisplayRate=4423680
+  // samples/sec, converted to 16x16 blocks (/256).
+  Maybe<AV1BlockLimits> limits = AV1BlockLimitsForLevel(0);
+  ASSERT_TRUE(limits.isSome());
+  EXPECT_EQ(limits->mMaxFs, 576u);
+  EXPECT_EQ(limits->mMaxBlocksPerSecond, 17280u);
+}
+
+TEST(AV1BlockLimitsForLevel, UndefinedButNamedLevel)
+{
+  EXPECT_TRUE(AV1BlockLimitsForLevel(2).isNothing());
+}
+
+TEST(AV1BlockLimitsForLevel, ReservedLevel)
+{
+  EXPECT_TRUE(AV1BlockLimitsForLevel(25).isNothing());
+}
+
+TEST(AV1BlockLimitsForLevel, MaximumParametersImposesNoLimit)
+{
+  EXPECT_TRUE(AV1BlockLimitsForLevel(31).isNothing());
+}

@@ -259,6 +259,7 @@ struct ReplacementChannelConfigInit
   TimedChannelInfo? timedChannelInfo;
   nullable RemoteLazyInputStream uploadStream;
   uint64_t uploadStreamLength;
+  bool uploadStreamIsStreaming;
   nsCString? contentType;
   nsCString? contentLength;
 };

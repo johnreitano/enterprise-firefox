@@ -2692,11 +2692,11 @@ bool nsFrameLoader::TryRemoteBrowserInternal() {
   RefPtr<BrowserParent> nextRemoteBrowser =
       mOpenWindowInfo ? mOpenWindowInfo->GetNextRemoteBrowser() : nullptr;
   if (nextRemoteBrowser) {
-    mRemoteBrowser = new BrowserHost(nextRemoteBrowser);
-    if (nextRemoteBrowser->GetOwnerElement()) {
-      MOZ_ASSERT_UNREACHABLE("Shouldn't have an owner element before");
+    if (nextRemoteBrowser->IsEmbedded()) {
+      MOZ_ASSERT_UNREACHABLE("Shouldn't have an embedder before");
       return false;
     }
+    mRemoteBrowser = new BrowserHost(nextRemoteBrowser);
     nextRemoteBrowser->SetOwnerElement(ownerElement);
   } else {
     RefPtr<ContentParent> contentParent;

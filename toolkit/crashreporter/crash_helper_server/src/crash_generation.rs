@@ -3,7 +3,7 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use super::{
-    breakpad_crash_generator::BreakpadProcessId,
+    breakpad_crash_generator::{BreakpadCrashGenerator, BreakpadProcessId},
     phc::{self, StackTrace},
 };
 
@@ -26,12 +26,13 @@ use windows::create_platform_specific_annotations;
 
 use anyhow::{Context, Result};
 use crash_helper_common::{
+    ApplicationInfo, AsRawProcessHandle, AsRawThreadHandle, BreakpadChar, BreakpadString,
+    ExtraCrashData, GeckoChildId, Pid, ProcessHandle, RawProcessHandle, ThreadHandle,
     crash_annotations::{
-        should_include_annotation, type_of_annotation, CrashAnnotation, CrashAnnotationType,
+        CrashAnnotation, CrashAnnotationType, should_include_annotation, type_of_annotation,
     },
-    AsProcessReaderHandle, ApplicationInfo, BreakpadChar, BreakpadString, ExtraCrashData, GeckoChildId, Pid, ProcessHandle,
 };
-use mozannotation_server::{AnnotationData, errors::AnnotationsRetrievalError, CAnnotation};
+use mozannotation_server::{AnnotationData, CAnnotation, errors::AnnotationsRetrievalError};
 use num_traits::FromPrimitive;
 use std::{
     collections::HashMap,
@@ -63,9 +64,9 @@ impl CrashReport {
  ******************************************************************************/
 
 #[derive(PartialEq)]
-enum MinidumpOrigin {
-    Breakpad,
-    WindowsErrorReporting,
+enum ProcessType {
+    Parent,
+    Child,
 }
 
 pub(crate) struct CrashGenerator
@@ -76,8 +77,7 @@ where
     Self: Send,
 {
     main_process_handle: ProcessHandle,
-    #[allow(unused)]
-    minidump_path: OsString,
+    minidump_path: PathBuf,
     reports_by_pid: HashMap<Pid, Vec<CrashReport>>,
     reports_by_id: HashMap<GeckoChildId, CrashReport>,
 }
@@ -89,14 +89,14 @@ impl CrashGenerator {
     ) -> CrashGenerator {
         CrashGenerator {
             main_process_handle,
-            minidump_path,
+            minidump_path: PathBuf::from(minidump_path),
             reports_by_pid: HashMap::<Pid, Vec<CrashReport>>::new(),
             reports_by_id: HashMap::<GeckoChildId, CrashReport>::new(),
         }
     }
 
     pub(crate) fn set_path(&mut self, path: OsString) {
-        self.minidump_path = path.clone();
+        self.minidump_path = PathBuf::from(path);
     }
 
     pub(crate) fn move_report_to_id(&mut self, pid: Pid, id: GeckoChildId) {
@@ -123,13 +123,39 @@ impl CrashGenerator {
         self.reports_by_id.remove(&id)
     }
 
-    fn finalize_crash_report(
+    pub(crate) fn generate_minidump(
         &mut self,
-        process_id: BreakpadProcessId,
+        id: GeckoChildId,
+        target_process: &ProcessHandle,
+        target_thread: &ThreadHandle,
+    ) -> Option<CrashReport> {
+        let path = BreakpadCrashGenerator::generate_minidump(
+            id,
+            AsRawProcessHandle::as_raw_handle(target_process),
+            AsRawThreadHandle::as_raw_handle(target_thread),
+            self.minidump_path.clone(),
+        );
+
+        if let Some(path) = path {
+            let error = self.finalize_crash_report(
+                AsRawProcessHandle::as_raw_handle(target_process),
+                /* extra_data */ None,
+                &path,
+                if id == 0 { ProcessType::Parent } else { ProcessType::Child },
+            );
+            Some(CrashReport::new(path.as_os_str(), &error))
+        } else {
+            None
+        }
+    }
+
+    fn finalize_crash_report(
+        &self,
+        process: RawProcessHandle,
         extra_data: Option<&ExtraCrashData>,
         minidump_path: &Path,
-        origin: MinidumpOrigin,
-    ) {
+        process_type: ProcessType,
+    ) -> Option<CString> {
         let mut extra_path = PathBuf::from(minidump_path);
         extra_path.set_extension("extra");
 
@@ -137,7 +163,7 @@ impl CrashGenerator {
             .map(|d| (d.error.clone(), d.annotations.clone()))
             .unwrap_or_default();
         let global_annotations = self.retrieve_main_process_annotations();
-        let annotations = retrieve_annotations(&process_id, origin);
+        let annotations = retrieve_annotations(process, process_type);
         let annotations = [
             STATIC_ANNOTATIONS.get().cloned().context("MissingStaticAnnotations"),
             global_annotations.context("MissingMainProcessAnnotations"),
@@ -148,13 +174,20 @@ impl CrashGenerator {
         .fold(HashMap::new(), fold_annotations);
         let extra_file_written = write_extra_file(annotations, &extra_path).is_ok();
 
-        let path = minidump_path.as_os_str();
-        let error = if !extra_file_written {
+        if !extra_file_written {
             Some(c"MissingAnnotations".to_owned())
         } else {
             error
-        };
+        }
+    }
 
+    fn insert_crash_report(
+        &mut self,
+        process_id: &BreakpadProcessId,
+        path: &Path,
+        error: Option<CString>,
+    ) {
+        let path = path.as_os_str();
         let entry = self.reports_by_pid.entry(process_id.pid);
         entry
             .and_modify(|entry| entry.push(CrashReport::new(path, &error)))
@@ -165,7 +198,7 @@ impl CrashGenerator {
         &self,
     ) -> Result<Vec<CAnnotation>, AnnotationsRetrievalError> {
         mozannotation_server::retrieve_annotations(
-            self.main_process_handle.as_handle(),
+            AsRawProcessHandle::as_raw_handle(&self.main_process_handle),
             CrashAnnotation::Count as usize,
         )
     }
@@ -306,30 +339,24 @@ pub(crate) unsafe extern "C" fn finalize_breakpad_minidump(
     let minidump_path = PathBuf::from(<OsString as BreakpadString>::from_ptr(minidump_path_ptr));
 
     let mut generator = generator.as_ref().unwrap().lock().unwrap();
-    generator.finalize_crash_report(
-        process_id,
+    let error = generator.finalize_crash_report(
+        process_id.get_native(),
         extra_data,
         &minidump_path,
-        MinidumpOrigin::Breakpad,
+        ProcessType::Child,
     );
+    generator.insert_crash_report(&process_id, &minidump_path, error);
 }
 
 fn retrieve_annotations(
-    process_id: &BreakpadProcessId,
-    origin: MinidumpOrigin,
+    process: RawProcessHandle,
+    process_type: ProcessType,
 ) -> Result<Vec<CAnnotation>> {
-    let res = mozannotation_server::retrieve_annotations(
-        process_id.get_native(),
-        CrashAnnotation::Count as usize,
-    );
-
-    let mut annotations = res?;
-    if origin == MinidumpOrigin::WindowsErrorReporting {
-        annotations.push(CAnnotation {
-            id: CrashAnnotation::WindowsErrorReporting as u32,
-            data: AnnotationData::ByteBuffer(vec![1]),
-        });
+    if process_type == ProcessType::Parent {
+        return Ok(vec![]);
     }
+
+    let mut annotations = mozannotation_server::retrieve_annotations(process, CrashAnnotation::Count as usize)?;
 
     // Add a unique identifier for this crash event.
     let crash_event_id = uuid::Uuid::new_v4()

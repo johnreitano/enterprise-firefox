@@ -1291,8 +1291,8 @@ class ContentParent final : public PContentParent,
       const MaybeDiscarded<BrowsingContext>& aContext);
 
   mozilla::ipc::IPCResult RecvNotifyOnHistoryReload(
-      const MaybeDiscarded<BrowsingContext>& aContext, const bool& aForceReload,
-      NotifyOnHistoryReloadResolver&& aResolver);
+      const MaybeDiscarded<BrowsingContext>& aContext,
+      const uint32_t& aReloadFlags, NotifyOnHistoryReloadResolver&& aResolver);
 
   mozilla::ipc::IPCResult RecvHistoryCommit(
       const MaybeDiscarded<BrowsingContext>& aContext, const uint64_t& aLoadID,
@@ -1339,9 +1339,9 @@ class ContentParent final : public PContentParent,
   RecvSessionHistoryEntryStoreWindowNameInContiguousEntries(
       const MaybeDiscarded<BrowsingContext>& aContext, const nsAString& aName);
 
-  mozilla::ipc::IPCResult RecvGetLoadingSessionHistoryInfoFromParent(
+  mozilla::ipc::IPCResult RecvAdoptChildSHEntry(
       const MaybeDiscarded<BrowsingContext>& aContext,
-      GetLoadingSessionHistoryInfoFromParentResolver&& aResolver);
+      AdoptChildSHEntryResolver&& aResolver);
 
   mozilla::ipc::IPCResult RecvSynchronizeNavigationAPIState(
       const MaybeDiscarded<BrowsingContext>& aContext,

@@ -110,8 +110,8 @@
     "forcedColors": "{HCM Theme$SelectedItem}"
   },
   "color/accent/attention": {
-    "light": "{Colors$color/green/40}",
-    "dark": "{Colors$color/green/30}",
+    "light": "{Colors$color/green/50}",
+    "dark": "{Colors$color/green/20}",
     "forcedColors": "{HCM Theme$AccentColor}"
   },
   "text/color": {
@@ -173,16 +173,6 @@
     "light": "{Theme$button/background/color}",
     "dark": "{Theme$button/background/color}",
     "forcedColors": "{Theme$button/background/color}"
-  },
-  "button/background/color/ghost/active": {
-    "light": "{Theme$button/background/color/active}",
-    "dark": "{Theme$button/background/color/active}",
-    "forcedColors": "{Theme$button/background/color/active}"
-  },
-  "button/background/color/ghost/hover": {
-    "light": "{Theme$button/background/color/hover}",
-    "dark": "{Theme$button/background/color/hover}",
-    "forcedColors": "{Theme$button/background/color/hover}"
   },
   "button/background/color/ghost/selected": {
     "light": "{Theme$button/background/color/selected}",
@@ -744,70 +734,55 @@
     "dark": "{Theme$border/color/interactive/disabled}",
     "forcedColors": "{Theme$border/color/interactive/disabled}"
   },
-  "toggle/background/color": {
-    "light": "transparent",
-    "dark": "transparent",
-    "forcedColors": "{HCM Theme$SelectedItemText}"
-  },
-  "toggle/background/color/hover": {
-    "light": "transparent",
-    "dark": "transparent",
-    "forcedColors": "{HCM Theme$SelectedItemText}"
-  },
-  "toggle/background/color/active": {
-    "light": "transparent",
-    "dark": "transparent",
-    "forcedColors": "{HCM Theme$SelectedItemText}"
-  },
   "toggle/background/color/pressed": {
     "light": "{Theme$button/background/color/primary}",
     "dark": "{Theme$button/background/color/primary}",
-    "forcedColors": "{HCM Theme$ButtonText}"
+    "forcedColors": "{Theme$button/background/color/primary}"
   },
   "toggle/background/color/pressed/hover": {
     "light": "{Theme$button/background/color/primary/hover}",
     "dark": "{Theme$button/background/color/primary/hover}",
-    "forcedColors": "{HCM Theme$SelectedItem}"
+    "forcedColors": "{Theme$button/background/color/primary/hover}"
   },
   "toggle/background/color/pressed/active": {
     "light": "{Theme$button/background/color/primary/active}",
     "dark": "{Theme$button/background/color/primary/active}",
-    "forcedColors": "{HCM Theme$SelectedItem}"
+    "forcedColors": "{Theme$button/background/color/primary/active}"
   },
   "toggle/border/color": {
     "light": "{Theme$border/color/interactive}",
     "dark": "{Theme$border/color/interactive}",
-    "forcedColors": "{HCM Theme$ButtonText}"
+    "forcedColors": "{Theme$border/color/interactive}"
   },
   "toggle/border/color/hover": {
     "light": "{Theme$border/color/interactive/hover}",
     "dark": "{Theme$border/color/interactive/hover}",
-    "forcedColors": "{HCM Theme$SelectedItem}"
+    "forcedColors": "{Theme$border/color/interactive/hover}"
   },
   "toggle/border/color/active": {
     "light": "{Theme$border/color/interactive/active}",
     "dark": "{Theme$border/color/interactive/active}",
-    "forcedColors": "{HCM Theme$ButtonText}"
+    "forcedColors": "{Theme$border/color/interactive/active}"
   },
   "toggle/dot/background/color": {
-    "light": "transparent",
-    "dark": "transparent",
-    "forcedColors": "{HCM Theme$ButtonText}"
+    "light": "{Theme$toggle/border/color}",
+    "dark": "{Theme$toggle/border/color}",
+    "forcedColors": "{Theme$toggle/border/color}"
   },
   "toggle/dot/background/color/hover": {
     "light": "{Theme$toggle/border/color/hover}",
     "dark": "{Theme$toggle/border/color/hover}",
-    "forcedColors": "{HCM Theme$SelectedItem}"
+    "forcedColors": "{Theme$toggle/border/color/hover}"
   },
   "toggle/dot/background/color/active": {
     "light": "{Theme$toggle/border/color/active}",
     "dark": "{Theme$toggle/border/color/active}",
-    "forcedColors": "{HCM Theme$SelectedItem}"
+    "forcedColors": "{Theme$toggle/border/color/active}"
   },
   "toggle/dot/background/color/on-pressed": {
     "light": "{Theme$background/color/box}",
     "dark": "{Theme$background/color/box}",
-    "forcedColors": "{HCM Theme$ButtonText}"
+    "forcedColors": "{Theme$background/color/box}"
   },
   "panel-list/border/color": {
     "light": "{Theme$panel/border/color}",

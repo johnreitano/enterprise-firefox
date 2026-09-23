@@ -449,7 +449,7 @@ def modify_mozharness_configs(config, tests):
         if "mac" in test_platform:
             mozharness["config"] = ["raptor/mac_external_browser_config.py"]
         elif "windows" in test_platform:
-            mozharness["config"] = ["raptor/windows_external_browser_config.py"]
+            mozharness["config"] = ["raptor/windows_config.py"]
         elif "linux" in test_platform:
             mozharness["config"] = ["raptor/linux_external_browser_config.py"]
         elif "android" in test_platform:

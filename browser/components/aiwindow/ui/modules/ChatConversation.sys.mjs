@@ -9,7 +9,6 @@ import {
   constructRelevantMemoriesContextMessage,
   replaceUrlsWithTokens,
   resolveMentionUrls,
-  stripUnresolvedUrlTokens,
 } from "moz-src:///browser/components/aiwindow/models/ChatUtils.sys.mjs";
 
 import { DEFAULT_RELEVANT_MEMORIES_MESSAGE_COUNT } from "moz-src:///browser/components/aiwindow/models/memories/MemoriesConstants.sys.mjs";
@@ -30,7 +29,10 @@ import {
 import { EventEmitter } from "resource://gre/modules/EventEmitter.sys.mjs";
 import { Conversation } from "moz-src:///browser/components/aiwindow/models/Conversation.sys.mjs";
 import { consumeStreamChunk } from "moz-src:///browser/components/aiwindow/models/TokenStreamParser.sys.mjs";
-import { UrlTokenizer } from "moz-src:///browser/components/aiwindow/ui/modules/UrlTokenizer.sys.mjs";
+import {
+  stripUnresolvedUrlTokens,
+  UrlTokenizer,
+} from "moz-src:///browser/components/aiwindow/ui/modules/UrlTokenizer.sys.mjs";
 
 /** @typedef {import("moz-src:///browser/components/aiwindow/models/SearchBrowsingHistory.sys.mjs").HistoryRow} HistoryRow */
 

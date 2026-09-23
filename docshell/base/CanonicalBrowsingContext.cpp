@@ -51,6 +51,7 @@
 #include "nsISupports.h"
 #include "nsIWebNavigation.h"
 #include "nsDocShell.h"
+#include "nsDocShellLoadTypes.h"
 #include "nsFrameLoader.h"
 #include "nsFrameLoaderOwner.h"
 #include "nsGlobalWindowOuter.h"
@@ -563,7 +564,7 @@ void CanonicalBrowsingContext::AddLoadingSessionHistoryEntry(
   mLoadingEntries.AppendElement(LoadingSessionHistoryEntry{aLoadId, aEntry});
 }
 
-void CanonicalBrowsingContext::GetLoadingSessionHistoryInfoFromParent(
+void CanonicalBrowsingContext::AdoptChildSHEntry(
     Maybe<LoadingSessionHistoryInfo>& aLoadingInfo) {
   nsISHistory* shistory = GetSessionHistory();
   if (!shistory || !GetParent()) {
@@ -572,22 +573,60 @@ void CanonicalBrowsingContext::GetLoadingSessionHistoryInfoFromParent(
 
   SessionHistoryEntry* parentSHE =
       GetParent()->Canonical()->GetActiveSessionHistoryEntry();
-  if (parentSHE) {
-    int32_t index = -1;
-    for (BrowsingContext* sibling : GetParent()->Children()) {
-      ++index;
-      if (sibling == this) {
-        if (RefPtr entry =
-                parentSHE->GetChildSHEntryIfHasNoDynamicallyAddedChild(index)) {
-          aLoadingInfo.emplace(entry);
-          mLoadingEntries.AppendElement(LoadingSessionHistoryEntry{
-              aLoadingInfo.value().mLoadId, entry.get()});
-          (void)SetHistoryID(entry->DocshellID());
-        }
-        break;
-      }
+  if (!parentSHE) {
+    return;
+  }
+
+  int32_t index = -1;
+  for (BrowsingContext* sibling : GetParent()->Children()) {
+    ++index;
+    if (sibling == this) {
+      break;
     }
   }
+
+  RefPtr<SessionHistoryEntry> entry;
+  parentSHE->GetChildAt(index, getter_AddRefs(entry));
+  if (!entry) {
+    return;
+  }
+
+  // Adopt the entry's docshell ID so later navigations can still
+  // match this BC back to it.
+  (void)SetHistoryID(entry->DocshellID());
+
+  uint32_t loadType = parentSHE->Info().LoadType();
+
+  bool dynamicallyAddedChild = false;
+  parentSHE->HasDynamicallyAddedChild(&dynamicallyAddedChild);
+
+  // XXX For history traversal, RemoveDynEntries will have cleared dynamic
+  // entries and dynamicallyAddedChild will be false once we get here.
+  // The order enforced by AddChild should avoid confusion between dynamic and
+  // static children anyway.
+  // Checking dynamicallyAddedChild might not be needed anymore.
+  MOZ_ASSERT_IF(
+      loadType != LOAD_REFRESH && !(loadType & nsIDocShell::LOAD_CMD_RELOAD),
+      !dynamicallyAddedChild);
+
+  // Never restore subframes for shift-reload or refresh.
+  // Also don't reload the child frame from history if the parent frame has
+  // expired from cache.
+  MOZ_ASSERT(!IsForceReloadType(loadType),
+             "Should've purged entry in PrepareReloadEntry");
+  if (IsForceReloadType(loadType) || loadType == LOAD_REFRESH ||
+      dynamicallyAddedChild ||
+      (loadType == LOAD_RELOAD_NORMAL &&
+       (parentSHE->SharedInfo()->mExpired ||
+        !StaticPrefs::docshell_shistory_restoreSubframesOnReload()))) {
+    parentSHE->RemoveChild(entry);
+    return;
+  }
+
+  entry->SetLoadType(loadType);
+  aLoadingInfo.emplace(entry);
+  mLoadingEntries.AppendElement(
+      LoadingSessionHistoryEntry{aLoadingInfo.value().mLoadId, entry.get()});
 }
 
 UniquePtr<LoadingSessionHistoryInfo>
@@ -1378,7 +1417,7 @@ already_AddRefed<nsDocShellLoadState> CanonicalBrowsingContext::CreateLoadInfo(
 }
 
 void CanonicalBrowsingContext::NotifyOnHistoryReload(
-    bool aForceReload, bool& aCanReload,
+    uint32_t aReloadFlags, bool& aCanReload,
     Maybe<NotNull<RefPtr<nsDocShellLoadState>>>& aLoadState,
     Maybe<bool>& aReloadActiveEntry) {
   MOZ_DIAGNOSTIC_ASSERT(!aLoadState);
@@ -1393,26 +1432,17 @@ void CanonicalBrowsingContext::NotifyOnHistoryReload(
   }
 
   if (mActiveEntry) {
+    shistory->PrepareReloadEntry(mActiveEntry, aReloadFlags);
     aLoadState.emplace(WrapMovingNotNull(
         RefPtr{CreateLoadInfo(mActiveEntry, NavigationType::Reload)}));
     aReloadActiveEntry.emplace(true);
-    if (aForceReload) {
-      shistory->RemoveFrameEntries(mActiveEntry);
-    }
   } else if (!mLoadingEntries.IsEmpty()) {
-    const LoadingSessionHistoryEntry& loadingEntry =
-        mLoadingEntries.LastElement();
-    uint64_t loadId = loadingEntry.mLoadId;
+    RefPtr<SessionHistoryEntry> loadingEntry =
+        mLoadingEntries.LastElement().mEntry;
+    shistory->PrepareReloadEntry(loadingEntry, aReloadFlags);
     aLoadState.emplace(WrapMovingNotNull(
-        RefPtr{CreateLoadInfo(loadingEntry.mEntry, NavigationType::Reload)}));
+        RefPtr{CreateLoadInfo(loadingEntry, NavigationType::Reload)}));
     aReloadActiveEntry.emplace(false);
-    if (aForceReload) {
-      SessionHistoryEntry::LoadingEntry* entry =
-          SessionHistoryEntry::GetByLoadId(loadId);
-      if (entry) {
-        shistory->RemoveFrameEntries(entry->mEntry);
-      }
-    }
   }
 
   if (aLoadState) {
@@ -1612,8 +1642,9 @@ Maybe<int32_t> CanonicalBrowsingContext::HistoryGo(
   }
 
   for (auto& loadResult : loadResults) {
-    if (nsresult result = loadResult.mBrowsingContext->CheckSandboxFlags(
-            loadResult.mLoadState);
+    if (nsresult result =
+            loadResult.mBrowsingContext->EnsureSourceSandboxAllowsNavigation(
+                loadResult.mLoadState);
         NS_FAILED(result)) {
       aResolver(result);
       MOZ_LOG(gSHLog, LogLevel::Debug,

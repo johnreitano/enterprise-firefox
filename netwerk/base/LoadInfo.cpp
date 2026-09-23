@@ -341,13 +341,17 @@ LoadInfo::LoadInfo(
 
     if (nsMixedContentBlocker::IsUpgradableContentType(
             mInternalContentPolicyType)) {
-      // Check the load is within a secure context but ignore loopback URLs
+      // Check the load is within a secure context, but ignore documents that
+      // are only a secure context because they are loopback or because the
+      // user allowlisted them: those are not served over https, so upgrading
+      // their subresources would just break them.
       nsCOMPtr<nsIPrincipal> precursorPrincipal =
           mLoadingPrincipal->GetPrecursorPrincipal();
       nsCOMPtr<nsIPrincipal> requestingPrincipal =
           precursorPrincipal ? precursorPrincipal : mLoadingPrincipal;
       if (requestingPrincipal->GetIsOriginPotentiallyTrustworthy() &&
-          !requestingPrincipal->GetIsLoopbackHost()) {
+          !requestingPrincipal->GetIsLoopbackHost() &&
+          !requestingPrincipal->GetIsSecureContextAllowlistedHost()) {
         if (StaticPrefs::security_mixed_content_upgrade_display_content()) {
           mBrowserUpgradeInsecureRequests = true;
         } else {

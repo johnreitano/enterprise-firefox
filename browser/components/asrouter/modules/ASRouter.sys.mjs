@@ -1638,6 +1638,11 @@ export class _ASRouter {
       // This set default action always shows the OS "Open with" picker
       // (IOpenWithLauncher), which obtains the user's consent to set default.
       "SET_DEFAULT_BROWSER_OPEN_WITH",
+      // This only turns on the user's own switch for closed-browser web
+      // notifications, which an infobar then offers to turn back off. The
+      // disabling action is deliberately absent from this list: it is only
+      // ever fired from UI the user clicked.
+      "ENABLE_CLOSED_BROWSER_NOTIFICATIONS",
     ];
     // ALLOWED_ACTION_MESSAGE_ACTIONS above is the in-tree baseline. It can be
     // extended off-train via Remote Settings, except for the actions in

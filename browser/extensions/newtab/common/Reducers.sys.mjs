@@ -1460,7 +1460,7 @@ function Stocks(prevState = INITIAL_STATE.Stocks, action) {
       return {
         ...prevState,
         searchStatus: action.data.status,
-        searchResults: action.data.values || [],
+        searchResults: action.data.matches || [],
       };
     case at.WIDGETS_STOCKS_SEARCH_CLEAR:
       return {

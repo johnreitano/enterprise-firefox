@@ -237,10 +237,11 @@ More Info: https://www.phonemore.com/specs/google/pixel-6/
 Google Cloud virtual machines running the tests in a docker container. They are only used by the memory tests, which are not sensitive enough to the noise introduced by the hypervisor to require bare metal.
 
 * **Worker pools, and their platforms**:
-  * `gecko-t/t-linux-docker-noscratch-amd`
+  * `enterprise-t/t-linux-docker-noscratch-amd`
     * `test-linux2404-64-clang-trunk/opt`
     * `test-linux2404-64-shippable/opt`
     * `test-linux2404-64/opt`
+  * `gecko-t/t-linux-docker-noscratch-amd`
 
 ```text
 Instance Type: c3d-standard-8
@@ -257,12 +258,14 @@ Image: ubuntu-2404-headless
 Azure virtual machines. As with the Linux virtual machines above, they are only used by the tests that do not need bare metal: the memory tests and the Talos xperf test, which needs the privileged pool to record ETW traces.
 
 * **Worker pools, and their platforms**:
+  * `enterprise-t/win11-64-25h2`
+    * `test-windows11-64-25h2-shippable/opt`
+    * `test-windows11-64-25h2/opt`
+  * `enterprise-t/win11-64-25h2-privileged`
+    * `test-windows11-64-25h2-shippable/opt`
+    * `test-windows11-64-25h2/opt`
   * `gecko-t/win11-64-25h2`
-    * `test-windows11-64-25h2-shippable/opt`
-    * `test-windows11-64-25h2/opt`
   * `gecko-t/win11-64-25h2-privileged`
-    * `test-windows11-64-25h2-shippable/opt`
-    * `test-windows11-64-25h2/opt`
 
 ```text
 Instance Type: Standard_F8alds_v7

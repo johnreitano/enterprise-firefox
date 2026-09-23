@@ -2902,9 +2902,9 @@ public class GeckoSessionTestRule implements TestRule {
     return (Boolean) webExtensionApiCall("IsFissionRunning", null);
   }
 
-  /** Simulate user gesture activation */
-  public void notifyUserGestureActivation(final GeckoSession session) {
-    webExtensionApiCall(session, "NotifyUserGestureActivation", null);
+  /** Opens the picker of the element matching selector with a simulated user gesture. */
+  public void showPicker(final GeckoSession session, final String selector) {
+    webExtensionApiCall(session, "ShowPicker", args -> args.put("selector", selector));
   }
 
   /** Adds a virtual WebAuthn authenticator. Returns the authenticator ID. */

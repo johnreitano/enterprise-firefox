@@ -285,7 +285,7 @@ partial interface Navigator {
 };
 
 partial interface Navigator {
-  [Throws, Pref="beacon.enabled"]
+  [Throws]
   boolean sendBeacon(DOMString url,
                      optional BodyInit? data = null);
 };

@@ -184,8 +184,10 @@ bool BaseCompiler::createDebugOnlyStackMapForNonResumingTrap(StackMap** result,
   MOZ_ASSERT(!TrapMightResume(t1));
   MOZ_ASSERT_IF(t2 != Trap::Limit, !TrapMightResume(t2));
 
+  // Ensure `*result` is always defined.
+  *result = nullptr;
+
   if (MOZ_LIKELY(!compilerEnv_.debugEnabled())) {
-    *result = nullptr;
     return true;
   }
 
@@ -346,25 +348,15 @@ bool StackMapGenerator::createStackMap(
   // reasonably can.
   for (const Stk& v : stk) {
     switch (v.kind()) {
-      // These are neither refs nor register-resident; hence, uninteresting.
-      case Stk::MemI32:
-      case Stk::MemI64:
-      case Stk::MemF32:
-      case Stk::MemF64:
+      // These are neither refs nor register-resident, and there's nothing we
+      // can check.  Hence, uninteresting.
       case Stk::ConstI32:
       case Stk::ConstI64:
       case Stk::ConstF32:
       case Stk::ConstF64:
 #ifdef ENABLE_JIT_SIMD
-      case Stk::MemV128:
       case Stk::ConstV128:
 #endif
-        continue;
-
-      // These are also uninteresting, but we can take the opportunity to check
-      // that they live in the section of stack set up by beginFunction().  The
-      // unguarded use of |value()| here is safe due to the assertion above this
-      // loop.
       case Stk::LocalI32:
       case Stk::LocalI64:
       case Stk::LocalF32:
@@ -372,7 +364,21 @@ bool StackMapGenerator::createStackMap(
 #ifdef ENABLE_JIT_SIMD
       case Stk::LocalV128:
 #endif
-        MOZ_ASSERT(v.offs() <= framePushedAtEntryToBody.value());
+        continue;
+
+      // It would be nice to be able to assert that these live in the section
+      // of stack set up by beginFunction(), that is, `v.offs() <=
+      // framePushedAtEntryToBody.value()`.  But that's only true for
+      // `Stk::Mem*` entries carrying incoming parameters to the function.
+      // It's not true for `Stk::Mem*` entries resulting from general spilling,
+      // a.k.a. calls to `sync()`.  See bug 2072424.
+      case Stk::MemI32:
+      case Stk::MemI64:
+      case Stk::MemF32:
+      case Stk::MemF64:
+#ifdef ENABLE_JIT_SIMD
+      case Stk::MemV128:
+#endif
         continue;
 
       // These are register-resident, but aren't refs.  Check condition [2].

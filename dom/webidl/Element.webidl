@@ -348,7 +348,6 @@ partial interface Element {
 
 // https://w3c.github.io/pointerlock/#pointerlockoptions-dictionary
 dictionary PointerLockOptions {
-  [Pref="dom.pointer-lock.unadjusted-movement.enabled"]
   boolean unadjustedMovement = false;
 };
 

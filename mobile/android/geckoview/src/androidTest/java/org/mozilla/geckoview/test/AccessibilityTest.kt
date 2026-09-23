@@ -263,15 +263,11 @@ class AccessibilityTest : BaseSessionTest() {
 
     @Test
     fun testForceEnabledByPrefSurvivesNewSessionAttach() {
-        // Force enable accessibility via the pref instead of the GeckoView
-        // API.
+        // Force enable accessibility via the pref.
         sessionRule.setPrefsUntilTestEnd(mapOf("accessibility.force_disabled" to -1))
-        // Confirm that accessibility is enabled.
-        assertThat(
-            "Root node should have WebView class name",
-            createNodeInfo(AccessibilityNodeProvider.HOST_VIEW_ID).className.toString(),
-            equalTo("android.webkit.WebView"),
-        )
+        // Check that accessibility is enabled.
+        mainSession.loadTestPath(HELLO_HTML_PATH)
+        waitForInitialFocus()
 
         // Clear the Android specific force enable set in @Before, so the pref
         // is the only thing keeping accessibility on. This will be set to true

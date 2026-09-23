@@ -21,7 +21,8 @@ smartwindow-monitor-panel-empty-description = { -brand-short-name } can keep an 
 # Shown when the task's condition was met on its last check
 smartwindow-monitor-panel-result-match = Match
 smartwindow-monitor-panel-result-no-match = No match
-smartwindow-monitor-panel-result-error = Check failed
+# Shown when the most recent check failed, so there is no match to report.
+smartwindow-monitor-panel-result-could-not-check = Couldn’t check
 smartwindow-monitor-panel-create = Create new task
 # Panel title while the user is filling in the create form
 smartwindow-monitor-panel-create-title = Create new task
@@ -41,6 +42,34 @@ ai-tasks-monitor-notification-title = { -smart-window-brand-name } monitor agent
 ai-tasks-monitor-notification-body = Found what you’re watching for.
 ai-tasks-monitor-notification-snooze = Snooze
 ai-tasks-monitor-notification-dismiss = Dismiss
+
+# Desktop notification shown right after the user creates a monitor, so they
+# know a match will be announced the same way. The notification title is the
+# monitor's name.
+# Variables:
+#   $site (String) - Hostname of the first page the monitor watches, e.g. "example.com"
+#   $extraCount (Number) - How many more pages the monitor watches besides $site
+ai-tasks-monitor-created-notification-body =
+    { $extraCount ->
+        [0] Now watching { $site }. You’ll get a notification like this one when there’s a match.
+        [one] Now watching { $site } and { $extraCount } other page. You’ll get a notification like this one when there’s a match.
+       *[other] Now watching { $site } and { $extraCount } other pages. You’ll get a notification like this one when there’s a match.
+    }
+
+# Desktop notification shown when a monitor pauses itself, either because it
+# went a long time without its condition being met or because it reached its
+# maximum lifetime. The notification title is the monitor's name.
+# Variables:
+#   $days (Number) - Number of days the monitor ran without a match
+ai-tasks-monitor-expired-notification-body-no-match = This task was automatically paused after { $days } days without a match. You can resume it anytime.
+# Variables:
+#   $days (Number) - Number of days the monitor has been running
+ai-tasks-monitor-expired-notification-body-max-age = This task was automatically paused after { $days } days. You can resume it anytime.
+ai-tasks-monitor-expired-notification-resume = Resume
+# Desktop notification shown when a task's check could not run at all, for
+# example because the page could not be loaded. The task's name is the
+# notification title, so the body does not repeat it.
+ai-tasks-monitor-error-notification-body = This task couldn’t run. Please check.
 
 # Smart Window Alerts
 # This file contains localized strings for the Smart Window alerts feature,
@@ -135,12 +164,10 @@ ai-tasks-alert-watching-pages = { $count ->
 ai-tasks-alert-error-name-required = Enter a name for this task.
 # Shown under the "Notify me when" field when it is left empty on submit
 ai-tasks-alert-error-condition-required = Enter what you want to watch for.
-# Shown under the page field when an address only looks like it is missing its
-# scheme, e.g. "example.com"
-ai-tasks-alert-error-url-scheme = Add https:// or http:// to start of the URL.
-# Shown under the page field for input that cannot be parsed as a URL at all
-ai-tasks-alert-error-invalid-url = Enter a full URL, starting with https:// or http://
-ai-tasks-alert-error-duplicate-url = This URL has already been added
+# Shown under the page field for input that isn't a web address. A missing
+# scheme is filled in with https automatically
+ai-tasks-alert-error-invalid-url = Enter a valid URL.
+ai-tasks-alert-error-duplicate-url = This URL has already been added.
 # Shown under the page field when submitting with no pages added
 ai-tasks-alert-error-no-pages = Add at least one page to watch.
 # Variables:
@@ -148,6 +175,9 @@ ai-tasks-alert-error-no-pages = Add at least one page to watch.
 ai-tasks-alert-error-max-urls = { $maxUrls ->
  *[other] You can watch up to { $maxUrls } pages. Delete one to add another.
 }
+# Shown when creating or resuming a task is refused because the limit of
+# active tasks has been reached. Paused tasks don’t count toward the limit.
+ai-tasks-alert-error-active-limit = You’ve reached the limit of active tasks. Pause or delete one to add or resume another.
 
 ## Accessibility - ARIA labels and accessibility text
 

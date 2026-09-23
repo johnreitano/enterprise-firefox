@@ -22,7 +22,7 @@ const FirefoxViewTestUtils = ChromeUtils.importESModule(
 FirefoxViewTestUtils.init(this);
 
 const PERMISSIONS_PAGE =
-  "https://example.com/browser/browser/base/content/test/permissions/permissions.html";
+  "https://example.com/browser/browser/base/content/test/browser-permissions/permissions.html";
 // On enterprise, the FxA button is hidden and the enterprise badge takes its
 // place in the toolbar keyboard navigation order.
 const afterUrlBarButton = AppConstants.MOZ_ENTERPRISE

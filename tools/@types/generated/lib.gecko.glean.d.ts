@@ -755,7 +755,6 @@ interface GleanImpl {
     httpsOnlyModeEnabled: GleanQuantity;
     httpsOnlyModeEnabledPbm: GleanQuantity;
     fissionPrincipals: GleanEventWithExtras<{ principalType?: string, scheme?: string, value?: string }>;
-    shadowedHtmlDocumentPropertyAccess: GleanEventWithExtras<{ name?: string }>;
     cspViolationInternalPage: GleanEventWithExtras<{ baseline?: string|boolean, blockeduridetails?: string, blockeduritype?: string, columnnumber?: string|number, directive?: string, linenumber?: string|number, sample?: string, selfdetails?: string, selftype?: string, sourcedetails?: string, sourcetype?: string }>;
     evalUsageParentProcess: GleanEventWithExtras<{ fileinfo?: string, value?: string }>;
     evalUsageSystemContext: GleanEventWithExtras<{ fileinfo?: string, value?: string }>;

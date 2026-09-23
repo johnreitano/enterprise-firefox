@@ -52,6 +52,7 @@ extensions = [
     "etp_matrix",
     "staging_paths",
     "dark_mode",
+    "mermaid_wrapped_option",
 ]
 
 myst_enable_extensions = [
@@ -88,6 +89,9 @@ mermaid_init_config = {
     "gantt": {"useMaxWidth": False},
     "er": {"useMaxWidth": False},
 }
+
+# ZenUML sequence diagrams. The plugin is fetched only on a page that has one.
+mermaid_include_zenuml = True
 
 # The paths are loaded from config.yml so they can be shared with a CI
 # optimization strategy that ensures the doc task runs when these files change.

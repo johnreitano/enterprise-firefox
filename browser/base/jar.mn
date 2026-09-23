@@ -8,7 +8,7 @@ browser.jar:
 *       content/browser/aboutDialog.xhtml                    (content/aboutDialog.xhtml)
         content/browser/aboutDialog.js                (content/aboutDialog.js)
         content/browser/aboutDialog.css               (content/aboutDialog.css)
-        content/browser/aboutRestartRequired.js       (content/aboutRestartRequired.js)
+        content/browser/aboutRestartRequired.mjs      (content/aboutRestartRequired.mjs)
         content/browser/aboutRestartRequired.xhtml    (content/aboutRestartRequired.xhtml)
         content/browser/aboutRestartForced.js         (content/aboutRestartForced.js)
         content/browser/aboutRestartForced.xhtml      (content/aboutRestartForced.xhtml)

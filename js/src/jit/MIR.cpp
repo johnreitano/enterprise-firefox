@@ -208,8 +208,9 @@ static MConstant* EvaluateIntConstantOperands(TempAllocator& alloc,
       break;
     case MDefinition::Opcode::Ursh:
       // Decline folding if the output doesn't fit into a signed result and
-      // bailouts are disabled. (Wasm has bailouts disabled.)
-      if (lhs < 0 && rhs == 0 && !ins->toUrsh()->bailoutsDisabled()) {
+      // bailouts are enabled. (Wasm has bailouts disabled.)
+      if (lhs < 0 && (rhs & shiftMask) == 0 &&
+          !ins->toUrsh()->bailoutsDisabled()) {
         return nullptr;
       }
       ret = UnsigedInt(lhs) >> (UnsigedInt(rhs) & shiftMask);
@@ -327,7 +328,10 @@ static MConstant* EvaluateIntConstantOperands(TempAllocator& alloc,
 
 static MConstant* EvaluateInt32ConstantOperands(TempAllocator& alloc,
                                                 MBinaryInstruction* ins) {
-  return EvaluateIntConstantOperands<MIRType::Int32>(alloc, ins);
+  MConstant* result = EvaluateIntConstantOperands<MIRType::Int32>(alloc, ins);
+  MOZ_RELEASE_ASSERT(!result || !ins->range() ||
+                     ins->range()->contains(result->toInt32()));
+  return result;
 }
 
 static MConstant* EvaluateInt64ConstantOperands(TempAllocator& alloc,

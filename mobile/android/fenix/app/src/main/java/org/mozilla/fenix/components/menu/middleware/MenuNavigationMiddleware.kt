@@ -189,6 +189,16 @@ class MenuNavigationMiddleware(
                     }
                 }
 
+                is MenuAction.Navigate.OpenTabGroupFlow -> {
+                    navController.nav(
+                        id = R.id.menuDialogFragment,
+                        directions =
+                            MenuDialogFragmentDirections.actionMenuDialogFragmentToTabGroupFlowFragment(
+                                entryPoint = action.entryPoint
+                            ),
+                    )
+                }
+
                 is MenuAction.Navigate.SaveToCollection -> {
                     currentState.browserMenuState?.selectedTab?.let { currentSession ->
                         navController.nav(

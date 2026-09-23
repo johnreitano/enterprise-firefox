@@ -747,9 +747,6 @@ void HandleException(ResumeFromException* rfe) {
   }
 #endif
 
-  JitFrameIter iter(cx->activation()->asJit(),
-                    /* mustUnwindActivation = */ true);
-
   // Live wasm code on the stack is kept alive (in TraceJitActivation) by
   // marking the instance of every wasm::Frame found by WasmFrameIter.
   // However, we're going to pop frames while iterating which means that a GC
@@ -760,10 +757,11 @@ void HandleException(ResumeFromException* rfe) {
   // jump to the JIT's exception handling trampoline. However, we must keep the
   // throw stub alive itself which is owned by the innermost instance.
   Rooted<WasmInstanceObject*> keepAlive(cx);
-  if (iter.isWasm()) {
-    keepAlive = iter.asWasm().instance()->object();
+  if (activation->hasWasmExitFP() && !activation->isWasmTrapping()) {
+    keepAlive = activation->wasmExitInstance()->object();
   }
 
+  JitFrameIter iter(activation, /* mustUnwindActivation = */ true);
   CommonFrameLayout* prevJitFrame = nullptr;
   while (!iter.done()) {
     if (iter.isWasm()) {

@@ -240,6 +240,12 @@ static gfx::IntSize ClampedIntSize(uint32_t aWidth, uint32_t aHeight) {
       static_cast<int32_t>(std::min<uint32_t>(aHeight, INT32_MAX)));
 }
 
+static bool IsLowResolution(const VideoConfiguration& aConfig) {
+  const CheckedInt<uint32_t> pixels =
+      CheckedInt<uint32_t>(aConfig.mWidth) * aConfig.mHeight;
+  return pixels.isValid() && pixels.value() <= kLowResolutionPixelCount;
+}
+
 static CodecType WebrtcMimeToCodecType(const MediaExtendedMIMEType& aMime) {
   const nsCString& mime = aMime.Type().AsString();
   if (mime.EqualsLiteral("video/h264")) {
@@ -266,9 +272,24 @@ static InfoType UnsupportedInfo() {
   return info;
 }
 
+// Whether aMime signals AV1 tier=1 with an explicit level below 4.0
+// (level-idx 8), for which Annex A.3 defines no high tier parameters.
+// Present-but-invalid parameters have already been rejected by
+// WebrtcCodecInfo during the support check, so only well-formed or absent
+// ones reach here. With an absent level-idx the level is inferred from the
+// requested resolution, which is only a lower bound, so tier can't be judged.
+static bool WebrtcVideoTierUndefined(const MediaExtendedMIMEType& aMime) {
+  if (WebrtcMimeToCodecType(aMime) != CodecType::AV1) {
+    return false;
+  }
+  const auto fmtp = ParseAV1Fmtp(aMime.OriginalString());
+  MOZ_ASSERT(!fmtp.HasInvalidParam());
+  return fmtp.mTier.isOk() && fmtp.mTier.inspect() == 1 &&
+         fmtp.mLevelIdx.isOk() && fmtp.mLevelIdx.inspect() < 8;
+}
+
 // Whether aVideo's resolution and framerate exceed the caps of the H264/AV1
-// level signaled in aMime's fmtp parameters, or the signaled AV1 tier is not
-// defined for that level. Present-but-invalid parameters
+// level signaled in aMime's fmtp parameters. Present-but-invalid parameters
 // have already been rejected by WebrtcCodecInfo during the support check, so
 // only well-formed or absent ones reach here. An absent level is deliberately
 // not defaulted (to level 1.0 for H264, 3.1 for AV1, per their RTP payload
@@ -288,16 +309,9 @@ static bool WebrtcVideoExceedsLevel(const MediaExtendedMIMEType& aMime,
     case CodecType::AV1: {
       const auto fmtp = ParseAV1Fmtp(aMime.OriginalString());
       MOZ_ASSERT(!fmtp.HasInvalidParam());
-      if (fmtp.mLevelIdx.isErr()) {
-        return false;
-      }
-      const uint8_t levelIdx = fmtp.mLevelIdx.inspect();
-      // Annex A.3 defines no high tier parameters below level 4.0 (level-idx
-      // 8).
-      if (fmtp.mTier.isOk() && fmtp.mTier.inspect() == 1 && levelIdx < 8) {
-        return true;
-      }
-      return !AV1LevelFits(levelIdx, aVideo.mWidth, aVideo.mHeight, framerate);
+      return fmtp.mLevelIdx.isOk() &&
+             !AV1LevelFits(fmtp.mLevelIdx.inspect(), aVideo.mWidth,
+                           aVideo.mHeight, framerate);
     }
     default:
       return false;
@@ -511,49 +525,38 @@ static uint32_t Vp8EncoderThreads(const uint32_t aPixels,
   return 1;
 #endif
 }
-static bool IsWebRTCSWEncodeSmooth(const VideoConfiguration& aConfig) {
-  const auto shouldForceSmooth =
-      StaticPrefs::media_mediacapabilities_webrtc_encode_smooth_override();
-  if (shouldForceSmooth == 1) {
-    return true;
-  } else if (shouldForceSmooth == 2) {
-    return false;
-  }
-
-  const NS_ConvertUTF16toUTF8 mimeStr(aConfig.mContentType);
-  const int32_t slash = mimeStr.FindChar('/');
-  if (slash < 0) {
-    return false;
-  }
-  const auto afterSlash = Substring(mimeStr, slash + 1);
-  const int32_t semi = afterSlash.FindChar(';');
-  nsAutoCString codecStr(semi >= 0 ? Substring(afterSlash, 0, semi)
-                                   : afterSlash);
-  codecStr.Trim(" \t");
-
+static bool IsSWEncodeSmooth(const CodecType aCodec,
+                             const VideoConfiguration& aConfig) {
   // ratio = clip_duration / wall_time at 60fps: >1.0 means faster than
   // real-time. threads = libwebrtc thread count used during measurement. For
   // non-standard resolutions: rounds up to nearest standard bucket
   // Approximates scaling linearly by framerate and thread count.
   static const struct {
-    const char* codec;
+    CodecType codec;
     uint32_t w, h;
     float ratio;  // realtime ratio at 60fps; >1.0 = faster than real-time
     uint32_t threads;
   } kMeasured[] = {
-      {"h264", 426, 240, 2.06f, 1},   {"h264", 854, 480, 1.71f, 1},
-      {"h264", 1280, 720, 1.51f, 1},  {"h264", 1920, 1080, 1.37f, 1},
-      {"h264", 3840, 2160, 0.47f, 1},  // not smooth at 60fps
-      {"av1", 426, 240, 2.10f, 2},    {"av1", 854, 480, 1.43f, 4},
-      {"av1", 1280, 720, 0.98f, 4},   // not smooth at 60fps
-      {"av1", 1920, 1080, 0.73f, 4},  // not smooth at 60fps
-      {"av1", 3840, 2160, 0.26f, 4},  // not smooth at 60fps
-      {"vp9", 426, 240, 1.94f, 1},    {"vp9", 854, 480, 1.85f, 2},
-      {"vp9", 1280, 720, 1.64f, 4},   {"vp9", 1920, 1080, 1.20f, 4},
-      {"vp9", 3840, 2160, 0.50f, 4},  // not smooth at 60fps
-      {"vp8", 426, 240, 2.01f, 1},    {"vp8", 854, 480, 1.80f, 3},
-      {"vp8", 1280, 720, 1.54f, 3},   {"vp8", 1920, 1080, 1.31f, 3},
-      {"vp8", 3840, 2160, 0.55f, 3},  // not smooth at 60fps
+      {CodecType::H264, 426, 240, 2.06f, 1},
+      {CodecType::H264, 854, 480, 1.71f, 1},
+      {CodecType::H264, 1280, 720, 1.51f, 1},
+      {CodecType::H264, 1920, 1080, 1.37f, 1},
+      {CodecType::H264, 3840, 2160, 0.47f, 1},  // not smooth at 60fps
+      {CodecType::AV1, 426, 240, 2.10f, 2},
+      {CodecType::AV1, 854, 480, 1.43f, 4},
+      {CodecType::AV1, 1280, 720, 0.98f, 4},   // not smooth at 60fps
+      {CodecType::AV1, 1920, 1080, 0.73f, 4},  // not smooth at 60fps
+      {CodecType::AV1, 3840, 2160, 0.26f, 4},  // not smooth at 60fps
+      {CodecType::VP9, 426, 240, 1.94f, 1},
+      {CodecType::VP9, 854, 480, 1.85f, 2},
+      {CodecType::VP9, 1280, 720, 1.64f, 4},
+      {CodecType::VP9, 1920, 1080, 1.20f, 4},
+      {CodecType::VP9, 3840, 2160, 0.50f, 4},  // not smooth at 60fps
+      {CodecType::VP8, 426, 240, 2.01f, 1},
+      {CodecType::VP8, 854, 480, 1.80f, 3},
+      {CodecType::VP8, 1280, 720, 1.54f, 3},
+      {CodecType::VP8, 1920, 1080, 1.31f, 3},
+      {CodecType::VP8, 3840, 2160, 0.55f, 3},  // not smooth at 60fps
   };
 
   const CheckedInt<uint32_t> pixelCount =
@@ -568,13 +571,14 @@ static bool IsWebRTCSWEncodeSmooth(const VideoConfiguration& aConfig) {
   const uint32_t cores =
       std::max(1u, static_cast<uint32_t>(GetNumberOfProcessors()));
 
-  // Actual thread count for this machine and codec.
-  uint32_t actualThreads = 1;  // h264 (openh264) is always single-threaded
-  if (codecStr.EqualsIgnoreCase("av1")) {
+  // Single-threaded default. OpenH264 media.gmp.encoder.multithreaded exists,
+  // isn't hooked up to WebRTC and is buggy, at least for decode. Bug 2065570.
+  uint32_t actualThreads = 1;
+  if (aCodec == CodecType::AV1) {
     actualThreads = Av1EncoderThreads(pixels, cores);
-  } else if (codecStr.EqualsIgnoreCase("vp9")) {
+  } else if (aCodec == CodecType::VP9) {
     actualThreads = Vp9EncoderThreads(pixels, cores);
-  } else if (codecStr.EqualsIgnoreCase("vp8")) {
+  } else if (aCodec == CodecType::VP8) {
     actualThreads = Vp8EncoderThreads(pixels, cores);
   }
 
@@ -583,7 +587,7 @@ static bool IsWebRTCSWEncodeSmooth(const VideoConfiguration& aConfig) {
   // (rounds up, conservative).
   int32_t bucketIdx = -1;
   for (int32_t i = 0; i < static_cast<int32_t>(std::size(kMeasured)); i++) {
-    if (!codecStr.EqualsIgnoreCase(kMeasured[i].codec)) {
+    if (aCodec != kMeasured[i].codec) {
       continue;
     } else if (kMeasured[i].w * kMeasured[i].h >= pixels) {
       bucketIdx = i;
@@ -599,6 +603,18 @@ static bool IsWebRTCSWEncodeSmooth(const VideoConfiguration& aConfig) {
       bucket.ratio * (60.0f / static_cast<float>(rfps)) *
       (static_cast<float>(actualThreads) / static_cast<float>(bucket.threads));
   return scaledRatio >= 1.0f;
+}
+
+static bool IsWebRTCSWEncodeSmooth(const CodecType aCodec,
+                                   const VideoConfiguration& aConfig) {
+  const auto shouldForceSmooth =
+      StaticPrefs::media_mediacapabilities_webrtc_encode_smooth_override();
+  if (shouldForceSmooth == 1) {
+    return true;
+  } else if (shouldForceSmooth == 2) {
+    return false;
+  }
+  return IsSWEncodeSmooth(aCodec, aConfig);
 }
 
 // Gets the global's event target and creates a new DOMMozPromiseRequestHolder
@@ -734,7 +750,8 @@ void MediaCapabilities::CreateWebRTCDecodingInfo(
 
         const auto& v = aConfiguration.mVideo.Value();
         const auto& mime = videoContainer->ExtendedType();
-        if (WebrtcVideoExceedsLevel(mime, v)) {
+        if (WebrtcVideoTierUndefined(mime) ||
+            WebrtcVideoExceedsLevel(mime, v)) {
           auto unsupported = UnsupportedInfo<MediaCapabilitiesDecodingInfo>();
           LOG("{} -> {}", aConfiguration, unsupported);
           return PromiseType::CreateAndResolve(
@@ -1358,6 +1375,33 @@ MediaCapabilities::CheckEncryptedDecodingSupport(
       aConfiguration.mKeySystemConfiguration.Value().mKeySystem, configs);
 }
 
+// Steps 8 through 11 for the "record" type. MediaRecorder encodes video in
+// software, so there is no encoder factory to query. aVideoMime is set only
+// for a video stream that was found supported.
+static void CreateRecordEncodingInfo(
+    const MediaEncodingConfiguration& aConfiguration, Promise* aPromise,
+    const Maybe<MediaExtendedMIMEType>& aVideoMime) {
+  // Step 8: Set supported to true.
+  MediaCapabilitiesInfo info;
+  info.mSupported = true;
+
+  if (aVideoMime) {
+    MOZ_ASSERT(aConfiguration.mVideo.WasPassed());
+    const auto& v = aConfiguration.mVideo.Value();
+    // Steps 9 and 10, video. CanRecordVideoTrackWith accepts only VP8.
+    info.mSmooth = IsSWEncodeSmooth(CodecType::VP8, v);
+    info.mPowerEfficient = IsLowResolution(v);
+  } else {
+    // Steps 9 and 10, audio. Audio encode is always smooth and power efficient.
+    info.mSmooth = true;
+    info.mPowerEfficient = true;
+  }
+
+  // Step 11: Return info.
+  LOG("{} -> {}", aConfiguration, info);
+  aPromise->MaybeResolve(std::move(info));
+}
+
 // https://w3c.github.io/media-capabilities/#abstract-opdef-create-a-mediacapabilitiesencodinginfo
 already_AddRefed<Promise> MediaCapabilities::EncodingInfo(
     const MediaEncodingConfiguration& aConfiguration, ErrorResult& aRv) {
@@ -1445,8 +1489,33 @@ already_AddRefed<Promise> MediaCapabilities::EncodingInfo(
     encodePromise->MaybeResolve(std::move(info));
     return encodePromise.forget();
   }
+  MOZ_ASSERT(videoSupported == CodecSupport::Supported ||
+             audioSupported == CodecSupport::Supported);
 
-  // Step 8: Otherwise, set supported to true.
+  // Steps 8 through 11 are type specific: WebRTC queries the encoder
+  // factories, MediaRecorder does not.
+  switch (aConfiguration.mType) {
+    case MediaEncodingType::Record:
+      CreateRecordEncodingInfo(aConfiguration, encodePromise, videoMime);
+      return encodePromise.forget();
+    case MediaEncodingType::Webrtc:
+      CreateWebRTCEncodingInfo(aConfiguration, encodePromise, videoMime);
+      return encodePromise.forget();
+  }
+  MOZ_ASSERT_UNREACHABLE("Unhandled MediaEncodingType");
+  info.mSupported = false;
+  info.mSmooth = false;
+  info.mPowerEfficient = false;
+  encodePromise->MaybeResolve(std::move(info));
+  return encodePromise.forget();
+}
+
+// Steps 8 through 11 for the "webrtc" type.
+void MediaCapabilities::CreateWebRTCEncodingInfo(
+    const MediaEncodingConfiguration& aConfiguration, Promise* aPromise,
+    const Maybe<MediaExtendedMIMEType>& aVideoMime) {
+  // Step 8: Set supported to true.
+  MediaCapabilitiesInfo info;
   info.mSupported = true;
 
   // We defer checking specific encoder support to a background TaskQueue, and
@@ -1461,7 +1530,7 @@ already_AddRefed<Promise> MediaCapabilities::EncodingInfo(
           "MediaCapabilities::EncodingInfo")) {
     // Worker is shutting down. Per spec, leave the promise pending; it will
     // be cleaned up by GC when the worker is torn down.
-    return encodePromise.forget();
+    return;
   }
 
   RefPtr<TaskQueue> taskQueue =
@@ -1469,19 +1538,16 @@ already_AddRefed<Promise> MediaCapabilities::EncodingInfo(
                         "MediaCapabilities::TaskQueue");
   InvokeAsync(
       taskQueue, __func__,
-      [aConfiguration, videoMime, videoSupported, audioMime, audioSupported,
+      [aConfiguration, videoMime = aVideoMime,
        info = std::move(info)]() mutable -> RefPtr<PromiseType> {
         // Step 7 returns early if neither audio nor video are
         // supported. If video isn't supported, audio must be - they
         // can't both be unknown. We can assume audio encoding, which
         // should be smooth and powerEfficient.
-        MOZ_ASSERT(audioSupported == CodecSupport::Supported ||
-                   videoSupported == CodecSupport::Supported);
-        (void)audioSupported;
         info.mSmooth = true;
         info.mPowerEfficient = true;
 
-        if (videoSupported != CodecSupport::Supported) {
+        if (!videoMime) {
           LOG("{} -> {}", aConfiguration, info);
           return PromiseType::CreateAndResolve(
               std::move(info), "MediaCapabilities::EncodingInfo");
@@ -1489,17 +1555,22 @@ already_AddRefed<Promise> MediaCapabilities::EncodingInfo(
 
         MOZ_ASSERT(aConfiguration.mVideo.WasPassed());
         const auto& v = aConfiguration.mVideo.Value();
-        if (WebrtcVideoExceedsLevel(*videoMime, v)) {
+        // Unlike DecodingInfo, a resolution/framerate that exceeds the
+        // negotiated level isn't rejected here: the encoder downscales
+        // and decimates to fit the level instead (see bug 2013936). An
+        // undefined tier can't be fixed that way though.
+        if (WebrtcVideoTierUndefined(*videoMime)) {
           auto unsupported = UnsupportedInfo<MediaCapabilitiesInfo>();
           LOG("{} -> {}", aConfiguration, unsupported);
           return PromiseType::CreateAndResolve(
               std::move(unsupported), "MediaCapabilities::EncodingInfo");
         }
+        const CodecType codec = WebrtcMimeToCodecType(*videoMime);
         auto encoderConfig = BuildEncoderConfig(*videoMime, v);
         return SupportsVideoEncodeForWebrtc(encoderConfig)
             ->Then(
                 GetCurrentSerialEventTarget(), __func__,
-                [aConfiguration,
+                [aConfiguration, codec,
                  info](media::EncodeSupportSet aVideoSupport) mutable
                     -> RefPtr<PromiseType> {
                   if (aVideoSupport.isEmpty()) {
@@ -1512,12 +1583,6 @@ already_AddRefed<Promise> MediaCapabilities::EncodingInfo(
                   const auto& v = aConfiguration.mVideo.Value();
                   const bool hwSupported = aVideoSupport.contains(
                       media::EncodeSupport::HardwareEncode);
-                  const CheckedInt<uint32_t> pixels =
-                      CheckedInt<uint32_t>(v.mWidth) *
-                      CheckedInt<uint32_t>(v.mHeight);
-                  const bool lowResolution =
-                      pixels.isValid() &&
-                      pixels.value() <= kLowResolutionPixelCount;
 
                   // Step 9: If the user agent is able to encode the media
                   // represented by configuration at the indicated framerate,
@@ -1529,7 +1594,8 @@ already_AddRefed<Promise> MediaCapabilities::EncodingInfo(
                   // benchmarking code similar to what we had in the tree
                   // earlier for decoding which was removed due to maintenance
                   // concerns.
-                  info.mSmooth &= hwSupported || IsWebRTCSWEncodeSmooth(v);
+                  info.mSmooth &=
+                      hwSupported || IsWebRTCSWEncodeSmooth(codec, v);
 
                   // Step 10: If the user agent is able to encode the media
                   // represented by configuration in a power efficient manner,
@@ -1548,7 +1614,7 @@ already_AddRefed<Promise> MediaCapabilities::EncodingInfo(
                   // encoding power efficiency unless the device's power source
                   // has side effects such as enabling different encoding or
                   // decoding modules.
-                  info.mPowerEfficient &= (hwSupported || lowResolution);
+                  info.mPowerEfficient &= (hwSupported || IsLowResolution(v));
 
                   LOG("{} -> {}", aConfiguration, info);
                   return PromiseType::CreateAndResolve(
@@ -1564,7 +1630,7 @@ already_AddRefed<Promise> MediaCapabilities::EncodingInfo(
       })
       ->Then(
           targetThread, __func__,
-          [encodePromise, workerRef, holder,
+          [encodePromise = RefPtr(aPromise), workerRef, holder,
            aConfiguration](MediaCapabilitiesInfo aInfo) {
             holder->Complete();
             nsIGlobalObject* global = holder->GetParentObject();
@@ -1574,7 +1640,6 @@ already_AddRefed<Promise> MediaCapabilities::EncodingInfo(
           },
           [] { MOZ_CRASH("Unexpected"); })
       ->Track(*holder);
-  return encodePromise.forget();
 }
 
 bool MediaCapabilities::CheckTypeForMediaSource(

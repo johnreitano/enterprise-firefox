@@ -423,6 +423,12 @@ signed. Set this to `true` to disable APK signing.
 
 We enable build-signing for `shippable`, `nightly`, and `enable-build-signing` tasks.
 
+## target-store
+
+The Android app store a `push-android` task submits to: `google`, `samsung` or
+`huawei`. Together with `build-type` it identifies a push task, since several
+stores can be fed from the same signed build.
+
 ## run-visual-metrics
 
 If set to true, will run the visual metrics task on the provided

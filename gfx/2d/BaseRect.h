@@ -523,14 +523,14 @@ struct BaseRect {
   MOZ_ALWAYS_INLINE T Height() const { return height; }
 
   MOZ_ALWAYS_INLINE T XMost() const {
-    if constexpr (std::is_integral<T>::value) {
+    if constexpr (std::is_integral_v<T>) {
       return (Saturate<T>(x) + width).value();
     } else {
       return x + width;
     }
   }
   MOZ_ALWAYS_INLINE T YMost() const {
-    if constexpr (std::is_integral<T>::value) {
+    if constexpr (std::is_integral_v<T>) {
       return (Saturate<T>(y) + height).value();
     } else {
       return y + height;

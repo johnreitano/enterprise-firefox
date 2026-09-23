@@ -345,8 +345,21 @@ class JsepTrackTest : public JsepTrackTestBase {
     ASSERT_EQ(a.mClock, b.mClock) << MSG;
     ASSERT_EQ(a.mChannels, b.mChannels) << MSG;
     ASSERT_NE(a.mDirection, b.mDirection) << MSG;
-    // These constraints are for fmtp and rid, which _are_ signaled
-    ASSERT_EQ(a.mConstraints, b.mConstraints) << MSG;
+    // These constraints are for fmtp and rid, which _are_ signaled, with the
+    // exception of maxFs/maxMbps: for H264 and AV1 those can also be
+    // populated from the negotiated level (Annex A Table A-1 / Annex A.3),
+    // which is only ever computed for the send codec (see bug 1143709 for
+    // H264, and the AV1 "receiver-declared and asymmetric" comment in
+    // JsepCodecDescription.h), so they legitimately differ from the recv
+    // codec's, which never gets this derived value.
+    ASSERT_EQ(a.mConstraints.maxWidth, b.mConstraints.maxWidth) << MSG;
+    ASSERT_EQ(a.mConstraints.maxHeight, b.mConstraints.maxHeight) << MSG;
+    ASSERT_EQ(a.mConstraints.maxFps, b.mConstraints.maxFps) << MSG;
+    ASSERT_EQ(a.mConstraints.maxBr, b.mConstraints.maxBr) << MSG;
+    ASSERT_EQ(a.mConstraints.maxPps, b.mConstraints.maxPps) << MSG;
+    ASSERT_EQ(a.mConstraints.maxCpb, b.mConstraints.maxCpb) << MSG;
+    ASSERT_EQ(a.mConstraints.maxDpb, b.mConstraints.maxDpb) << MSG;
+    ASSERT_EQ(a.mConstraints.scaleDownBy, b.mConstraints.scaleDownBy) << MSG;
 #undef MSG
 
     if (a.Type() == SdpMediaSection::kVideo) {

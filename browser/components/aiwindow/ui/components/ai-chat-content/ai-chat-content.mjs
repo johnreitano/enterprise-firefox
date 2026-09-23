@@ -2,7 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { html, nothing } from "chrome://global/content/vendor/lit.all.mjs";
+import {
+  html,
+  nothing,
+  repeat,
+} from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/assistant-message-footer.mjs";
@@ -140,6 +144,7 @@ export class AIChatContent extends MozLitElement {
 
   #lastScrollReq = null;
   #overflowObserver = null;
+  #overflowRafId = null;
   #scrollHandler = null;
   #jumpClickHandler = null;
   #scrollRafId = null;
@@ -219,6 +224,10 @@ export class AIChatContent extends MozLitElement {
     super.disconnectedCallback();
     this.#overflowObserver?.disconnect();
     this.#overflowObserver = null;
+    if (this.#overflowRafId) {
+      cancelAnimationFrame(this.#overflowRafId);
+      this.#overflowRafId = null;
+    }
     this.#teardownScrollListener();
     this.#removeClientErrorListeners?.();
     this.#removeClientErrorListeners = null;
@@ -377,37 +386,85 @@ export class AIChatContent extends MozLitElement {
     this.addEventListener("thumbs-down", event => {
       this.#dispatchAction("thumbs-down", event.detail);
     });
+
+    this.addEventListener("shown", this.#onPanelShown);
+  }
+
+  // panel-list positions itself against the viewport and is unaware of the
+  // chrome chat header. If it opens into the header area, it can be covered and
+  // intercept header clicks, so shift it below the header.
+  #onPanelShown = event => {
+    const panel = event.composedPath()[0];
+    if (panel?.localName !== "panel-list") {
+      return;
+    }
+
+    const bounds = panel.getBoundingClientRect();
+    const overlap = this.#topSpacing() - bounds.top;
+    if (overlap <= 0) {
+      return;
+    }
+
+    panel.style.top = `${(parseFloat(panel.style.top) || 0) + overlap}px`;
+    const height =
+      panel.getAttribute("valign") === "top"
+        ? bounds.height - overlap
+        : window.innerHeight - (bounds.top + overlap);
+    panel.style.maxHeight = `${Math.max(0, height)}px`;
+  };
+
+  // How much of the viewport's top edge the floating chat header covers, read
+  // off the space the chat list already reserves for it.
+  #topSpacing() {
+    const innerWrapper = this.shadowRoot?.querySelector(".chat-inner-wrapper");
+    if (!innerWrapper) {
+      return 0;
+    }
+    return parseFloat(getComputedStyle(innerWrapper).paddingBlockStart) || 0;
   }
 
   #initOverflowObserver() {
     this.#overflowObserver = new ResizeObserver(() => {
-      const wrapper = this.shadowRoot.querySelector(".chat-content-wrapper");
-      const innerWrapper = this.shadowRoot.querySelector(".chat-inner-wrapper");
-
-      if (!wrapper || !innerWrapper) {
+      // The wrapper resizes on every streamed chunk, and reading
+      // scrollHeight/clientHeight below forces a synchronous reflow. Coalesce
+      // to one read per frame.
+      if (this.#overflowRafId) {
         return;
       }
-
-      const hasContent = innerWrapper.children.length;
-      // Use a 10px threshold to avoid false positives from layout differences
-      const thresholdPadding = 10;
-
-      wrapper.toggleAttribute(
-        "overflowing",
-        hasContent &&
-          wrapper.scrollHeight > wrapper.clientHeight + thresholdPadding
-      );
-
-      // Recompute the jump-to-bottom button after content resizes (e.g.
-      // switching to an empty/short conversation) since no scroll event
-      // fires in that case and the button would otherwise stay visible.
-      this.#updateJumpButtonState();
+      this.#overflowRafId = requestAnimationFrame(() => {
+        this.#overflowRafId = null;
+        this.#updateOverflowState();
+      });
     });
     this.updateComplete.then(() => {
       this.#overflowObserver.observe(
         this.shadowRoot.querySelector(".chat-inner-wrapper")
       );
     });
+  }
+
+  #updateOverflowState() {
+    const wrapper = this.shadowRoot.querySelector(".chat-content-wrapper");
+    const innerWrapper = this.shadowRoot.querySelector(".chat-inner-wrapper");
+
+    if (!wrapper || !innerWrapper) {
+      return;
+    }
+
+    const hasContent = innerWrapper.children.length;
+    // Use a 10px threshold to avoid false positives from layout differences
+    const thresholdPadding = 10;
+
+    wrapper.toggleAttribute(
+      "overflowing",
+      hasContent &&
+        wrapper.scrollHeight > wrapper.clientHeight + thresholdPadding
+    );
+
+    // Recompute the jump-to-bottom button after content resizes (e.g.
+    // switching to an empty/short conversation) since no scroll event
+    // fires in that case and the button would otherwise stay visible.
+    this.#updateJumpButtonState();
   }
 
   get #wrapper() {
@@ -1166,8 +1223,10 @@ export class AIChatContent extends MozLitElement {
 
   #getGroupTabsData(confirmedData) {
     const selectedTabs = confirmedData.selectedTabs || [];
-    const tabCount = selectedTabs.length;
     const group = confirmedData.group || {};
+    // The group can also hold the chat tab, which the user never picked, so
+    // report the size of the group rather than the size of their selection.
+    const tabCount = group.tabCount ?? selectedTabs.length;
 
     const rows = this.#buildTabsRow(
       "smart-window-grouped-tabs-row-label",
@@ -1831,15 +1890,28 @@ export class AIChatContent extends MozLitElement {
   }
 
   #renderMessages(items) {
-    return items.map((item, i) => {
-      const { type, msgs, msg, isComplete, contextPageUrl } = item;
-      if (type === "action-log") {
-        return this.#renderActionLogGroup(msgs, isComplete, i);
-      }
+    return repeat(
+      items,
+      (item, i) => this.#renderItemKey(item, i),
+      (item, i) => {
+        const { type, msgs, msg, isComplete, contextPageUrl } = item;
+        if (type === "action-log") {
+          return this.#renderActionLogGroup(msgs, isComplete, i);
+        }
 
-      const chips = this.#getVisibleChips(msg, contextPageUrl);
-      return this.#renderMessage(msg, chips);
-    });
+        const chips = this.#getVisibleChips(msg, contextPageUrl);
+        return this.#renderMessage(msg, chips);
+      }
+    );
+  }
+
+  #renderItemKey(item, i) {
+    if (item.type === "action-log") {
+      const first = item.msgs?.[0];
+      return `action-log:${first?.toolCallId ?? first?.messageId ?? i}`;
+    }
+    const { msg } = item;
+    return `message:${msg?.convId ?? ""}:${msg?.ordinal ?? i}`;
   }
 
   render() {

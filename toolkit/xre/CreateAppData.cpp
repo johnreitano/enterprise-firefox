@@ -121,7 +121,7 @@ nsresult XRE_ReadEnterpriseConsoleAddress(const XREAppData& aAppData,
   nsCOMPtr<nsIFile> cfgFile;
   nsresult rv = aAppData.xreDirectory->Clone(getter_AddRefs(cfgFile));
   NS_ENSURE_SUCCESS(rv, rv);
-  rv = cfgFile->Append(u"firefox.cfg"_ns);
+  rv = cfgFile->Append(MOZ_APP_NAME u".cfg"_ns);
   NS_ENSURE_SUCCESS(rv, rv);
 
   nsCString obscured = MOZ_TRY(URLPreloader::ReadFile(cfgFile));

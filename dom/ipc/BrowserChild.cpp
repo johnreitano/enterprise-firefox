@@ -2649,6 +2649,7 @@ mozilla::ipc::IPCResult BrowserChild::RecvNormalPrioritySelectionEvent(
 mozilla::ipc::IPCResult BrowserChild::RecvSimpleContentCommandEvent(
     const EventMessage& aMessage) {
   WidgetContentCommandEvent localEvent(true, aMessage, mPuppetWidget);
+  localEvent.MarkAsComingFromAnotherProcess();
   DispatchWidgetEventViaAPZ(localEvent);
   (void)SendOnEventNeedingAckHandled(aMessage, 0u);
   return IPC_OK();
@@ -2666,6 +2667,7 @@ mozilla::ipc::IPCResult BrowserChild::RecvInsertText(
   WidgetContentCommandEvent localEvent(true, eContentCommandInsertText,
                                        mPuppetWidget);
   localEvent.mString = Some(nsString(aStringToInsert));
+  localEvent.MarkAsComingFromAnotherProcess();
   DispatchWidgetEventViaAPZ(localEvent);
   (void)SendOnEventNeedingAckHandled(eContentCommandInsertText, 0u);
   return IPC_OK();
@@ -2678,7 +2680,7 @@ mozilla::ipc::IPCResult BrowserChild::RecvNormalPriorityInsertText(
 
 mozilla::ipc::IPCResult BrowserChild::RecvReplaceText(
     const nsString& aReplaceSrcString, const nsString& aStringToInsert,
-    uint32_t aOffset, bool aPreventSetSelection) {
+    uint32_t aOffset, PreventSetSelection aPreventSetSelection) {
   // Use normal event path to reach focused document.
   WidgetContentCommandEvent localEvent(true, eContentCommandReplaceText,
                                        mPuppetWidget);
@@ -2686,6 +2688,7 @@ mozilla::ipc::IPCResult BrowserChild::RecvReplaceText(
   localEvent.mSelection.mReplaceSrcString = aReplaceSrcString;
   localEvent.mSelection.mOffset = aOffset;
   localEvent.mSelection.mPreventSetSelection = aPreventSetSelection;
+  localEvent.MarkAsComingFromAnotherProcess();
   DispatchWidgetEventViaAPZ(localEvent);
   (void)SendOnEventNeedingAckHandled(eContentCommandReplaceText, 0u);
   return IPC_OK();
@@ -2693,7 +2696,7 @@ mozilla::ipc::IPCResult BrowserChild::RecvReplaceText(
 
 mozilla::ipc::IPCResult BrowserChild::RecvNormalPriorityReplaceText(
     const nsString& aReplaceSrcString, const nsString& aStringToInsert,
-    uint32_t aOffset, bool aPreventSetSelection) {
+    uint32_t aOffset, PreventSetSelection aPreventSetSelection) {
   return RecvReplaceText(aReplaceSrcString, aStringToInsert, aOffset,
                          aPreventSetSelection);
 }

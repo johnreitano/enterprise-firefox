@@ -306,6 +306,7 @@ nsXMLContentSink::DidBuildModel(bool aTerminated) {
     mDocument->RemoveObserver(this);
     mIsDocumentObserver = false;
 
+    const RefPtr<nsXMLContentSink> kungFuDeathGrip(this);
     RefPtr<Document> doc = mDocument;
     if (!mDeferredLayoutStart && doc->IsBeingUsedAsImage()) {
       // Eagerly layout image documents, so that layout-triggered loads have a
@@ -313,7 +314,7 @@ nsXMLContentSink::DidBuildModel(bool aTerminated) {
       doc->FlushPendingNotifications(FlushType::Layout);
     }
 
-    doc->EndLoad();
+    doc->EndLoad(/* aFireDOMContentLoadedSync = */ !aTerminated);
 
     DropParserAndPerfHint();
   }
@@ -407,7 +408,8 @@ nsresult nsXMLContentSink::OnTransformDone(Document* aSourceDocument,
     ScrollToRef();
   }
 
-  originalDocument->EndLoad();
+  const RefPtr<nsXMLContentSink> kungFuDeathGrip(this);
+  originalDocument->EndLoad(/* aFireDOMContentLoadedSync = */ true);
   if (blockingOnload) {
     // This UnblockOnload call corresponds to the BlockOnload call in
     // nsContentSink::WillBuildModelImpl.
@@ -415,7 +417,7 @@ nsresult nsXMLContentSink::OnTransformDone(Document* aSourceDocument,
   }
   // On failure, aResultDocument is a separate error document.
   if (transformedDocument && transformedDocument->IsExpectingEndLoad()) {
-    transformedDocument->EndLoad();
+    transformedDocument->EndLoad(/* aFireDOMContentLoadedSync = */ true);
   }
 
   DropParserAndPerfHint();
@@ -1019,12 +1021,12 @@ nsXMLContentSink::HandleStartElement(const char16_t* aName,
                                      uint32_t aAttsCount, uint32_t aLineNumber,
                                      uint32_t aColumnNumber) {
   return HandleStartElement(aName, aAtts, aAttsCount, aLineNumber,
-                            aColumnNumber, true);
+                            aColumnNumber, FROM_PARSER_NETWORK);
 }
 
 nsresult nsXMLContentSink::HandleStartElement(
     const char16_t* aName, const char16_t** aAtts, uint32_t aAttsCount,
-    uint32_t aLineNumber, uint32_t aColumnNumber, bool aInterruptable) {
+    uint32_t aLineNumber, uint32_t aColumnNumber, FromParser aFromParser) {
   MOZ_RELEASE_ASSERT(aAttsCount % 2 == 0, "incorrect aAttsCount");
   // Adjust aAttsCount so it's the actual number of attributes
   aAttsCount /= 2;
@@ -1057,9 +1059,9 @@ nsresult nsXMLContentSink::HandleStartElement(
   nodeInfo = mNodeInfoManager->GetNodeInfo(localName, prefix, nameSpaceID,
                                            nsINode::ELEMENT_NODE);
 
-  result = CreateElement(aAtts, aAttsCount, nodeInfo, aLineNumber,
-                         aColumnNumber, getter_AddRefs(content), &appendContent,
-                         FROM_PARSER_NETWORK);
+  result =
+      CreateElement(aAtts, aAttsCount, nodeInfo, aLineNumber, aColumnNumber,
+                    getter_AddRefs(content), &appendContent, aFromParser);
   NS_ENSURE_SUCCESS(result, result);
 
   // Have to do this before we push the new content on the stack... and have to
@@ -1110,8 +1112,7 @@ nsresult nsXMLContentSink::HandleStartElement(
       nsContentUtils::AddScriptRunner(
           MakeAndAddRef<nsDocElementCreatedNotificationRunner>(mDocument));
 
-      if (aInterruptable && NS_SUCCEEDED(result) && mParser &&
-          !mParser->IsParserEnabled()) {
+      if (NS_SUCCEEDED(result) && mParser && !mParser->IsParserEnabled()) {
         return NS_ERROR_HTMLPARSER_BLOCK;
       }
     } else if (!mCurrentHead) {
@@ -1121,8 +1122,7 @@ nsresult nsXMLContentSink::HandleStartElement(
     }
   }
 
-  return aInterruptable && NS_SUCCEEDED(result) ? DidProcessATokenImpl()
-                                                : result;
+  return NS_SUCCEEDED(result) ? DidProcessATokenImpl() : result;
 }
 
 NS_IMETHODIMP

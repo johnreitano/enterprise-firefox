@@ -27,8 +27,8 @@ function httpUrl(href) {
 }
 
 /**
- * Root component for about:aitab. Looks up the page config for the generated
- * page named in the page URL and renders it.
+ * Root component for about:smartpage. Looks up the page config for the
+ * generated page named in the page URL and renders it.
  *
  * Body blocks render as placeholders for now; the text, table, cards, list and
  * timeline components land separately.

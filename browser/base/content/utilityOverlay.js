@@ -213,10 +213,6 @@ function createUserContextMenu(
   // have their own messages rather than the menuitem `.label` attribute ones.
   let panelItemL10nIds = {
     "user-context-new-tab2": "user-context-new-tab2-panel-item",
-    "user-context-personal2": "user-context-personal2-panel-item",
-    "user-context-work2": "user-context-work2-panel-item",
-    "user-context-banking2": "user-context-banking2-panel-item",
-    "user-context-shopping2": "user-context-shopping2-panel-item",
     "user-context-add-container2": "user-context-add-container2-panel-item",
     "user-context-manage-containers2":
       "user-context-manage-containers2-panel-item",
@@ -264,8 +260,9 @@ function createUserContextMenu(
     }
 
     let menuitem = createMenuItem({
-      name: identity.name,
-      l10nId: identity.l10nId,
+      name: ContextualIdentityService.getUserContextLabel(
+        identity.userContextId
+      ),
     });
     menuitem.setAttribute("data-usercontextid", identity.userContextId);
 

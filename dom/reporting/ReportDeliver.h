@@ -47,10 +47,10 @@ class ReportDeliver final : public nsIObserver, public nsINamed {
     nsCString mReportBodyJSON;
     nsCOMPtr<nsIPrincipal> mPrincipal;
     nsCOMPtr<nsICookieJarSettings> mCookieJarSettings;
-    uint32_t mFailures;
-    uintptr_t mGlobalKey;
+    uint32_t mFailures = 0;
+    uintptr_t mGlobalKey = 0;
     // Used to track in devtools only
-    uint64_t mAssociatedBrowsingContext;
+    uint64_t mAssociatedBrowsingContext = 0;
   };
 
   static void AttemptDelivery(nsIGlobalObject* aGlobal, const nsACString& aType,

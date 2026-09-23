@@ -246,14 +246,14 @@ test_newtab({
     // Wait for the weather toggle to be present in the DOM (it is unmounted
     // until the sub-panel opens).
     await ContentTaskUtils.waitForCondition(
-      () => content.document.querySelector("#weather-section moz-toggle"),
+      () => content.document.querySelector("#weather-toggle"),
       "Weather section toggle should be present"
     );
 
     // We waive XRay wrappers because we want to call the click()
     // method defined on the toggle from this context.
     let weatherSwitch = Cu.waiveXrays(
-      content.document.querySelector("#weather-section moz-toggle")
+      content.document.querySelector("#weather-toggle")
     );
     Assert.ok(
       !Services.prefs.getBoolPref(WEATHER_PREF),

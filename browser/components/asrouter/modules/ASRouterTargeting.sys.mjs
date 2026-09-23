@@ -62,7 +62,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "resource:///modules/asrouter/ASRouterPreferences.sys.mjs",
   AttributionCode:
     "moz-src:///browser/components/attribution/AttributionCode.sys.mjs",
-  BackupService: "resource:///modules/backup/BackupService.sys.mjs",
+  BackupService: "moz-src:///browser/components/backup/BackupService.sys.mjs",
   BrowserInitState: "resource:///modules/BrowserGlue.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
   ClientEnvironment: "resource://normandy/lib/ClientEnvironment.sys.mjs",
@@ -938,6 +938,9 @@ const TargetingGetters = {
   },
   get isDefaultBrowserUncached() {
     return ShellService.isDefaultBrowser();
+  },
+  get hasAttemptedSetDefault() {
+    return ShellService.attemptedSetDefaultThisSession;
   },
   get isOneClickSetDefaultEnabled() {
     return QueryCache.getters.isOneClickSetDefaultEnabled

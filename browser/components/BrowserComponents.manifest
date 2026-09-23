@@ -27,6 +27,7 @@ category browser-before-ui-startup moz-src:///browser/modules/ObserverForwarder.
 #ifdef MOZ_ENTERPRISE
 category browser-before-ui-startup resource://gre/modules/enterprise/EnterpriseEndpoints.sys.mjs EnterpriseEndpoints.init
 category browser-before-ui-startup resource://gre/modules/enterprise/EnterpriseStorageEncryption.sys.mjs EnterpriseStorageEncryption.init
+category browser-before-ui-startup resource:///modules/enterprise/EnterpriseThemeMigration.sys.mjs EnterpriseThemeMigration.migrate
 #endif
 #ifdef XP_WIN
 category browser-before-ui-startup moz-src:///browser/components/shell/StartupOSIntegration.sys.mjs StartupOSIntegration.applyCustomIconOnStartup
@@ -210,13 +211,11 @@ category browser-idle-startup resource://gre/modules/RFPHelper.sys.mjs RFPHelper
 category browser-idle-startup resource://gre/modules/Blocklist.sys.mjs Blocklist.loadBlocklistAsync
 category browser-idle-startup resource://gre/modules/psm/RemoteSecuritySettings.sys.mjs RemoteSecuritySettings.init
 category browser-idle-startup moz-src:///browser/components/tabbrowser/TabUnloader.sys.mjs TabUnloader.init
-category browser-idle-startup resource:///modules/GenAI.sys.mjs GenAI.init
+category browser-idle-startup moz-src:///browser/components/genai/GenAI.sys.mjs GenAI.init
 category browser-idle-startup moz-src:///browser/components/urlbar/QuickSuggest.sys.mjs QuickSuggest.init
 category browser-idle-startup moz-src:///browser/components/urlbar/UrlbarSearchTermsPersistence.sys.mjs UrlbarSearchTermsPersistence.init
 category browser-idle-startup moz-src:///browser/components/search/SERPCategorization.sys.mjs SERPCategorization.init
 category browser-idle-startup resource://gre/modules/ContentRelevancyManager.sys.mjs ContentRelevancyManager.init
-category browser-idle-startup chrome://global/content/ml/EngineProcess.sys.mjs EngineProcess.maybeReportNativeOnnxRuntimeAvailability
-category browser-idle-startup resource://gre/modules/ColorwayThemeMigration.sys.mjs ColorwayThemeMigration.maybeWarn
 category browser-idle-startup resource://gre/modules/AppServicesTracing.sys.mjs RustLogForwarder.init
 category browser-idle-startup moz-src:///toolkit/components/contextualidentity/ContextualIdentityService.sys.mjs ContextualIdentityService.load
 #ifdef MOZ_UPDATER
@@ -259,6 +258,7 @@ category browser-quit-application-granted moz-src:///browser/components/ipprotec
 
 #ifdef MOZ_ENTERPRISE
 category browser-quit-application-granted resource://gre/modules/enterprise/EnterpriseBadge.sys.mjs EnterpriseBadge.uninit
+category browser-quit-application-granted resource:///modules/enterprise/EnterpriseHandler.sys.mjs EnterpriseHandler.uninit
 #endif
 
 category search-service-notification moz-src:///browser/components/search/SearchUIUtils.sys.mjs SearchUIUtils.showSearchServiceNotification

@@ -9,7 +9,7 @@
 // Behaviour that crosses a process or database boundary belongs in
 // browser_aitab_actions.js instead.
 //
-// The components are mounted bare in the about:aitab document rather than
+// The components are mounted bare in the about:smartpage document rather than
 // through a stored page, so these stay independent of the page config shape.
 // Note the mounting has to be repeated inside each content task: the task runs
 // in the content process and cannot call helpers defined in this file.
@@ -17,7 +17,7 @@
 const AITAB_TEST_PREF = "browser.smartwindow.aitab.enabled";
 
 /**
- * Opens about:aitab, where every AI Tab custom element is registered.
+ * Opens about:smartpage, where every AI Tab custom element is registered.
  *
  * @param {Function} task - Content task, receives the spawn args.
  * @param {Array} args - Structured-cloneable arguments for the task.
@@ -29,7 +29,7 @@ async function withAITabDocument(task, args = []) {
       [AITAB_TEST_PREF, true],
     ],
   });
-  await BrowserTestUtils.withNewTab("about:aitab", async browser => {
+  await BrowserTestUtils.withNewTab("about:smartpage", async browser => {
     await SpecialPowers.spawn(browser, args, task);
   });
   await SpecialPowers.popPrefEnv();

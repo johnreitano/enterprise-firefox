@@ -1145,6 +1145,11 @@ def add_gecko_profile_symbolication_deps(config, tasks):
             if "profiler-node-tools" not in fetch_toolchains:
                 fetch_toolchains.append("profiler-node-tools")
 
+            symbols_zip = "target.crashreporter-symbols.zip"
+            fetch_builds = fetches.setdefault("build", [])
+            if not any(f.get("artifact") == symbols_zip for f in fetch_builds):
+                fetch_builds.append({"artifact": symbols_zip, "extract": False})
+
             test_platform = task["test-platform"]
 
             if "macosx" in test_platform and "aarch64" in test_platform:
@@ -1174,16 +1179,6 @@ def add_gecko_profile_symbolication_deps(config, tasks):
                 if node_toolchain not in fetch_toolchains:
                     fetch_toolchains.append(node_toolchain)
 
-        yield task
-
-
-@transforms.add
-def set_tag(config, tasks):
-    """Set test for a specific tag."""
-    tag = None
-    for task in tasks:
-        if tag:
-            task["mozharness"]["extra-options"].extend(["--tag", tag])
         yield task
 
 

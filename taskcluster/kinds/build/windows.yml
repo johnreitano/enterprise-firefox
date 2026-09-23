@@ -86,7 +86,6 @@ win32/opt:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
         extra-config:
-            stage_platform: win32
             mozconfig_platform: win32
     run-on-projects: ['integration']
     use-sccache: true
@@ -137,7 +136,6 @@ win32-fuzzing/debug:
             - builds/releng_base_linux_64_builds.py
             - builds/taskcluster_sub_win32/debug.py
         extra-config:
-            stage_platform: win32
             mozconfig_platform: win32
         mozconfig-variant: debug-fuzzing
     run-on-projects: ['trunk']
@@ -403,7 +401,6 @@ win64-plain/debug:
             - builds/taskcluster_base_win64.py
         extra-config:
             disable_package_metrics: true
-            stage_platform: win64
         mozconfig-variant: plain-debug
     run-on-projects: ['trunk', 'enterprise-firefox']
     run-on-repo-type: ['git']
@@ -451,7 +448,6 @@ win64/opt:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
         extra-config:
-            stage_platform: win64
             mozconfig_platform: win64
     run-on-projects: ['integration']
     use-sccache: true
@@ -786,7 +782,6 @@ win64-plain/opt:
             - builds/taskcluster_base_win64.py
         extra-config:
             disable_package_metrics: true
-            stage_platform: win64
         mozconfig-variant: plain-opt
     run-on-projects: ['mozilla-central', 'enterprise-firefox']
     run-on-repo-type: ['git']
@@ -851,7 +846,6 @@ win32-shippable/opt:
               builds/releng_base_linux_64_builds.py
             - taskcluster_nightly.py
         extra-config:
-            stage_platform: win32
             mozconfig_platform: win32
     fetches:
         toolchain:
@@ -905,7 +899,6 @@ win64-shippable/opt:
             - builds/releng_base_linux_64_builds.py
             - taskcluster_nightly.py
         extra-config:
-            stage_platform: win64
             mozconfig_platform: win64
             max_build_output_timeout: 3600
     fetches:
@@ -956,7 +949,6 @@ win64-nightlyasrelease/opt:
             - builds/releng_base_linux_64_builds.py
             - taskcluster_nightly.py
         extra-config:
-            stage_platform: win64
             mozconfig_platform: win64
             max_build_output_timeout: 3600
         mozconfig-variant: nightly-as-release
@@ -1002,7 +994,6 @@ win32-add-on-devel/opt:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
         extra-config:
-            stage_platform: win32-add-on-devel
             mozconfig_platform: win32
         mozconfig-variant: add-on-devel
     run-on-projects: ['mozilla-beta', 'mozilla-release']
@@ -1048,7 +1039,6 @@ win64-add-on-devel/opt:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
         extra-config:
-            stage_platform: win64-on-devel
             mozconfig_platform: win64
         mozconfig-variant: add-on-devel
     run-on-projects: ['mozilla-beta', 'mozilla-release']
@@ -1192,7 +1182,6 @@ win32-rusttests/opt:
             - builds/taskcluster_base_windows.py
             - builds/taskcluster_base_win32.py
         extra-config:
-            stage_platform: win32-rusttests
             app_name: tools/rusttests
             disable_package_metrics: true
         mozconfig-variant: rusttests
@@ -1236,7 +1225,6 @@ win32-rusttests/debug:
             - builds/taskcluster_base_windows.py
             - builds/taskcluster_base_win32.py
         extra-config:
-            stage_platform: win32-rusttests
             app_name: tools/rusttests
             disable_package_metrics: true
         mozconfig-variant: rusttests-debug
@@ -1524,7 +1512,6 @@ win64-asan/opt:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
         extra-config:
-            stage_platform: win64-asan
             mozconfig_platform: win64
         mozconfig-variant: nightly-asan
     use-sccache: true
@@ -1572,7 +1559,6 @@ win64-asan-fuzzing/opt:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
         extra-config:
-            stage_platform: win64-fuzzing-asan
             mozconfig_platform: win64
         mozconfig-variant: nightly-fuzzing-asan
     use-sccache: true
@@ -1641,7 +1627,6 @@ win32-devedition/opt:
             - builds/releng_base_linux_64_builds.py
             - taskcluster_nightly.py
         extra-config:
-            stage_platform: win32-devedition
             mozconfig_platform: win32
         mozconfig-variant: devedition
     run-on-projects: ['mozilla-beta']
@@ -1696,7 +1681,6 @@ win64-devedition/opt:
             - builds/releng_base_linux_64_builds.py
             - taskcluster_nightly.py
         extra-config:
-            stage_platform: win64-devedition
             mozconfig_platform: win64
             max_build_output_timeout: 3600
         mozconfig-variant: devedition
@@ -1770,6 +1754,7 @@ win64-aarch64/debug:
             - vs
             - dxc-aarch64-pc-windows-msvc
             - winappsdk-aarch64-pc-windows-msvc
+            - onnxruntime-aarch64-windows-msvc
     optimization:
         skip-unless-expanded: null
 
@@ -1799,7 +1784,6 @@ win64-aarch64/opt:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
         extra-config:
-            stage_platform: win64-aarch64
             mozconfig_platform: win64-aarch64
     run-on-projects: ['integration']
     use-sccache: true
@@ -1822,6 +1806,7 @@ win64-aarch64/opt:
             - vs
             - dxc-aarch64-pc-windows-msvc
             - winappsdk-aarch64-pc-windows-msvc
+            - onnxruntime-aarch64-windows-msvc
     optimization:
         skip-unless-expanded: null
 
@@ -1857,7 +1842,6 @@ win64-aarch64-shippable/opt:
             - builds/releng_base_linux_64_builds.py
             - taskcluster_nightly.py
         extra-config:
-            stage_platform: win64-aarch64
             mozconfig_platform: win64-aarch64
             max_build_output_timeout: 3600
     fetches:
@@ -1878,6 +1862,7 @@ win64-aarch64-shippable/opt:
             - vs
             - dxc-aarch64-pc-windows-msvc
             - winappsdk-aarch64-pc-windows-msvc
+            - onnxruntime-aarch64-windows-msvc
 
 win64-aarch64-devedition/opt:
     description: "AArch64 Win64 Dev Edition (shippable)"
@@ -1910,7 +1895,6 @@ win64-aarch64-devedition/opt:
             - builds/releng_base_linux_64_builds.py
             - taskcluster_nightly.py
         extra-config:
-            stage_platform: win64-aarch64
             mozconfig_platform: win64-aarch64
             max_build_output_timeout: 3600
         mozconfig-variant: devedition
@@ -1933,3 +1917,4 @@ win64-aarch64-devedition/opt:
             - vs
             - dxc-aarch64-pc-windows-msvc
             - winappsdk-aarch64-pc-windows-msvc
+            - onnxruntime-aarch64-windows-msvc

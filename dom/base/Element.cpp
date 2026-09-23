@@ -116,6 +116,7 @@
 #include "mozilla/dom/Sanitizer.h"
 #include "mozilla/dom/ScriptLoader.h"
 #include "mozilla/dom/ShadowRoot.h"
+#include "mozilla/dom/SpeculationRules.h"
 #include "mozilla/dom/StylePropertyMapReadOnly.h"
 #include "mozilla/dom/Text.h"
 #include "mozilla/dom/TreeIterator.h"
@@ -517,15 +518,6 @@ void Element::TraverseCustomElementRegistry(
   }
 }
 
-/* static */
-void Element::UnlinkCustomElementRegistry(Element* aElement) {
-  if (aElement->GetCustomElementRegistryState() ==
-      CustomElementRegistryState::Scoped) {
-    CustomElementRegistry::RemoveScopedRegistry(*aElement);
-    aElement->SetCustomElementRegistryState(CustomElementRegistryState::Global);
-  }
-}
-
 void Element::Focus(const FocusOptions& aOptions, CallerType aCallerType,
                     ErrorResult& aError) {
   const RefPtr<nsFocusManager> fm = nsFocusManager::GetFocusManager();
@@ -575,7 +567,6 @@ void Element::SetCustomElementRegistry(
       "We shouldn't override an already assigned scoped registry");
 
   if (aCustomElementRegistry->IsScoped()) {
-    SetCustomElementRegistryState(CustomElementRegistryState::Scoped);
     CustomElementRegistry::SetScopedRegistry(*this, *aCustomElementRegistry);
     // https://html.spec.whatwg.org/#scoped-document-set
     // Append element's node document to the registry's scoped document set.
@@ -3190,6 +3181,17 @@ static bool WillDetachFromShadowOnUnbind(const Element& aElement,
          (aNullParent || !aElement.GetParent()->IsInShadowTree());
 }
 
+void Element::NodeInfoChanged(Document* aOldDoc) {
+  FragmentOrElement::NodeInfoChanged(aOldDoc);
+  // https://dom.spec.whatwg.org/#concept-node-adopt
+  // 3.3.1. Set the node document of each attribute in inclusiveDescendant's
+  //        attribute list to document.
+  mAttrs.NodeInfoChanged(NodeInfoManager());
+  if (nsDOMAttributeMap* attributeMap = GetAttributeMap()) {
+    attributeMap->AdoptCachedAttributes(NodeInfoManager());
+  }
+}
+
 void Element::UnbindFromTree(UnbindContext& aContext) {
   const bool nullParent = aContext.IsUnbindRoot(this);
 
@@ -4710,6 +4712,7 @@ void Element::GetEventTargetParentForLinks(EventChainPreVisitor& aVisitor) {
     case eFocus:
     case eMouseOut:
     case eBlur:
+    case ePointerDown:
       break;
     default:
       return;
@@ -4757,7 +4760,11 @@ void Element::GetEventTargetParentForLinks(EventChainPreVisitor& aVisitor) {
       }
       break;
     }
-
+    case ePointerDown:
+      if (auto* speculationRules = OwnerDoc()->GetSpeculationRules()) {
+        speculationRules->PointerDown(this);
+      }
+      break;
     default:
       // switch not in sync with the optimization switch earlier in this
       // function

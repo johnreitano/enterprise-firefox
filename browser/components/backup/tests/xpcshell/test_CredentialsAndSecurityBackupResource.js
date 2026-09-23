@@ -4,7 +4,7 @@ https://creativecommons.org/publicdomain/zero/1.0/ */
 "use strict";
 
 const { CredentialsAndSecurityBackupResource } = ChromeUtils.importESModule(
-  "resource:///modules/backup/CredentialsAndSecurityBackupResource.sys.mjs"
+  "moz-src:///browser/components/backup/resources/CredentialsAndSecurityBackupResource.sys.mjs"
 );
 
 /**

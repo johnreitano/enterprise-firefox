@@ -29,6 +29,7 @@ async function check_homepage({
   expectedURL,
   expectedPageVal = -1,
   locked = false,
+  checkUI = false,
 }) {
   if (expectedURL) {
     is(HomePage.get(), expectedURL, "Homepage URL should match expected");
@@ -49,6 +50,13 @@ async function check_homepage({
       locked,
       "Lock status of browser.startup.page should match expected"
     );
+  }
+
+  // Loading about:preferences dominates this helper's runtime. The disabled
+  // states below follow |locked| and |expectedPageVal|, not the URLs, so
+  // callers that only vary the homepage list have nothing new to check.
+  if (!checkUI && !locked && expectedPageVal == -1) {
+    return;
   }
 
   // Test that UI is disabled when the Locked property is enabled

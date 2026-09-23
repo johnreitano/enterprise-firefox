@@ -27,25 +27,37 @@ function mockServicesChromeScript() {
 
   const mockAlertsService = {
     showAlertWithCallbacks(alert, callbacks) {
+      // Remove properties of object that can't be sent across process boundary.
+      function sanitizeObject(object) {
+        if (object === null) {
+          return null;
+        }
+        const sanitized = {};
+        for (let [key, value] of Object.entries(object)) {
+          // Send spec of nsIURI.
+          if (value?.spec) {
+            value = value.spec;
+          }
+          if (typeof value === "function") {
+            continue;
+          }
+          if (typeof value === "object") {
+            value = sanitizeObject(value);
+          }
+          sanitized[key] = value;
+        }
+        return sanitized;
+      }
+      // data about this alert that can be queried by the content process
+      // with getNotificationData().
+      const data = sanitizeObject(alert);
+      data.body = data.text; // for consistency with Notification
+      data.actions = alert.actions.map(sanitizeObject);
       activeNotifications[alert.name] = {
         callbacks,
         title: alert.title,
         image: alert.image,
-        // data about this alert that can be queried by the content process
-        // with getNotificationData().
-        data: {
-          title: alert.title,
-          imageURL: alert.imageURL,
-          dir: alert.dir,
-          lang: alert.lang,
-          body: alert.text,
-          tag: alert.name,
-          actions: alert.actions.map(action => ({
-            action: action.action,
-            title: action.title,
-            iconURL: action.iconURL,
-          })),
-        },
+        data,
       };
 
       // fake async alert show event

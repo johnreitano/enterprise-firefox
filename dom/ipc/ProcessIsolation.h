@@ -91,6 +91,15 @@ Result<RemoteType, nsresult> PredictRemoteTypeForURI(
     const RemoteType& aPreferredRemoteType, bool aUseRemoteSubframes);
 
 /**
+ * If `aURI` is an `about:reader` URI whose "url" query parameter names a
+ * document about:reader will actually load, return that URL, otherwise return
+ * `nullptr`.
+ *
+ * Safe to call with any URI.
+ */
+already_AddRefed<nsIURI> GetAboutReaderURL(nsIURI* aURI);
+
+/**
  * Adds a `highValue` permission to the permissions database, and make loads of
  * that origin isolated.
  *

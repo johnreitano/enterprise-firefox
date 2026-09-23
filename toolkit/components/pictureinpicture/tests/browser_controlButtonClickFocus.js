@@ -6,45 +6,30 @@
 const VIDEO_ID = "with-controls";
 
 /**
- * Opens a PiP window, runs a test task, and closes the window when
- * the task finishes.
- *
- * @param {Function} taskFn the test to run.
+ * Tests that pressing Space when PiP initializes immediately toggles playback
+ * rather than activating any controls.
  */
-async function withPipWindow(taskFn) {
-  await SpecialPowers.pushPrefEnv({
-    set: [
-      [
-        "media.videocontrols.picture-in-picture.keyboard-controls.enabled",
-        true,
-      ],
-      [
-        "media.videocontrols.picture-in-picture.improved-video-controls.enabled",
-        true,
-      ],
-    ],
+add_task(async function test_space_toggles_playback_on_init() {
+  await withPipWindow({}, async (browser, pipWin) => {
+    Assert.ok(
+      !pipWin.document.activeElement?.closest(".control-button"),
+      "No control button should have focus when the window opens"
+    );
+
+    let pausedPromise = BrowserTestUtils.waitForContentEvent(
+      browser,
+      "pause",
+      true
+    );
+    EventUtils.synthesizeKey(" ", {}, pipWin);
+    await pausedPromise;
+
+    Assert.ok(
+      await isVideoPaused(browser, VIDEO_ID),
+      "Space should pause the video right after opening the window"
+    );
   });
-
-  await BrowserTestUtils.withNewTab(
-    {
-      url: TEST_PAGE,
-      gBrowser,
-    },
-    async browser => {
-      await ensureVideosReady(browser);
-      await SpecialPowers.spawn(browser, [VIDEO_ID], async videoID => {
-        await content.document.getElementById(videoID).play();
-      });
-
-      let pipWin = await triggerPictureInPicture(browser, VIDEO_ID);
-      ok(pipWin, "Got Picture-in-Picture window.");
-
-      await taskFn(browser, pipWin);
-
-      await BrowserTestUtils.closeWindow(pipWin);
-    }
-  );
-}
+});
 
 /**
  * Tests that clicking a control button does not move focus onto it, so that
@@ -52,7 +37,7 @@ async function withPipWindow(taskFn) {
  * clicked button.
  */
 add_task(async function test_click_does_not_focus_control_button() {
-  await withPipWindow(async (browser, pipWin) => {
+  await withPipWindow({}, async (browser, pipWin) => {
     let seekForwardButton = pipWin.document.getElementById("seekForward");
     await BrowserTestUtils.waitForMutationCondition(
       seekForwardButton,
@@ -103,7 +88,7 @@ add_task(async function test_click_does_not_focus_control_button() {
  * Tests that Space still activates a control button with keyboard focus.
  */
 add_task(async function test_space_activates_focused_control_button() {
-  await withPipWindow(async (browser, pipWin) => {
+  await withPipWindow({}, async (browser, pipWin) => {
     let seekForwardButton = pipWin.document.getElementById("seekForward");
     await BrowserTestUtils.waitForMutationCondition(
       seekForwardButton,
@@ -130,63 +115,27 @@ add_task(async function test_space_activates_focused_control_button() {
  * than toggling playback.
  */
 add_task(async function test_space_activates_panel_controls() {
-  await SpecialPowers.pushPrefEnv({
-    set: [
-      [
-        "media.videocontrols.picture-in-picture.keyboard-controls.enabled",
-        true,
-      ],
-      [
-        "media.videocontrols.picture-in-picture.display-text-tracks.enabled",
-        true,
-      ],
-      [
-        "media.videocontrols.picture-in-picture.display-text-tracks.toggle.enabled",
-        true,
-      ],
-    ],
-  });
-
-  await BrowserTestUtils.withNewTab(
+  await withPipWindow(
     {
-      url: TEST_PAGE_WITH_WEBVTT,
-      gBrowser,
-    },
-    async browser => {
-      await ensureVideosReady(browser);
       // Test with the subtitles panel, so load text tracks.
-      await prepareVideosAndWebVTTTracks(browser, VIDEO_ID);
-      await SpecialPowers.spawn(browser, [VIDEO_ID], async videoID => {
-        await content.document.getElementById(videoID).play();
-      });
-
-      let pipWin = await triggerPictureInPicture(browser, VIDEO_ID);
-      ok(pipWin, "Got Picture-in-Picture window.");
-
-      // Resize the PiP window so that the subtitles button is visible.
-      let resizePromise = BrowserTestUtils.waitForEvent(pipWin, "resize");
-      pipWin.resizeTo(640, 360);
-      await resizePromise;
-
+      url: TEST_PAGE_WITH_WEBVTT,
+      prefs: [
+        [
+          "media.videocontrols.picture-in-picture.display-text-tracks.enabled",
+          true,
+        ],
+        [
+          "media.videocontrols.picture-in-picture.display-text-tracks.toggle.enabled",
+          true,
+        ],
+      ],
+    },
+    async (browser, pipWin) => {
       let subtitlesButton = pipWin.document.getElementById("closed-caption");
       let settingsPanel = pipWin.document.getElementById("settings");
-      await BrowserTestUtils.waitForMutationCondition(
-        subtitlesButton,
-        { attributeFilter: ["hidden", "disabled"] },
-        () => !subtitlesButton.hidden && !subtitlesButton.disabled,
-        { msg: "Waiting for the subtitles button to be available" }
-      );
 
       // Open the panel with the keyboard, so that focus moves into it.
-      subtitlesButton.focus();
-      let panelVisiblePromise = BrowserTestUtils.waitForMutationCondition(
-        settingsPanel,
-        { attributeFilter: ["class"] },
-        () => !settingsPanel.classList.contains("hide"),
-        { msg: "Waiting for the subtitles settings panel to open" }
-      );
-      EventUtils.synthesizeKey(" ", {}, pipWin);
-      await panelVisiblePromise;
+      await openPanelWithKeyboard(pipWin, subtitlesButton, settingsPanel);
 
       let subtitlesToggle = pipWin.document.getElementById("subtitles-toggle");
       Assert.equal(
@@ -212,8 +161,6 @@ add_task(async function test_space_activates_panel_controls() {
         !(await isVideoPaused(browser, VIDEO_ID)),
         "Video should still be playing, so Space did not toggle playback"
       );
-
-      await BrowserTestUtils.closeWindow(pipWin);
     }
   );
 });

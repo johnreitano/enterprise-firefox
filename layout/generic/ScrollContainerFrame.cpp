@@ -7490,14 +7490,15 @@ void ScrollContainerFrame::RestoreState(nsILayoutHistoryState* aState) {
   if (!GetStateKey(mContent, key)) {
     return;
   }
-  if (UniquePtr state = aState->TakeState(key)) {
-    ScrollState scrollState;
-    scrollState.mScrollPosition = state->scrollState();
-    scrollState.mAllowScrollOriginDowngrade =
-        state->allowScrollOriginDowngrade();
-    scrollState.mResolution = state->resolution();
-    RestoreState(scrollState);
+  UniquePtr state = aState->TakeState(key);
+  if (!state || mDidHistoryRestore) {
+    return;
   }
+  ScrollState scrollState;
+  scrollState.mScrollPosition = state->scrollState();
+  scrollState.mAllowScrollOriginDowngrade = state->allowScrollOriginDowngrade();
+  scrollState.mResolution = state->resolution();
+  RestoreState(scrollState);
 }
 
 void ScrollContainerFrame::RestoreState(const ScrollState& aState) {

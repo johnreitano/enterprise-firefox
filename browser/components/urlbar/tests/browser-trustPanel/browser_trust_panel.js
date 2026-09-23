@@ -32,13 +32,13 @@ ChromeUtils.defineLazyGetter(this, "fxAccounts", () => {
 
 const TRACKING_PAGE =
   // eslint-disable-next-line sdl/no-insecure-url
-  "http://tracking.example.org/browser/browser/base/content/test/protectionsUI/trackingPage.html";
+  "http://tracking.example.org/browser/browser/base/content/test/browser-protectionsUI/trackingPage.html";
 
 // The http is required here so that the sub iframe is not blocked which prevents the
 // cookie test.
 const COOKIE_PAGE =
   // eslint-disable-next-line sdl/no-insecure-url
-  "http://not-tracking.example.com/browser/browser/base/content/test/protectionsUI/cookiePage.html";
+  "http://not-tracking.example.com/browser/browser/base/content/test/browser-protectionsUI/cookiePage.html";
 
 const TEST_BREACH = {
   // Make sure the breach is a recent one, since breaches older than a year are not taken into account:

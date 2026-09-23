@@ -1248,7 +1248,7 @@ nsXULAppInfo::GetWidgetToolkit(nsACString& aResult) {
                     static_cast<int>(GeckoProcessType_##enum_name),           \
                 "GeckoProcessType in nsXULAppAPI.h not synchronized with "    \
                 "nsIXULRuntime.idl");
-#include "mozilla/GeckoProcessTypes.h"
+#include "mozilla/GeckoProcessTypes.inc"
 #undef GECKO_PROCESS_TYPE
 
 // .. and ensure that that is all of them:
@@ -2767,8 +2767,8 @@ nsresult LaunchChild(bool aBlankCommandLine, bool aTryExec) {
   // immediately returns non-zero then we may mask that by returning a zero
   // exit status.
 
-#    endif  // WP_WIN
-#  endif    // WP_MACOSX
+#    endif  // XP_WIN
+#  endif    // XP_MACOSX
 #endif      // MOZ_WIDGET_ANDROID
 
   return NS_ERROR_LAUNCHED_CHILD_PROCESS;
@@ -2952,6 +2952,23 @@ static nsresult ProfileEncryptionMismatchDialog(const char* aMsgKey,
 }
 
 #if defined(MOZ_ENTERPRISE)
+// Returns NS_OK only if |aDir| is a private per-user directory: a directory
+// (not a symlink) owned by the current user with mode 0700. Desktop-Linux only;
+// a no-op elsewhere, where the OS temporary directory is already per-user.
+static nsresult ValidateFeltScratchDir(nsIFile* aDir) {
+#  if defined(XP_LINUX) && !defined(ANDROID)
+  nsAutoCString path;
+  MOZ_TRY(aDir->GetNativePath(path));
+
+  struct stat st;
+  if (lstat(path.get(), &st) != 0 || !S_ISDIR(st.st_mode) ||
+      st.st_uid != geteuid() || (st.st_mode & 07777) != 0700) {
+    return NS_ERROR_FILE_ACCESS_DENIED;
+  }
+#  endif
+  return NS_OK;
+}
+
 // Wipes the contents of the Felt UI scratch profile directory(ies) so that the
 // next startup behaves like a brand-new profile. Does not delete the directory
 // itself (its path is held in mProfD / mProfLD by the caller); only its direct
@@ -2966,6 +2983,8 @@ static nsresult ResetFeltUIScratchProfile(nsIFile* aProfileDir,
     nsresult rv = aDir->Exists(&exists);
     NS_ENSURE_SUCCESS(rv, rv);
     if (exists) {
+      rv = ValidateFeltScratchDir(aDir);
+      NS_ENSURE_SUCCESS(rv, rv);
       nsCOMPtr<nsIDirectoryEnumerator> entries;
       rv = aDir->GetDirectoryEntries(getter_AddRefs(entries));
       NS_ENSURE_SUCCESS(rv, rv);
@@ -3524,6 +3543,17 @@ static ReturnAbortOnError ShowEnterpriseConsoleSetup(
 }
 #endif
 
+// Both profile dialogs relaunch Firefox to start the chosen profile, and macOS
+// hands an ASWebAuthenticationSession request to the process it launched rather
+// than to the relaunched one, so showing a dialog would drop the request.
+static bool ShouldSkipProfileDialogForWebAuth() {
+#if defined(XP_MACOSX) && defined(NIGHTLY_BUILD)
+  return WasLaunchedByAuthenticationServices();
+#else
+  return false;
+#endif
+}
+
 static bool gDoMigration = false;
 static bool gDoProfileReset = false;
 constinit static nsCOMPtr<nsIToolkitProfile> gResetOldProfile;
@@ -3645,6 +3675,14 @@ static nsresult SelectProfile(nsToolkitProfileService* aProfileSvc,
         // many (thousands) of existing directories, which is unlikely to
         // happen.
         MOZ_TRY(file->CreateUnique(nsIFile::DIRECTORY_TYPE, 0700));
+      }
+
+      // Validate the directory whether it was just created or already existed.
+      if (NS_FAILED(ValidateFeltScratchDir(file))) {
+        Output(true,
+               "Error: refusing to use the Felt UI scratch profile: it is not "
+               "a private directory owned by the current user.\n");
+        return NS_ERROR_FILE_ACCESS_DENIED;
       }
 
       nsCOMPtr<nsIFile> localDir = file;
@@ -6065,6 +6103,11 @@ int XREMain::XRE_mainStartup(bool* aExitFlag) {
     return 0;
   }
 
+  if (rv == NS_ERROR_FILE_ACCESS_DENIED) {
+    // SelectProfile already reported the reason; exit non-zero.
+    return 1;
+  }
+
   if (NS_FAILED(rv)) {
     // We failed to choose or create profile - notify user and quit
     ProfileMissingDialog(mNativeApp);
@@ -6274,7 +6317,9 @@ int XREMain::XRE_mainStartup(bool* aExitFlag) {
   // We only ever show the profile selector if a specific profile wasn't chosen
   // via command line arguments or environment variables.
   if (wasDefaultSelection) {
-    if (!mProfileSvc->GetStartWithLastProfile()) {
+    if (ShouldSkipProfileDialogForWebAuth()) {
+      rv = NS_OK;
+    } else if (!mProfileSvc->GetStartWithLastProfile()) {
       // First check the old style profile manager
       rv = ShowProfileManager(mProfileSvc, mNativeApp);
     } else if (profile && profile->GetShowProfileSelector()) {
@@ -7128,8 +7173,7 @@ nsresult XREMain::XRE_mainRun() {
       // Check if we're running from a DMG or an app translocated location and
       // allow the user to install to the Applications directory.
       if (MacRunFromDmgUtils::MaybeInstallAndRelaunch()) {
-        bool userAllowedQuit = true;
-        appStartup->Quit(nsIAppStartup::eForceQuit, 0, &userAllowedQuit);
+        appStartup->Quit(nsIAppStartup::eForceQuit, 0);
       }
 #  endif
 #endif
@@ -7711,7 +7755,7 @@ bool XRE_IsE10sParentProcess() {
   bool XRE_Is##proc_typename##Process() {                                     \
     return XRE_GetProcessType() == GeckoProcessType_##enum_name;              \
   }
-#include "mozilla/GeckoProcessTypes.h"
+#include "mozilla/GeckoProcessTypes.inc"
 #undef GECKO_PROCESS_TYPE
 
 bool XRE_UseNativeEventProcessing() {
@@ -7840,7 +7884,7 @@ mozilla::BinPathType XRE_GetChildProcBinPathType(
                              procinfo_typename, webidl_typename, allcaps_name) \
     case GeckoProcessType_##enum_name:                                         \
       return BinPathType::process_bin_type;
-#  include "mozilla/GeckoProcessTypes.h"
+#  include "mozilla/GeckoProcessTypes.inc"
 #  undef GECKO_PROCESS_TYPE
     default:
       return BinPathType::PluginContainer;

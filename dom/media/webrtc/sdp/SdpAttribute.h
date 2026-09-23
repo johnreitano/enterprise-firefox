@@ -397,6 +397,8 @@ class SdpFingerprintAttributeList : public SdpAttribute {
   struct Fingerprint {
     HashAlgorithm hashFunc;
     std::vector<uint8_t> fingerprint;
+
+    bool operator==(const Fingerprint&) const = default;
   };
 
   // For use by application programmers. Enforces that it's a known and

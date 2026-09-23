@@ -17,7 +17,7 @@ ChromeUtils.defineESModuleGetters(this, {
 
 const TRACKING_PAGE =
   // eslint-disable-next-line sdl/no-insecure-url
-  "http://tracking.example.org/browser/browser/base/content/test/protectionsUI/trackingPage.html";
+  "http://tracking.example.org/browser/browser/base/content/test/browser-protectionsUI/trackingPage.html";
 
 const TEST_BREACH = {
   // Make sure the breach is a recent one, since breaches older than a year are not taken into account:
@@ -97,6 +97,21 @@ async function waitForTrustIconWithoutClass(className, message) {
     message,
     100,
     100
+  );
+}
+
+/**
+ * The tracker-count prefs only gate whether the trust icon reacts to blocked
+ * trackers, not whether the platform records them. Waiting for the log to be
+ * populated guarantees that any code under test observing
+ * #computeTrackerCount() runs after the block has happened.
+ *
+ * @param {Browser} browser The browser whose content-blocking log to poll.
+ */
+async function waitForContentBlockingLog(browser) {
+  await TestUtils.waitForCondition(
+    () => Object.keys(JSON.parse(browser.getContentBlockingLog())).length,
+    "Waiting for the content-blocking log to record the blocked tracker"
   );
 }
 
@@ -533,11 +548,7 @@ add_task(async function test_tracker_count_hidden_when_feature_gate_disabled() {
       content.postMessage("cryptomining", "*");
     });
 
-    // Unfortunately #updateToolbarTrackerCount is asynchronous and, when the
-    // tracker count is disabled, doesn't result in observable effects that we
-    // can await:
-    // eslint-disable-next-line mozilla/no-arbitrary-setTimeout
-    await new Promise(r => setTimeout(r, 500));
+    await waitForContentBlockingLog(tab.linkedBrowser);
 
     Assert.ok(
       !trustIconContainer().classList.contains("has-blocked-trackers"),
@@ -567,11 +578,7 @@ add_task(async function test_tracker_count_hidden_when_pref_disabled() {
       content.postMessage("cryptomining", "*");
     });
 
-    // Unfortunately #updateToolbarTrackerCount is asynchronous and, when the
-    // tracker count is disabled, doesn't result in observable effects that we
-    // can await:
-    // eslint-disable-next-line mozilla/no-arbitrary-setTimeout
-    await new Promise(r => setTimeout(r, 500));
+    await waitForContentBlockingLog(tab.linkedBrowser);
 
     Assert.ok(
       !trustIconContainer().classList.contains("has-blocked-trackers"),
@@ -579,6 +586,52 @@ add_task(async function test_tracker_count_hidden_when_pref_disabled() {
     );
   } finally {
     await BrowserTestUtils.removeTab(tab);
+    await SpecialPowers.popPrefEnv();
+  }
+});
+
+// Regression test for bug 2070204: when the tracker count feature is disabled,
+// switching away from and back to a tab that has blocked trackers must not
+// reveal (and animate) the tracker-count pill. On tab switch, updateIdentity
+// runs #updateUrlbarIcon while the content-blocking log is already populated,
+// which previously added the has-blocked-trackers class regardless of the pref.
+add_task(async function test_no_tracker_count_on_tab_switch_when_disabled() {
+  await SpecialPowers.pushPrefEnv({
+    set: [["browser.urlbar.trackerCount.enabled", false]],
+  });
+
+  await PlacesUtils.history.clear();
+
+  const trackingTab = await BrowserTestUtils.openNewForegroundTab({
+    gBrowser,
+    opening: TRACKING_PAGE,
+    waitForLoad: true,
+  });
+
+  try {
+    await SpecialPowers.spawn(trackingTab.linkedBrowser, [], () => {
+      content.postMessage("cryptomining", "*");
+    });
+
+    // Ensure the tracker blocking event is recorded:
+    await waitForContentBlockingLog(trackingTab.linkedBrowser);
+
+    const otherTab = await BrowserTestUtils.openNewForegroundTab({
+      gBrowser,
+      opening: "about:blank",
+      waitForLoad: true,
+    });
+
+    await BrowserTestUtils.switchTab(gBrowser, trackingTab);
+
+    Assert.ok(
+      !trustIconContainer().classList.contains("has-blocked-trackers"),
+      "has-blocked-trackers class should not appear after switching back when the tracker count is disabled"
+    );
+
+    await BrowserTestUtils.removeTab(otherTab);
+  } finally {
+    await BrowserTestUtils.removeTab(trackingTab);
     await SpecialPowers.popPrefEnv();
   }
 });

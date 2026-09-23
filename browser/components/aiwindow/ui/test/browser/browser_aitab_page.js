@@ -5,7 +5,7 @@
 
 const AITAB_PREF = "browser.smartwindow.aitab.enabled";
 const PAGE_NAME = "hotels_san_francisco_1.html";
-const PAGE_URL = `about:aitab?page=${PAGE_NAME}`;
+const PAGE_URL = `about:smartpage?page=${PAGE_NAME}`;
 
 const PAGE_CONFIG = {
   header: {
@@ -56,7 +56,7 @@ add_task(async function test_page_unavailable_when_disabled() {
         Ci.nsIContentPolicy.TYPE_DOCUMENT
       ),
     /NS_ERROR_NOT_AVAILABLE/,
-    "about:aitab cannot be loaded when the pref is off"
+    "about:smartpage cannot be loaded when the pref is off"
   );
 
   await SpecialPowers.popPrefEnv();
@@ -103,7 +103,7 @@ add_task(async function test_path_like_page_name_rejected() {
   const pathLikeName = "../../../etc/passwd";
 
   await BrowserTestUtils.withNewTab(
-    `about:aitab?page=${encodeURIComponent(pathLikeName)}`,
+    `about:smartpage?page=${encodeURIComponent(pathLikeName)}`,
     async browser => {
       await SpecialPowers.spawn(browser, [pathLikeName], async name => {
         await content.customElements.whenDefined("aitab-page");
@@ -144,7 +144,7 @@ add_task(async function test_path_like_page_name_rejected() {
 add_task(async function test_missing_page_reports_unavailable() {
   await SpecialPowers.pushPrefEnv({ set: [[AITAB_PREF, true]] });
 
-  await BrowserTestUtils.withNewTab("about:aitab", async browser => {
+  await BrowserTestUtils.withNewTab("about:smartpage", async browser => {
     await SpecialPowers.spawn(browser, [], async () => {
       await content.customElements.whenDefined("aitab-page");
       const page = content.document.querySelector("aitab-page").wrappedJSObject;
@@ -266,7 +266,7 @@ add_task(async function test_deleting_an_already_deleted_page_succeeds() {
   // The tab has to be on the page being deleted: the parent reads the name
   // from the tab URL rather than from the message.
   await BrowserTestUtils.withNewTab(
-    "about:aitab?page=twice_page",
+    "about:smartpage?page=twice_page",
     async browser => {
       const actor =
         browser.browsingContext.currentWindowGlobal.getActor("AITab");

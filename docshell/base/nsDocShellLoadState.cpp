@@ -68,6 +68,11 @@ bool ContentTriggeredURILoadIsAllowed(nsIURI* aURI,
            ContentTriggeredURILoadIsAllowed(innerURI, aEffectiveRemoteType);
   }
 
+  // about:reader is process-allocated based on the "url" parameter.
+  if (nsCOMPtr<nsIURI> readerURI = GetAboutReaderURL(aURI)) {
+    return ContentTriggeredURILoadIsAllowed(readerURI, aEffectiveRemoteType);
+  }
+
   // A null principal is the least privileged principal there is, so any URI it
   // is allowed to link to may be loaded from any content process.
   nsCOMPtr<nsIPrincipal> genericNullPrincipal = NullPrincipal::Create({});

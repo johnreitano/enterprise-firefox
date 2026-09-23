@@ -623,6 +623,7 @@ function Privacy({ dispatch, widgetsMayBeMaximized, widgetEnabledMap }) {
             iconSrc="chrome://global/skin/icons/more.svg"
             menuId="privacy-context-menu"
             type="ghost"
+            data-l10n-id="newtab-privacy-widget-menu-button"
           />
           <panel-list className="panel-list-no-icons" id="privacy-context-menu">
             {widgetsMayBeMaximized && (

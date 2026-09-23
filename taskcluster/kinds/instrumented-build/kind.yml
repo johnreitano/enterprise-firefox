@@ -470,7 +470,6 @@ tasks:
                 - builds/releng_base_firefox.py
                 - builds/releng_base_linux_64_builds.py
             extra-config:
-                stage_platform: win32
                 mozconfig_platform: win32
         fetches:
             toolchain:
@@ -509,7 +508,6 @@ tasks:
                 - builds/releng_base_firefox.py
                 - builds/releng_base_linux_64_builds.py
             extra-config:
-                stage_platform: win64
                 mozconfig_platform: win64
                 extra_mozconfig_content:
                     - ac_add_options --as-milestone=release
@@ -551,7 +549,6 @@ tasks:
                 - builds/releng_base_firefox.py
                 - builds/releng_base_linux_64_builds.py
             extra-config:
-                stage_platform: win64
                 mozconfig_platform: win64
         fetches:
             toolchain:
@@ -591,7 +588,6 @@ tasks:
                 - builds/releng_base_firefox.py
                 - builds/releng_base_linux_64_builds.py
             extra-config:
-                stage_platform: win64-aarch64
                 mozconfig_platform: win64-aarch64
         fetches:
             toolchain:

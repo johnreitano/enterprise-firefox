@@ -9,6 +9,7 @@ import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.feature.addons.Addon
 import mozilla.components.service.fxa.manager.AccountState
 import org.mozilla.fenix.components.menu.MenuAccessPoint
+import org.mozilla.fenix.tabgroups.flow.TabGroupFlowEntryPoint
 
 /** Actions to dispatch through the [MenuStore] to modify the [MenuState]. */
 sealed class MenuAction : MenuEvent {
@@ -157,6 +158,12 @@ sealed class MenuAction : MenuEvent {
     /** [MenuAction] dispatched when the user clicks the IP protection menu item. */
     data object IPProtectionToggle : MenuAction()
 
+    /** [MenuAction] dispatched when the user asks to save the current webpage content as a PDF. */
+    data object SaveAsPdfRequested : MenuAction()
+
+    /** [MenuAction] dispatched when the user asks to print the current webpage. */
+    data object PrintRequested : MenuAction()
+
     /** [MenuAction] dispatched when a navigation event occurs for a specific destination. */
     sealed class Navigate : MenuAction() {
 
@@ -198,6 +205,9 @@ sealed class MenuAction : MenuEvent {
 
         /** [Navigate] action dispatched when navigating to add site to home screen. */
         data object AddToHomeScreen : Navigate()
+
+        /** [Navigate] action dispatched when opening the tab group flow. */
+        data class OpenTabGroupFlow(val entryPoint: TabGroupFlowEntryPoint) : Navigate()
 
         /**
          * [Navigate] action dispatched when navigating to save a site to a collection.

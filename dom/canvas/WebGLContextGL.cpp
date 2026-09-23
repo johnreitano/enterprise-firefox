@@ -1567,6 +1567,17 @@ void WebGLContext::PolygonOffset(GLfloat factor, GLfloat units) {
   gl->fPolygonOffset(factor, units);
 }
 
+void WebGLContext::PolygonOffsetClampEXT(const GLfloat factor,
+                                         const GLfloat units,
+                                         const GLfloat clamp) {
+  const FuncScope funcScope(*this, "polygonOffsetClampEXT");
+  if (IsContextLost()) return;
+  MOZ_RELEASE_ASSERT(
+      IsExtensionEnabled(WebGLExtensionID::EXT_polygon_offset_clamp));
+
+  gl->fPolygonOffsetClamp(factor, units, clamp);
+}
+
 void WebGLContext::ProvokingVertex(const webgl::ProvokingVertex mode) const {
   const FuncScope funcScope(*this, "provokingVertex");
   if (IsContextLost()) return;

@@ -83,13 +83,14 @@ add_task(async function test_idempotent() {
   migrateWithPlacements({
     [CustomizableUI.AREA_TABSTRIP]: [
       "tabbrowser-tabs",
+      "alltabs-button",
       ORGANIZE_TABS,
       SWITCHER,
     ],
   });
   Assert.deepEqual(
     getSavedStatePlacements(CustomizableUI.AREA_TABSTRIP),
-    ["tabbrowser-tabs", ORGANIZE_TABS, SWITCHER],
+    ["tabbrowser-tabs", "alltabs-button", ORGANIZE_TABS, SWITCHER],
     "A button already in place is left untouched"
   );
 });

@@ -90,41 +90,59 @@ AV1FmtpParams ParseAV1Fmtp(const nsACString& aMimeString) {
   return out;
 }
 
+namespace {
+struct AV1LevelConstraint {
+  uint8_t mLevelIdx;
+  uint32_t mMaxPicSize;
+  uint32_t mMaxHSize;
+  uint32_t mMaxVSize;
+  uint64_t mMaxDisplayRate;
+};
+}  // namespace
+
+// AV1 spec Annex A.3 "Levels" table (MaxPicSize/MaxHSize/MaxVSize/
+// MaxDisplayRate columns). Only levels with defined parameters are listed;
+// levels 2.2, 2.3, 3.2, 3.3, 4.2, 4.3 and 7.0-7.3 (level-idx 2, 3, 6, 7, 10,
+// 11, 20-23) have no defined parameters and are intentionally absent, as are
+// the reserved 24-30.
+static constexpr AV1LevelConstraint kAV1LevelConstraints[] = {
+    {0, 147456, 2048, 1152, 4423680},         // 2.0
+    {1, 278784, 2816, 1584, 8363520},         // 2.1
+    {4, 665856, 4352, 2448, 19975680},        // 3.0
+    {5, 1065024, 5504, 3096, 31950720},       // 3.1
+    {8, 2359296, 6144, 3456, 70778880},       // 4.0
+    {9, 2359296, 6144, 3456, 141557760},      // 4.1
+    {12, 8912896, 8192, 4352, 267386880},     // 5.0
+    {13, 8912896, 8192, 4352, 534773760},     // 5.1
+    {14, 8912896, 8192, 4352, 1069547520},    // 5.2
+    {15, 8912896, 8192, 4352, 1069547520},    // 5.3
+    {16, 35651584, 16384, 8704, 1069547520},  // 6.0
+    {17, 35651584, 16384, 8704, 2139095040},  // 6.1
+    {18, 35651584, 16384, 8704, 4278190080},  // 6.2
+    {19, 35651584, 16384, 8704, 4278190080},  // 6.3
+};
+
+Maybe<AV1BlockLimits> AV1BlockLimitsForLevel(uint8_t aLevelIdx) {
+  if (aLevelIdx == 31) {
+    // "Maximum parameters" -- no limits imposed.
+    return Nothing();
+  }
+  for (const auto& c : kAV1LevelConstraints) {
+    if (c.mLevelIdx == aLevelIdx) {
+      // Convert samples to 16x16-pixel blocks, the unit
+      // VideoEncodingConstraints::maxFs/maxMbps use.
+      return Some(AV1BlockLimits{c.mMaxPicSize / 256, c.mMaxDisplayRate / 256});
+    }
+  }
+  return Nothing();
+}
+
 bool AV1LevelFits(uint8_t aLevelIdx, uint32_t aWidth, uint32_t aHeight,
                   double aFramerate) {
   if (aLevelIdx == 31) {
     // "Maximum parameters" -- no limits imposed.
     return true;
   }
-
-  struct AV1LevelConstraint {
-    uint8_t mLevelIdx;
-    uint32_t mMaxPicSize;
-    uint32_t mMaxHSize;
-    uint32_t mMaxVSize;
-    uint64_t mMaxDisplayRate;
-  };
-  // AV1 spec Annex A.3 "Levels" table (MaxPicSize/MaxHSize/MaxVSize/
-  // MaxDisplayRate columns). Only levels with defined parameters are
-  // listed; levels 2.2, 2.3, 3.2, 3.3, 4.2, 4.3 and 7.0-7.3 (level-idx 2, 3,
-  // 6, 7, 10, 11, 20-23) have no defined parameters and are intentionally
-  // absent, as are the reserved 24-30.
-  static constexpr AV1LevelConstraint kAV1LevelConstraints[] = {
-      {0, 147456, 2048, 1152, 4423680},         // 2.0
-      {1, 278784, 2816, 1584, 8363520},         // 2.1
-      {4, 665856, 4352, 2448, 19975680},        // 3.0
-      {5, 1065024, 5504, 3096, 31950720},       // 3.1
-      {8, 2359296, 6144, 3456, 70778880},       // 4.0
-      {9, 2359296, 6144, 3456, 141557760},      // 4.1
-      {12, 8912896, 8192, 4352, 267386880},     // 5.0
-      {13, 8912896, 8192, 4352, 534773760},     // 5.1
-      {14, 8912896, 8192, 4352, 1069547520},    // 5.2
-      {15, 8912896, 8192, 4352, 1069547520},    // 5.3
-      {16, 35651584, 16384, 8704, 1069547520},  // 6.0
-      {17, 35651584, 16384, 8704, 2139095040},  // 6.1
-      {18, 35651584, 16384, 8704, 4278190080},  // 6.2
-      {19, 35651584, 16384, 8704, 4278190080},  // 6.3
-  };
 
   for (const auto& c : kAV1LevelConstraints) {
     if (c.mLevelIdx != aLevelIdx) {

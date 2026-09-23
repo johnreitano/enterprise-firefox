@@ -241,6 +241,17 @@ declare const isDefaultBrowser: boolean;
 
 Behaves the same as `isDefaultBrowser`, but retrieves the current value directly from shell service instead of using the cached value. This may not be as performant.
 
+### `hasAttemptedSetDefault`
+
+Has the user asked Firefox to make itself the default browser during this session. True as soon as the request is made, whether or not the OS honours it.
+Does not persist across restarts.
+
+#### Definition
+
+```ts
+declare const hasAttemptedSetDefault: boolean;
+```
+
 ### `isOneClickSetDefaultEnabled`
 
 Windows only. Can Firefox currently make itself the default browser by writing

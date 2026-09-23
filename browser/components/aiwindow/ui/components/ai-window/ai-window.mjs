@@ -2096,6 +2096,10 @@ export class AIWindow extends MozLitElement {
   async #generateResumeActivityConversation(resumePrompt) {
     const conversationAtClick = this.#conversation;
     let conversation = null;
+    // Only the memory-driven builder composes a bespoke system prompt that has
+    // to survive the request; the plain fallback leaves the system prompt to
+    // #fetchAIResponse, which builds it for the model it resolves.
+    let hasBespokeSystemPrompt = false;
     this.#isGeneratingResumeActivityConversation = true;
     try {
       if (this.#resumeActivityMemoriesEnabled) {
@@ -2107,6 +2111,7 @@ export class AIWindow extends MozLitElement {
             },
             conversationAtClick?.id
           );
+          hasBespokeSystemPrompt = !!conversation;
         } catch (e) {
           lazy.log.error(
             "[Prompts] Failed to create resume-activity conversation:",
@@ -2153,9 +2158,8 @@ export class AIWindow extends MozLitElement {
       resumePrompt.text.replace(RESUME_HEADLINE_PREFIX_RE, "").trim() ||
       resumePrompt.text.trim();
 
-    // The conversation was built with its own bespoke system prompt and its
-    // user turn already appended, so the request only needs real-time context
-    // injected before it goes out.
+    // The conversation was built with its user turn already appended, so the
+    // request only needs real-time context injected before it goes out.
     const userMessage = conversation.messages.at(-1);
     await conversation.injectRealTimeContext(userMessage, {});
     this.openConversation(conversation);
@@ -2163,7 +2167,7 @@ export class AIWindow extends MozLitElement {
       text: userMessage?.content?.body ?? resumePrompt.content.headline,
       submitType: "resume",
       skipPromptGeneration: true,
-      skipSystemPromptRefresh: true,
+      skipSystemPromptRefresh: hasBespokeSystemPrompt,
       assistantToolUIData: {
         uiType: "tab-group-confirmation",
         toolCallId: `resume-activity-${resumePrompt.memory.id}`,
@@ -2184,6 +2188,10 @@ export class AIWindow extends MozLitElement {
    * no memory content in the system prompt - used when memories are
    * toggled off, or as a fallback if the memory-driven builder fails.
    *
+   * The engine is left for #fetchAIResponse to build, so the system prompt
+   * loaded here is a placeholder that keeps the system message ahead of the
+   * user turn; #fetchAIResponse rewrites it for the model it resolves.
+   *
    * @param {object} resumePrompt
    * @param {string} [conversationId] - Id to reuse for the new conversation,
    *   so telemetry keeps the chat_id of the conversation the pill was clicked
@@ -2191,16 +2199,10 @@ export class AIWindow extends MozLitElement {
    * @returns {Promise<ChatConversation>}
    */
   async #buildPlainResumeConversation(resumePrompt, conversationId) {
-    const { engine, parameters } = await lazy.buildEngineForFeature(
-      lazy.MODEL_FEATURES.CHAT,
-      { flowId: null, modelChoiceIdOverride: this.#selectedModelChoiceId }
-    );
     const conversation = new lazy.ChatConversation({
       ...(conversationId ? { id: conversationId } : {}),
       title: resumePrompt.content.headline,
     });
-    conversation.engine = engine;
-    conversation.parameters = parameters;
     await conversation.loadSystemPrompt();
     conversation.addUserMessage(resumePrompt.content.headline);
     conversation.securityProperties.setPrivateData();

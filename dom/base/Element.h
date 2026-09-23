@@ -317,7 +317,9 @@ class Element : public FragmentOrElement {
 
   ~Element() {
     NS_ASSERTION(!HasServoData(), "expected ServoData to be cleared earlier");
-    UnlinkCustomElementRegistry(this);
+    MOZ_DIAGNOSTIC_ASSERT(
+        GetCustomElementRegistryState() != CustomElementRegistryState::Scoped,
+        "Scoped registry should have been removed in LastRelease or Unlink");
   }
 
   NS_INLINE_DECL_STATIC_IID(NS_ELEMENT_IID)
@@ -537,6 +539,7 @@ class Element : public FragmentOrElement {
   nsresult BindToTree(BindContext&, nsINode& aParent) override;
   void UnbindFromTree(UnbindContext&) override;
   using nsIContent::UnbindFromTree;
+  void NodeInfoChanged(Document* aOldDoc) override;
 
   // Container Timing (https://wicg.github.io/container-timing/).
   // Returns the nearest strict-ancestor element carrying a `containertiming`
@@ -1852,7 +1855,6 @@ class Element : public FragmentOrElement {
   void SetNullCustomElementRegistry();
   static void TraverseCustomElementRegistry(
       Element* aElement, nsCycleCollectionTraversalCallback& aCb);
-  static void UnlinkCustomElementRegistry(Element* aElement);
 
   Maybe<float> GetLastRememberedBSize() const {
     const nsExtendedDOMSlots* slots = GetExistingExtendedDOMSlots();

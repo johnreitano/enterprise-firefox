@@ -5,8 +5,8 @@
 // Please pull this list from, and only from https://publicsuffix.org/list/public_suffix_list.dat,
 // rather than any other VCS sites. Pulling from any other URL is not guaranteed to be supported.
 
-// VERSION: 2026-09-15_10-18-26_UTC
-// COMMIT: 3955e3ec29b94c3cca7bd4509c5f14a7c0959e26
+// VERSION: 2026-09-21_18-50-07_UTC
+// COMMIT: 728555a30ef4d40e42a82d5678e5fbad2ad17b26
 
 // Instructions on pulling and using this list can be found at https://publicsuffix.org/list/.
 
@@ -12844,6 +12844,13 @@ dyndns.dappnode.io
 builtwithdark.com
 darklang.io
 
+// Databricks, Inc. : https://www.databricks.com/
+// Submitted by Databricks Enterprise Security <entsec@databricks.com>
+aws.databricksapps.com
+*.azure.databricksapps.com
+gcp.databricksapps.com
+aws-gov.databricksapps.us
+
 // DataDetect, LLC. : https://datadetect.com
 // Submitted by Andrew Banchich <abanchich@sceven.com>
 demo.datadetect.com
@@ -13625,6 +13632,10 @@ preview.site
 // Submitted by Jason Zhu <jason@owtware.com>
 filegear.me
 
+// Files.com : https://www.files.com/
+// Submitted by Caleb Hearth <ops+public-suffix@files.com>
+hosted-by-files.com
+
 // Firebase, Inc.
 // Submitted by Chris Raynor <chris@firebase.com>
 firebaseapp.com
@@ -14018,6 +14029,7 @@ here.now
 // Heroku : https://www.heroku.com/
 // Submitted by Shumon Huque <public-dns@salesforce.com>
 herokuapp.com
+*.compute.herokuapp.com
 
 // Heyflow : https://www.heyflow.com
 // Submitted by Mirko Nitschke <tech@heyflow.com>
@@ -15363,8 +15375,6 @@ qcx.io
 // QNAP System Inc : https://www.qnap.com
 // Submitted by Nick Chang <cloudadmin@qnap.com>
 myqnapcloud.cn
-alpha-myqnapcloud.com
-dev-myqnapcloud.com
 mycloudnas.com
 mynascloud.com
 myqnapcloud.com
@@ -15993,6 +16003,10 @@ realtime.supabase.co
 storage.supabase.co
 supabase.in
 supabase.net
+
+// Surge : https://surge.sh
+// Submitted by Brock Whitten <support@surge.sh>
+surge.sh
 
 // Syncloud : https://syncloud.org
 // Submitted by Boris Rybalkin <syncloud@syncloud.it>

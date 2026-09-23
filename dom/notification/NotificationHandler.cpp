@@ -71,8 +71,12 @@ nsresult OpenWindowFor(nsIPrincipal* aPrincipal, const nsCString& aURL) {
   mozilla::ipc::PrincipalInfo info{};
   MOZ_TRY(PrincipalToPrincipalInfo(aPrincipal, &info));
 
-  (void)ClientOpenWindow(nullptr,
-                         ClientOpenWindowArgs(info, Nothing(), aURL, origin));
+  NS_DispatchToCurrentThread(NS_NewRunnableFunction(
+      "OpenWindowFor",
+      [info = std::move(info), url = aURL, origin = std::move(origin)]() {
+        (void)ClientOpenWindow(
+            nullptr, ClientOpenWindowArgs(info, Nothing(), url, origin));
+      }));
   return NS_OK;
 }
 

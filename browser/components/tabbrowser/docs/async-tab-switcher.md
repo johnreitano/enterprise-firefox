@@ -52,6 +52,7 @@ There are a number of requirements that the tab switcher must satisfy. In no par
 6. The printing UI uses tabs to show print preview, which requires that the print-previewed tab is in the background and yet also have its docShell be "active" - a state that's usually reserved for the selected tab. See {ref}`async-tab-switcher-useful-properties`
 7. `<xul:tab>`'s and `<xul:browser>`'s might be created or destroyed at any time during an async tab switch
 8. It should be possible to render layers for a tab, despite it not having been set as active (this is used for {ref}`async-tab-switcher-warming`)
+9. A `<xul:browser>`'s frameloader may be replaced at any time during an async tab switch, by a process switch or by a page restored from the bfcache. The switcher relies on the replacement carrying the old frameloader's layer state over and dispatching `MozLayerTreeCleared` or `MozLayerTreeReady` on the browser when the browser's layers change across the swap, so that it learns when a tab it is waiting on has gained or lost its layers
 
 ## Lifecycle
 

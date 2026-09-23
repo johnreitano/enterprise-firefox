@@ -23,11 +23,10 @@ use crate::gradient_builder::GradientBuilder;
 use crate::color::{ColorF, ColorU};
 use crate::font::{FontInstanceKey, GlyphInstance, GlyphOptions};
 use crate::image::{ColorDepth, ImageKey};
-use crate::key_types::EdgeMask;
-use crate::key_types::GradientStopKey;
+use crate::key_types::{EdgeMask, GradientStopKey, StretchSizeKey};
 use crate::prim_geometry::{
-    apply_gradient_local_clip, optimize_linear_gradient, optimize_radial_gradient,
-    resolve_tile_size, simplify_repeated_primitive,
+    apply_gradient_local_clip, image_stretch_size, optimize_linear_gradient,
+    optimize_radial_gradient, resolve_tile_size, simplify_repeated_primitive,
 };
 use crate::units::*;
 
@@ -342,7 +341,6 @@ impl<'de> Deserialize<'de> for BuiltDisplayList {
                 Debug::HitTest(v) => Real::HitTest(v),
                 Debug::Line(v) => Real::Line(v),
                 Debug::Image(v) => Real::Image(v),
-                Debug::RepeatingImage(v) => Real::RepeatingImage(v),
                 Debug::YuvImage(v) => Real::YuvImage(v),
                 Debug::Border(v) => Real::Border(v),
                 Debug::BoxShadow(v) => Real::BoxShadow(v),
@@ -632,7 +630,6 @@ impl BuiltDisplayList {
                 Real::HitTest(v) => Debug::HitTest(v),
                 Real::Line(v) => Debug::Line(v),
                 Real::Image(v) => Debug::Image(v),
-                Real::RepeatingImage(v) => Debug::RepeatingImage(v),
                 Real::YuvImage(v) => Debug::YuvImage(v),
                 Real::Border(v) => Debug::Border(v),
                 Real::BoxShadow(v) => Debug::BoxShadow(v),
@@ -1395,6 +1392,21 @@ impl DisplayListBuilder {
         bounds: LayoutRect,
         color: PropertyBinding<ColorF>,
     ) {
+        let (common, offset) = self.normalize_common(common);
+        let bounds = self.shift_rect(bounds, offset);
+        self.push_rect_prim(&common, bounds, color, EdgeMask::all());
+    }
+
+    /// Record a rectangle whose `common` and `bounds` are already normalised.
+    /// Every rectangle item goes through here, so this is the one place the
+    /// visibility test lives.
+    fn push_rect_prim(
+        &mut self,
+        common: &di::CommonItemProperties,
+        bounds: LayoutRect,
+        color: PropertyBinding<ColorF>,
+        transformed_aa_edges: EdgeMask,
+    ) {
         // A fully transparent rectangle draws nothing, so drop it here rather
         // than have the scene builder discover it. Two exceptions: inside a
         // shadow scope it is still captured so `pop_all_shadows` can copy it
@@ -1408,14 +1420,12 @@ impl DisplayListBuilder {
             return;
         }
 
-        let (common, offset) = self.normalize_common(common);
-        let item = di::DisplayItem::Rectangle(di::RectangleDisplayItem {
-            common,
+        self.push_item(&di::DisplayItem::Rectangle(di::RectangleDisplayItem {
+            common: *common,
             color,
-            bounds: self.shift_rect(bounds, offset),
-            transformed_aa_edges: EdgeMask::all(),
-        });
-        self.push_item(&item);
+            bounds,
+            transformed_aa_edges,
+        }));
     }
 
     pub fn push_hit_test(
@@ -1474,17 +1484,16 @@ impl DisplayListBuilder {
         key: ImageKey,
         color: ColorF,
     ) {
-        let (common, offset) = self.normalize_common(common);
-        let item = di::DisplayItem::Image(di::ImageDisplayItem {
+        self.push_image_prim(
             common,
-            bounds: self.shift_rect(bounds, offset),
-            image_key: key,
+            bounds,
+            StretchSizeKey::fills_prim(),
+            LayoutSize::zero(),
             image_rendering,
             alpha_type,
+            key,
             color,
-        });
-
-        self.push_item(&item);
+        );
     }
 
     pub fn push_repeating_image(
@@ -1498,13 +1507,37 @@ impl DisplayListBuilder {
         key: ImageKey,
         color: ColorF,
     ) {
+        self.push_image_prim(
+            common,
+            bounds,
+            image_stretch_size(&bounds, stretch_size),
+            tile_spacing,
+            image_rendering,
+            alpha_type,
+            key,
+            color,
+        );
+    }
+
+    /// The one item both image pushes produce.
+    fn push_image_prim(
+        &mut self,
+        common: &di::CommonItemProperties,
+        bounds: LayoutRect,
+        stretch_size: StretchSizeKey,
+        tile_spacing: LayoutSize,
+        image_rendering: di::ImageRendering,
+        alpha_type: di::AlphaType,
+        key: ImageKey,
+        color: ColorF,
+    ) {
         let (common, offset) = self.normalize_common(common);
-        let item = di::DisplayItem::RepeatingImage(di::RepeatingImageDisplayItem {
+        let item = di::DisplayItem::Image(di::ImageDisplayItem {
             common,
             bounds: self.shift_rect(bounds, offset),
-            image_key: key,
             stretch_size,
             tile_spacing,
+            image_key: key,
             image_rendering,
             alpha_type,
             color,
@@ -1603,8 +1636,8 @@ impl DisplayListBuilder {
     /// pushed strictly one at a time. Handing them back removes that hazard.
     pub fn create_gradient(
         &mut self,
-        start_point: LayoutPoint,
-        end_point: LayoutPoint,
+        start_point: LayoutVector2D,
+        end_point: LayoutVector2D,
         stops: Vec<di::GradientStop>,
         extend_mode: di::ExtendMode,
     ) -> (di::Gradient, Vec<di::GradientStop>) {
@@ -1616,7 +1649,7 @@ impl DisplayListBuilder {
     /// See [`create_gradient`](#method.create_gradient).
     pub fn create_radial_gradient(
         &mut self,
-        center: LayoutPoint,
+        center: LayoutVector2D,
         radius: LayoutSize,
         stops: Vec<di::GradientStop>,
         extend_mode: di::ExtendMode,
@@ -1629,7 +1662,7 @@ impl DisplayListBuilder {
     /// See [`create_gradient`](#method.create_gradient).
     pub fn create_conic_gradient(
         &mut self,
-        center: LayoutPoint,
+        center: LayoutVector2D,
         angle: f32,
         stops: Vec<di::GradientStop>,
         extend_mode: di::ExtendMode,
@@ -1936,8 +1969,8 @@ impl DisplayListBuilder {
 
         let mut tile_size = resolve_tile_size(&bounds, tile_size);
 
-        let mut start = gradient.start_point;
-        let mut end = gradient.end_point;
+        let mut start = gradient.start;
+        let mut end = gradient.end;
         // The simplification and clip pass. The fast-path two-stop segment
         // decomposition is not done here: it happens at prepare time, so
         // segments tile against the snapped prim rect (see
@@ -1961,8 +1994,8 @@ impl DisplayListBuilder {
             common,
             bounds,
             gradient: di::Gradient {
-                start_point: start,
-                end_point: end,
+                start,
+                end,
                 ..gradient
             },
             tile_size,
@@ -2019,14 +2052,16 @@ impl DisplayListBuilder {
             gradient.extend_mode,
             &stop_keys,
             &mut |solid_rect, color, aa_mask| {
-                // Pushed before the gradient, and unconditionally: a gradient
-                // that optimizes away entirely is all margin.
-                self.push_item(&di::DisplayItem::Rectangle(di::RectangleDisplayItem {
-                    common,
-                    bounds: *solid_rect,
-                    color: PropertyBinding::Value(color.into()),
-                    transformed_aa_edges: aa_mask,
-                }));
+                // Pushed before the gradient, and whether or not the gradient
+                // itself survives the empty-tile reject below: a gradient that
+                // optimizes away entirely is all margin. A transparent margin
+                // is dropped like any other transparent rectangle.
+                self.push_rect_prim(
+                    &common,
+                    *solid_rect,
+                    PropertyBinding::Value(color.into()),
+                    aa_mask,
+                );
             },
         );
 

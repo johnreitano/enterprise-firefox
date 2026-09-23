@@ -444,19 +444,6 @@ class ScopedShader final {
 
 // --
 
-class SaveRestoreCurrentProgram final {
-  GLContext& mGL;
-  const GLuint mOld;
-
- public:
-  explicit SaveRestoreCurrentProgram(GLContext* const gl)
-      : mGL(*gl), mOld(mGL.GetIntAs<GLuint>(LOCAL_GL_CURRENT_PROGRAM)) {}
-
-  ~SaveRestoreCurrentProgram() { mGL.fUseProgram(mOld); }
-};
-
-// --
-
 class ScopedDrawBlitState final {
   GLContext& mGL;
 
@@ -576,7 +563,7 @@ void DrawBlitProg::Draw(const BaseArgs& args,
                         const YUVArgs* const argsYUV) const {
   const auto& gl = mParent.mGL;
 
-  const SaveRestoreCurrentProgram oldProg(gl);
+  const ScopedBindProgram oldProg(gl);
   gl->fUseProgram(mProg);
 
   // --
@@ -872,7 +859,7 @@ std::unique_ptr<const DrawBlitProg> GLBlitHelper::CreateDrawBlitProg(
   GLenum status = 0;
   mGL->fGetProgramiv(prog, LOCAL_GL_LINK_STATUS, (GLint*)&status);
   if (status == LOCAL_GL_TRUE || mGL->CheckContextLost()) {
-    const SaveRestoreCurrentProgram oldProg(mGL);
+    const ScopedBindProgram oldProg(mGL);
     mGL->fUseProgram(prog);
     const char* samplerNames[] = {"uTex0", "uTex1", "uTex2"};
     for (int i = 0; i < 3; i++) {

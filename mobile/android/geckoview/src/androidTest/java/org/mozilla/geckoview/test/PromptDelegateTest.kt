@@ -3,6 +3,8 @@ http://creativecommons.org/publicdomain/zero/1.0/ */
 
 package org.mozilla.geckoview.test
 
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import androidx.core.net.toUri
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -46,6 +48,9 @@ class PromptDelegateTest :
                     }
             ),
     ) {
+    // Never completed; a field so the prompt is not GC-dismissed while the test drives it.
+    private val pendingResponse = GeckoResult<PromptResponse>(Handler(Looper.getMainLooper()))
+
     @Test
     fun popupTestAllow() {
         // Ensure popup blocking is enabled for this test.
@@ -330,7 +335,7 @@ class PromptDelegateTest :
                     assertThat("auth matches", authInfo.password, equalTo("bar"))
                     promptInstanceDelegate.prompt = request
                     request.setDelegate(promptInstanceDelegate)
-                    return GeckoResult()
+                    return pendingResponse
                 }
             }
         )
@@ -946,13 +951,7 @@ class PromptDelegateTest :
             }
         )
 
-        mainSession.evaluateJS(
-            """
-            document.documentElement.style.paddingTop = "50px";
-            this.c = document.getElementById('colorexample');
-            """
-                .trimIndent()
-        )
+        mainSession.evaluateJS("this.c = document.getElementById('colorexample')")
 
         val promise =
             mainSession.evaluatePromiseJS(
@@ -968,8 +967,7 @@ class PromptDelegateTest :
                     .trimIndent()
             )
 
-        mainSession.evaluateJS("document.addEventListener('click', () => this.c.click(), { once: true });")
-        mainSession.synthesizeTap(1, 1)
+        mainSession.showPicker("#colorexample")
 
         assertThat(
             "Value should match",
@@ -1024,8 +1022,7 @@ class PromptDelegateTest :
                     .trimIndent()
             )
 
-        mainSession.notifyUserGestureActivation()
-        mainSession.evaluateJS("document.getElementById('colorexample').showPicker()")
+        mainSession.showPicker("#colorexample")
 
         assertThat(
             "Value should match",
@@ -1040,8 +1037,7 @@ class PromptDelegateTest :
         mainSession.loadTestPath(PROMPT_HTML_PATH)
         mainSession.waitForPageStop()
 
-        mainSession.notifyUserGestureActivation()
-        mainSession.evaluateJS("document.getElementById('dateexample').showPicker()")
+        mainSession.showPicker("#dateexample")
 
         sessionRule.waitUntilCalled(
             object : PromptDelegate {
@@ -1370,8 +1366,7 @@ class PromptDelegateTest :
         mainSession.loadTestPath(PROMPT_HTML_PATH)
         mainSession.waitForPageStop()
 
-        mainSession.notifyUserGestureActivation()
-        mainSession.evaluateJS("document.getElementById('fileexample').showPicker()")
+        mainSession.showPicker("#fileexample")
 
         sessionRule.waitUntilCalled(
             object : PromptDelegate {
@@ -1403,8 +1398,7 @@ class PromptDelegateTest :
         mainSession.loadTestPath(PROMPT_HTML_PATH)
         mainSession.waitForPageStop()
 
-        mainSession.notifyUserGestureActivation()
-        mainSession.evaluateJS("document.getElementById('filemultipleexample').showPicker()")
+        mainSession.showPicker("#filemultipleexample")
 
         sessionRule.waitUntilCalled(
             object : PromptDelegate {
@@ -1459,8 +1453,7 @@ class PromptDelegateTest :
             }
         )
 
-        mainSession.notifyUserGestureActivation()
-        mainSession.evaluateJS("document.getElementById('direxample').showPicker()")
+        mainSession.showPicker("#direxample")
 
         sessionRule.waitUntilCalled(
             object : PromptDelegate {

@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use crate::{AsProcessReaderHandle, Pid, IO_TIMEOUT};
+use crate::{AsRawProcessHandle, AsRawThreadHandle, FromRawThreadHandle, Pid, IO_TIMEOUT};
 use std::{
     ffi::{CStr, CString, OsString},
     mem::{zeroed, MaybeUninit},
@@ -30,6 +30,7 @@ use windows_sys::Win32::{
 
 pub(crate) const PROCESS_RENDEZVOUS_ANCILLARY_DATA_LEN: usize = 1;
 
+pub type RawProcessHandle = HANDLE;
 #[repr(transparent)]
 pub struct ProcessHandle(pub OwnedHandle);
 
@@ -81,15 +82,33 @@ impl ProcessHandle {
     }
 }
 
-impl AsProcessReaderHandle for ProcessHandle {
-    fn as_handle(&self) -> process_reader::ProcessHandle {
-        self.0.as_raw_handle() as process_reader::ProcessHandle
+impl AsRawProcessHandle for ProcessHandle {
+    fn as_raw_handle(&self) -> RawProcessHandle {
+        self.0.as_raw_handle() as HANDLE
     }
 }
 
 impl Clone for ProcessHandle {
     fn clone(&self) -> Self {
         ProcessHandle(self.0.try_clone().unwrap())
+    }
+}
+
+// Windows supports proper thread handles but for the time being we stick to
+// thread IDs for compatibility with Breakpad interfaces.
+pub type RawThreadHandle = i32;
+#[repr(transparent)]
+pub struct ThreadHandle(pub i32);
+
+impl AsRawThreadHandle for ThreadHandle {
+    fn as_raw_handle(&self) -> RawThreadHandle {
+        self.0
+    }
+}
+
+impl FromRawThreadHandle for ThreadHandle {
+    unsafe fn from_raw_handle(handle: RawThreadHandle) -> ThreadHandle {
+        ThreadHandle(handle)
     }
 }
 

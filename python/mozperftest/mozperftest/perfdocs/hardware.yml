@@ -202,6 +202,7 @@ hardware:
       They are only used by the memory tests, which are not sensitive enough
       to the noise introduced by the hypervisor to require bare metal.
     worker-pools:
+      - enterprise-t/t-linux-docker-noscratch-amd
       - gecko-t/t-linux-docker-noscratch-amd
     specifications:
       Instance Type: c3d-standard-8
@@ -219,6 +220,8 @@ hardware:
       and the Talos xperf test, which needs the privileged pool to record ETW
       traces.
     worker-pools:
+      - enterprise-t/win11-64-25h2
+      - enterprise-t/win11-64-25h2-privileged
       - gecko-t/win11-64-25h2
       - gecko-t/win11-64-25h2-privileged
     specifications:

@@ -803,19 +803,23 @@ JavaException:
     uncaught Java exception.
   type: string
   scope: ping
+  bugs:
+    - 1904847
+    - 1961011
+    - 2073234
   glean:
     type: object
     # version history (typescript for brevity)
     # # 0
     # {
-    #   messages: string[],
+    #   messages: string[], /* see bug 2073234 */
     #   stack: { file: string, line: number, class_name: string, method_name: string, is_native: boolean }[]
     # }
     #
     # # 1
     # {
     #   throwables: {
-    #     message: string,
+    #     message: string, /* removed; see bug 2073234 */
     #     type_name: string,
     #     stack: { file: string, line: number, class_name: string, method_name: string, is_native: boolean }[]
     #   }[]
@@ -831,9 +835,6 @@ JavaException:
           items:
             type: object
             properties:
-              # The message of the Throwable.
-              message:
-                type: string
               # The java fully qualified type name of the Throwable.
               type_name:
                 type: string
@@ -1118,7 +1119,7 @@ PluginVersion:
 ProcessType:
   description: >
     Type of the process that crashed, the possible values are defined in
-    GeckoProcessTypes.h.
+    GeckoProcessTypes.inc.
   type: string
   scope: ping
 

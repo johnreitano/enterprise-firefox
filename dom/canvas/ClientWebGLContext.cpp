@@ -3347,6 +3347,11 @@ void ClientWebGLContext::PolygonOffset(GLfloat factor, GLfloat units) {
   Run<RPROC(PolygonOffset)>(factor, units);
 }
 
+void ClientWebGLContext::PolygonOffsetClampEXT(GLfloat factor, GLfloat units,
+                                               GLfloat clamp) {
+  Run<RPROC(PolygonOffsetClampEXT)>(factor, units, clamp);
+}
+
 void ClientWebGLContext::SampleCoverage(GLclampf value, WebGLboolean invert) {
   Run<RPROC(SampleCoverage)>(value, invert);
 }

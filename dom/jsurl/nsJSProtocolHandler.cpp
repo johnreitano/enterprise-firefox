@@ -59,7 +59,9 @@
 #include "nsThreadUtils.h"
 
 using mozilla::IsAscii;
+using mozilla::Maybe;
 using mozilla::dom::AutoEntryScript;
+using mozilla::dom::PermissionsPolicyInfo;
 
 static NS_DEFINE_CID(kJSURICID, NS_JSURI_CID);
 
@@ -332,6 +334,16 @@ nsresult JSURLInputStream::EvaluateScript(
           PolicyContainer::GetCSP(targetDoc->GetPolicyContainer());
       if (!AllowedByCSP(targetCSP, mURL, aJSCallingLocation)) {
         return NS_ERROR_DOM_RETVAL_UNDEFINED;
+      }
+    }
+
+    // If the original channel's nsILoadInfo has a PermissionsPolicyInfo,
+    // copy it to the new channel.
+    if (nsCOMPtr<nsIChannel> originalChannel = targetDoc->GetChannel()) {
+      nsCOMPtr<nsILoadInfo> originalLoadInfo = originalChannel->LoadInfo();
+      if (Maybe<PermissionsPolicyInfo> containerPolicy =
+              originalLoadInfo->GetContainerPermissionsPolicyInfo()) {
+        loadInfo->SetContainerPermissionsPolicyInfo(*containerPolicy);
       }
     }
   }

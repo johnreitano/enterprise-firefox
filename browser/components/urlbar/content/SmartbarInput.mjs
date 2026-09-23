@@ -185,13 +185,9 @@ ${
             context=""
             role="group"
             tooltip="aHTMLTooltip">
-        <html:div class="urlbarView-body-outer">
-          <html:div class="urlbarView-body-inner">
-            <html:div id="urlbar-results"
-                      class="urlbarView-results"
-                      role="listbox"/>
-          </html:div>
-        </html:div>
+        <html:div id="urlbar-results"
+                  class="urlbarView-results"
+                  role="listbox"/>
         <html:panel-list class="urlbarView-result-menu"></html:panel-list>
         <html:moz-urlbar-slot name="search-one-offs" />
       </html:div>
@@ -7083,7 +7079,10 @@ ${
 
     event.dataTransfer.setData("text/x-moz-url", `${href}\n${title}`);
     event.dataTransfer.setData("text/plain", href);
-    event.dataTransfer.setData("text/html", `<a href="${href}">${title}</a>`);
+    event.dataTransfer.setData(
+      "text/html",
+      `<a href="${UrlbarShared.escapeHtmlEntities(href)}">${UrlbarShared.escapeHtmlEntities(title)}</a>`
+    );
     event.dataTransfer.effectAllowed = "copyLink";
     event.stopPropagation();
   }

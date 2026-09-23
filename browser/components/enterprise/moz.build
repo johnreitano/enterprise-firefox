@@ -10,7 +10,10 @@ with Files("**"):
 EXTRA_JS_MODULES.enterprise += [
     "AccessConnectorButton.sys.mjs",
     "EnterpriseHandler.sys.mjs",
+    "EnterpriseThemeMigration.sys.mjs",
 ]
+
+XPCSHELL_TESTS_MANIFESTS += ["tests/xpcshell/xpcshell.toml"]
 
 JAR_MANIFESTS += ["jar.mn"]
 

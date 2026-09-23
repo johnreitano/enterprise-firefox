@@ -15,7 +15,9 @@ use malloc_size_of_derive::MallocSizeOf;
 use once_cell::sync::OnceCell;
 use uuid::Uuid;
 
-use crate::database::sqlite::{Database, MigrationResult};
+#[cfg(feature = "sqlite")]
+use crate::database::sqlite::MigrationResult;
+use crate::database::Database;
 use crate::debug::DebugOptions;
 use crate::error::ClientIdFileError;
 use crate::event_database::EventDatabase;
@@ -30,7 +32,9 @@ use crate::ping::PingMaker;
 use crate::session::{self, EventSessionContext, SessionManager, SessionMode, SessionState};
 use crate::storage::{StorageManager, INTERNAL_STORAGE};
 use crate::upload::{PingUploadManager, PingUploadTask, UploadResult, UploadTaskAction};
-use crate::util::{local_now_with_offset, sanitize_application_id, truncate_string_at_boundary};
+#[cfg(feature = "sqlite")]
+use crate::util::truncate_string_at_boundary;
+use crate::util::{local_now_with_offset, sanitize_application_id};
 use crate::{
     scheduler, system, AttributionMetrics, CommonMetricData, DistributionMetrics, ErrorKind,
     InternalConfiguration, Lifetime, PingRateLimit, Result, DEFAULT_MAX_EVENTS,
@@ -146,6 +150,7 @@ where
 ///     session_sample_rate: 1.0,
 ///     session_inactivity_timeout_ms: 1_800_000,
 ///     events_ping_acceleration_factor: None,
+///     enable_store_submitted_pings: false,
 /// };
 /// let mut glean = Glean::new(cfg).unwrap();
 /// let ping = PingType::new("sample", true, false, true, true, true, vec![], vec![], true, vec![]);
@@ -196,6 +201,7 @@ pub struct Glean {
     #[ignore_malloc_size_of = "TODO: Expose session memory allocations (bug 2043355)"]
     pub(crate) session_manager: SessionManager,
     events_ping_acceleration_factor: Option<usize>,
+    pub(crate) store_submitted_pings_enabled: bool,
 }
 
 impl Glean {
@@ -279,6 +285,7 @@ impl Glean {
             events_ping_acceleration_factor: cfg
                 .events_ping_acceleration_factor
                 .map(|x| x as usize),
+            store_submitted_pings_enabled: cfg.enable_store_submitted_pings,
         };
 
         // Ensuring these pings are registered.
@@ -312,6 +319,7 @@ impl Glean {
             ping_lifetime_max_time,
         )?);
 
+        #[cfg(feature = "sqlite")]
         if let Some(state) = glean.data_store.as_mut().unwrap().migration_state.take() {
             glean
                 .database_metrics
@@ -333,6 +341,7 @@ impl Glean {
                 .accumulate_raw_samples_nanos_sync(&glean, &[duration_ns]);
         }
 
+        #[cfg(feature = "sqlite")]
         if glean.data_store.as_mut().unwrap().migration_error == MigrationResult::Error {
             glean.database_metrics.migration_error.add_sync(&glean, 1);
         }
@@ -604,6 +613,7 @@ impl Glean {
             session_sample_rate: 1.0,
             session_inactivity_timeout_ms: 1_800_000,
             events_ping_acceleration_factor: None,
+            enable_store_submitted_pings: false,
         };
 
         let mut glean = Self::new(cfg).unwrap();
@@ -744,6 +754,7 @@ impl Glean {
                 .accumulate_sync(self, size.get() as i64)
         }
 
+        #[cfg(feature = "sqlite")]
         if let Some(load_state) = self
             .data_store
             .as_ref()
@@ -752,6 +763,17 @@ impl Glean {
             use crate::metrics::string::MAX_LENGTH_VALUE;
             let load_state = truncate_string_at_boundary(load_state, MAX_LENGTH_VALUE);
             self.database_metrics.load_error.set_sync(self, load_state)
+        }
+
+        #[cfg(not(feature = "sqlite"))]
+        if let Some(rkv_load_state) = self
+            .data_store
+            .as_ref()
+            .and_then(|database| database.rkv_load_state())
+        {
+            self.database_metrics
+                .rkv_load_error
+                .set_sync(self, rkv_load_state);
         }
     }
 
@@ -815,6 +837,16 @@ impl Glean {
         } else {
             false
         }
+    }
+
+    /// Sets whether storing submitted pings is enabled or not.
+    ///
+    /// # Arguments
+    ///
+    /// * `enabled` - When true, enables storing submitted pings.
+    ///
+    pub fn set_store_submitted_pings_enabled(&mut self, enabled: bool) {
+        self.store_submitted_pings_enabled = enabled;
     }
 
     /// Enable or disable a ping.
@@ -1421,10 +1453,12 @@ impl Glean {
     /// Checks the stored value of the "dirty flag".
     pub fn is_dirty_flag_set(&self) -> bool {
         let dirty_bit_metric = self.get_dirty_bit_metric();
-        match self
-            .storage()
-            .get_metric(dirty_bit_metric.meta(), INTERNAL_STORAGE)
-        {
+        match self.storage().get_metric(
+            #[cfg(not(feature = "sqlite"))]
+            self,
+            dirty_bit_metric.meta(),
+            INTERNAL_STORAGE,
+        ) {
             Some(Metric::Boolean(b)) => b,
             _ => false,
         }

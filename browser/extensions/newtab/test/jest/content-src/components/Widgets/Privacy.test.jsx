@@ -147,6 +147,14 @@ describe("Privacy widget", () => {
     );
   });
 
+  it("names the context menu button for screen readers", () => {
+    const { container } = renderPrivacy();
+    const menuButton = container.querySelector(".privacy-context-menu-button");
+    expect(menuButton.getAttribute("data-l10n-id")).toBe(
+      "newtab-privacy-widget-menu-button"
+    );
+  });
+
   it("fires widgets_impression once when the widget scrolls into view", () => {
     // beforeEach installs a firing IntersectionObserver, so the hook's
     // impression goes out on observe. This is the trigger the impression-time

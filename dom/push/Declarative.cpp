@@ -48,6 +48,63 @@ class DWPNotificationCallbacks final : public NotificationCallbacksCommon {
   virtual ~DWPNotificationCallbacks() = default;
 };
 
+static NotificationDirection ConvertNotificationDirection(
+    DeclarativePushDir aDir) {
+  switch (aDir) {
+    case DeclarativePushDir::Ltr:
+      return NotificationDirection::Ltr;
+    case DeclarativePushDir::Rtl:
+      return NotificationDirection::Rtl;
+    case DeclarativePushDir::Auto:
+      return NotificationDirection::Auto;
+  }
+  MOZ_CRASH("Invalid DeclarativePushDir.");
+  return NotificationDirection::Auto;
+}
+
+static Maybe<IPCNotificationOptions> GetNotificationOptionsForDeclarativePush(
+    DeclarativePushData&& aPush, nsIURI* aBaseURI) {
+  IPCNotificationOptions options;
+  nsresult rv = NS_NewURI(getter_AddRefs(options.navigate()), aPush.navigate,
+                          nullptr, aBaseURI);
+  // https://w3c.github.io/push-api/#dfn-declarative-push-message-parser
+  // Step 27: If notification's navigation URL is null, then return failure.
+  if (NS_FAILED(rv)) {
+    return Nothing();
+  }
+  options.title() = std::move(aPush.title);
+  options.body() = std::move(aPush.body);
+  options.dir() = ConvertNotificationDirection(aPush.dir);
+  options.silent() = aPush.silent;
+  if (StaticPrefs::dom_webnotifications_requireinteraction_enabled()) {
+    options.requireInteraction() = aPush.require_interaction;
+  }
+  options.tag() = std::move(aPush.tag);
+  options.lang() = std::move(aPush.lang);
+  for (DeclarativePushAction& action : aPush.actions) {
+    IPCNotificationAction ipcAction;
+    if (NS_FAILED(NS_NewURI(getter_AddRefs(ipcAction.navigate()),
+                            action.navigate, nullptr, aBaseURI))) {
+      // Step 28: If the navigation URL of any notification action of
+      // notification's actions is null, then return failure.
+      return Nothing();
+    }
+    // We still need to do the check above, even if there are more
+    // than kMaxActions actions. So we can't break out of the loop.
+    if (options.actions().Length() < notification::kMaxActions) {
+      ipcAction.title() = std::move(action.title);
+      ipcAction.name() = std::move(action.action);
+      options.actions().AppendElement(std::move(ipcAction));
+    }
+  }
+  nsCOMPtr<nsIURI> icon;
+  if (NS_SUCCEEDED(
+          NS_NewURI(getter_AddRefs(icon), aPush.icon, nullptr, aBaseURI))) {
+    options.icon() = icon.forget();
+  }
+  return Some(std::move(options));
+}
+
 bool ParseDeclarativePushAndShowNotification(Span<const uint8_t> aData,
                                              nsIPrincipal* aPrincipal,
                                              const nsACString& aScope) {
@@ -60,29 +117,24 @@ bool ParseDeclarativePushAndShowNotification(Span<const uint8_t> aData,
   if (NS_FAILED(NS_NewURI(getter_AddRefs(baseURI), aScope))) {
     return false;
   }
-  RefPtr<nsIURI> uri;
-  nsresult rv = NS_NewURI(getter_AddRefs(uri), declarativePush.navigate,
-                          nullptr, baseURI);
-  // https://w3c.github.io/push-api/#dfn-declarative-push-message-parser
-  // Step 27: If notification's navigation URL is null, then return failure.
-  if (NS_FAILED(rv)) {
+  Maybe<IPCNotificationOptions> options =
+      GetNotificationOptionsForDeclarativePush(std::move(declarativePush),
+                                               baseURI);
+  if (!options) {
     return false;
   }
   RefPtr permissionPromise = notification::EnsureValidNotificationPermission(
       aPrincipal, aPrincipal, aPrincipal->GetIsOriginPotentiallyTrustworthy());
   permissionPromise->Then(
       GetCurrentSerialEventTarget(), __func__,
-      [data = std::move(declarativePush), scope = NS_ConvertUTF8toUTF16(aScope),
-       principal = RefPtr(aPrincipal), navigateURI = RefPtr(uri)](
+      [options = options.extract(), scope = NS_ConvertUTF8toUTF16(aScope),
+       principal = RefPtr(aPrincipal)](
           const notification::NotificationPermissionPromise::
               ResolveOrRejectValue& aResult) {
         if (aResult.IsReject()) {
           // Don't have permission
           return;
         }
-        IPCNotificationOptions options;
-        options.title() = std::move(data.title);
-        options.navigate() = navigateURI;
         auto result = notification::CreateAlertForNotification(
             options, *principal, Nothing());
         if (result.isErr()) {

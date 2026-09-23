@@ -6,17 +6,13 @@
 
 #include "mozilla/ISVGDisplayableFrame.h"
 #include "mozilla/SVGContentUtils.h"
-#include "mozilla/SVGTextFrame.h"
 #include "mozilla/SVGUtils.h"
 #include "mozilla/dom/BindContext.h"
-#include "mozilla/dom/Document.h"
 #include "mozilla/dom/SVGAnimatedLength.h"
 #include "mozilla/dom/SVGGraphicsElementBinding.h"
 #include "mozilla/dom/SVGMatrix.h"
 #include "mozilla/dom/SVGRect.h"
-#include "mozilla/dom/SVGSVGElement.h"
 #include "nsIContentInlines.h"
-#include "nsLayoutUtils.h"
 
 namespace mozilla::dom {
 
@@ -37,21 +33,21 @@ SVGGraphicsElement::SVGGraphicsElement(
     already_AddRefed<mozilla::dom::NodeInfo> aNodeInfo)
     : SVGGraphicsElementBase(std::move(aNodeInfo)) {}
 
-static already_AddRefed<SVGRect> ZeroBBox(SVGGraphicsElement& aOwner) {
-  return MakeAndAddRef<SVGRect>(&aOwner, gfx::Rect{0, 0, 0, 0});
-}
-
 already_AddRefed<SVGRect> SVGGraphicsElement::GetBBox(
     const SVGBoundingBoxOptions& aOptions) {
   nsIFrame* frame = GetPrimaryFrame(FlushType::Layout);
 
+  auto ZeroBBox = [this]() {
+    return MakeAndAddRef<SVGRect>(this, gfx::Rect{0, 0, 0, 0});
+  };
+
   if (!frame || frame->HasAnyStateBits(NS_FRAME_IS_NONDISPLAY)) {
-    return ZeroBBox(*this);
+    return ZeroBBox();
   }
   ISVGDisplayableFrame* svgframe = do_QueryFrame(frame);
 
   if (!svgframe && !frame->IsInSVGTextSubtree()) {
-    return ZeroBBox(*this);
+    return ZeroBBox();
   }
 
   if (!NS_SVGNewGetBBoxEnabled()) {
@@ -76,7 +72,7 @@ already_AddRefed<SVGRect> SVGGraphicsElement::GetBBox(
     flags += {SVGBBoxFlag::IncludeFillGeometry, SVGBBoxFlag::IncludeClipped};
   }
   if (flags.isEmpty()) {
-    return ZeroBBox(*this);
+    return ZeroBBox();
   }
   flags += {SVGBBoxFlag::UseUserSpaceOfUseElement,
             SVGBBoxFlag::TextContentBounds, SVGBBoxFlag::DisregardCSSZoom};

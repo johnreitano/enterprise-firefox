@@ -1521,19 +1521,10 @@ void nsXULPopupManager::HidePopupsInList(
     const nsTArray<nsMenuPopupFrame*>& aFrames) {
   // Create a weak frame list. This is done in a separate array with the
   // right capacity predetermined to avoid multiple allocations.
-  nsTArray<WeakFrame> weakPopups(aFrames.Length());
-  uint32_t f;
-  for (f = 0; f < aFrames.Length(); f++) {
-    WeakFrame* wframe = weakPopups.AppendElement();
-    if (wframe) {
-      *wframe = aFrames[f];
-    }
-  }
-
-  for (f = 0; f < weakPopups.Length(); f++) {
+  for (auto& f : ToTArray<AutoTArray<WeakFrame, 32>>(aFrames)) {
     // check to ensure that the frame is still alive before hiding it.
-    if (weakPopups[f].IsAlive()) {
-      auto* frame = static_cast<nsMenuPopupFrame*>(weakPopups[f].GetFrame());
+    if (f.IsAlive()) {
+      auto* frame = static_cast<nsMenuPopupFrame*>(f.GetFrame());
       frame->HidePopup(true, ePopupInvisible);
     }
   }
@@ -1593,7 +1584,7 @@ void nsXULPopupManager::PaintPopups(nsRefreshDriver* aRefreshDriver) {
     return;
   }
 
-  SegmentedVector<std::pair<RefPtr<nsIWidget>, WeakFrame>> popupsToPaint;
+  AutoTArray<std::pair<RefPtr<nsIWidget>, WeakFrame>, 32> popupsToPaint;
   for (nsMenuChainItem* item = mPopups.get(); item; item = item->GetParent()) {
     nsMenuPopupFrame* frame = item->Frame();
     if (!frame->IsVisibleOrHiding()) {
@@ -1604,17 +1595,16 @@ void nsXULPopupManager::PaintPopups(nsRefreshDriver* aRefreshDriver) {
       continue;
     }
     if (nsIWidget* widget = frame->GetWidget()) {
-      // If we don't paint it, alas.
-      popupsToPaint.InfallibleAppend(std::make_pair(widget, frame));
+      popupsToPaint.AppendElement(std::make_pair(widget, frame));
     }
   }
 
-  for (auto iter = popupsToPaint.IterFromLast(); !iter.Done(); iter.Prev()) {
-    nsMenuPopupFrame* frame = do_QueryFrame(iter.Get().second.GetFrame());
+  for (const auto& popupToPaint : Reversed(popupsToPaint)) {
+    nsIWidget* widget = popupToPaint.first;
+    nsMenuPopupFrame* frame = do_QueryFrame(popupToPaint.second.GetFrame());
     if (!frame) {
       continue;
     }
-    nsIWidget* widget = iter.Get().first;
     if (frame->PendingWidgetMoveResize()) {
       frame->ClearPendingWidgetMoveResize();
 
@@ -1641,7 +1631,7 @@ void nsXULPopupManager::PaintPopups(nsRefreshDriver* aRefreshDriver) {
     if (!widget->IsVisible()) {
       widget->Show(true);
     }
-    if (!iter.Get().second.IsAlive() || !widget->NeedsPaint()) {
+    if (!popupToPaint.second.IsAlive() || !widget->NeedsPaint()) {
       continue;
     }
     nsAutoScriptBlocker scriptBlocker;

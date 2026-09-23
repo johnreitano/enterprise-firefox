@@ -85,5 +85,6 @@ interface Sanitizer {
   boolean setJavascriptURLs(boolean allow);
 
   // Remove markup that executes script. May modify multiple lists:
+  [UseCounter]
   boolean removeUnsafe();
 };

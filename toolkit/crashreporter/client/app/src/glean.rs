@@ -17,12 +17,6 @@ pub struct InitOptions {
     pub locale: Option<String>,
     pub server_endpoint: Option<String>,
     pub upload_enabled: bool,
-    /// The server to send telemetry to, overriding the default endpoint.
-    /// Set to the console telemetry endpoint (see
-    /// `enterprise_prefs::console_glean_url`); mock builds always use a fixed
-    /// example endpoint.
-    #[cfg(feature = "enterprise")]
-    pub server_url: Option<String>,
 }
 
 struct Prefs {
@@ -74,8 +68,6 @@ impl InitOptions {
             locale: None,
             server_endpoint: None,
             upload_enabled: true,
-            #[cfg(feature = "enterprise")]
-            server_url: None,
         }
     }
 
@@ -103,12 +95,12 @@ impl InitOptions {
         self
     }
 
-    /// Set the server to which telemetry is sent, overriding the default
-    /// endpoint.
+    /// Set the server to which telemetry is sent, overriding any endpoint
+    /// previously resolved from user preferences.
     #[cfg(feature = "enterprise")]
     #[cfg_attr(mock, allow(dead_code))]
-    pub fn set_server_url(&mut self, url: String) {
-        self.server_url = Some(url);
+    pub fn set_server_endpoint(&mut self, url: String) {
+        self.server_endpoint = Some(url);
     }
 
     /// Initialize glean.
@@ -157,11 +149,6 @@ impl InitOptions {
         init_glean.configuration.upload_enabled = self.upload_enabled;
         if self.server_endpoint.is_some() {
             init_glean.configuration.server_endpoint = self.server_endpoint;
-        }
-
-        #[cfg(feature = "enterprise")]
-        if let Some(url) = self.server_url {
-            init_glean.configuration.server_endpoint = Some(url);
         }
 
         // Always override the server endpoint in mock.

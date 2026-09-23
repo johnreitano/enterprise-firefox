@@ -121,6 +121,7 @@ EXPORTS.mozilla.dom += [
 EXPORTS.mozilla.media.webrtc += [
     "AV1FmtpParser.h",
     "CodecInfo.h",
+    "GMPH264Utils.h",
     "H264FmtpParser.h",
 ]
 

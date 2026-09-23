@@ -7,6 +7,12 @@
 const REDESIGN_PREF = "browser.privateWindowRedesign.enabled";
 const SHOWN_PREF = "browser.privatebrowsing.introAnimationShown";
 
+add_setup(async function () {
+  registerCleanupFunction(async () => {
+    await ASRouter.resetMessageState();
+  });
+});
+
 // Without the experiment the intro stays hidden and the static logo shows.
 add_task(async function test_intro_absent_without_experiment() {
   await SpecialPowers.pushPrefEnv({ set: [[REDESIGN_PREF, false]] });

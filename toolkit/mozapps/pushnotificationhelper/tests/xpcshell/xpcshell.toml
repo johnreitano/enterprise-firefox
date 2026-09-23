@@ -2,3 +2,5 @@
 run-if = ["os == 'win'"]
 
 ["test_push_notification_helper.js"]
+
+["test_push_notification_helper_registry.js"]

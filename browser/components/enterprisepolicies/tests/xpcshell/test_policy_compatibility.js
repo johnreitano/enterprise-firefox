@@ -41,6 +41,11 @@ function schemaWithCompatibility(versionAdded) {
 }
 
 add_task(async function test_unsupported_build_is_rejected() {
+  // The mock schema below only knows about CompatTestPolicy. Make sure the
+  // engine doesn't treat the previous task's run as "policies were applied"
+  // and inject onMissing() defaults for real policies (e.g. SitePolicies)
+  // that the mock schema would then reject as unknown.
+  Services.prefs.clearUserPref("browser.policies.applied");
   await setupPolicyEngineWithJson(
     { policies: { [POLICY_NAME]: true } },
     schemaWithCompatibility(false)
@@ -59,6 +64,7 @@ add_task(async function test_unsupported_build_is_rejected() {
 });
 
 add_task(async function test_supported_version_is_applied() {
+  Services.prefs.clearUserPref("browser.policies.applied");
   await setupPolicyEngineWithJson(
     { policies: { [POLICY_NAME]: true } },
     schemaWithCompatibility("149")
@@ -73,6 +79,7 @@ add_task(async function test_supported_version_is_applied() {
 });
 
 add_task(async function test_metadata_defaults_are_applied() {
+  Services.prefs.clearUserPref("browser.policies.applied");
   await setupPolicyEngineWithJson(
     { policies: { [POLICY_NAME]: true } },
     schemaWithCompatibility(undefined)
