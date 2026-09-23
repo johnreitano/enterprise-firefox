@@ -23,6 +23,7 @@
 #include <windows.h>
 #include <processthreadsapi.h>
 #include <shlwapi.h>
+#include <stdio.h>
 #include <appmodel.h>
 #include <wrl.h>
 #include <wrl/wrappers/corewrappers.h>
@@ -293,13 +294,14 @@ static void MaybeBreakForBrowserDebugging() {
 // via -felt and admits only the peer whose pid it expects. That peer is
 // whichever process ends up running as the browser, which with a launcher
 // process interposed is the launcher's child rather than the process felt
-// spawned. Announce that pid to felt on stderr: the stderr felt hands the
+// spawned. Announce that pid to felt on stdout: the stdout felt hands the
 // spawned process is a pipe only felt's own process tree can write to, and felt
 // drains it and parses this line in
 // toolkit/components/felt/content/FeltProcessParent.sys.mjs, so the format must
 // stay in sync with that file.
 static void AnnounceFeltBrowserPid(DWORD aPid) {
-  printf_stderr("\nFELT_BROWSER_PID=%lu\n", aPid);
+  fprintf(stdout, "\nFELT_BROWSER_PID=%lu\n", aPid);
+  fflush(stdout);
 }
 
 static bool IsFeltSpawned(int& argc, wchar_t** argv) {
@@ -447,7 +449,8 @@ static bool IsPackagedAppAutostarted() {
 }
 
 // The body of LauncherMain. Returns Nothing whenever this process is to go on
-// and run as the browser itself; LauncherMain announces it to felt in that case.
+// and run as the browser itself; LauncherMain announces it to felt in that
+// case.
 static Maybe<int> RunLauncherMain(int& argc, wchar_t* argv[],
                                   const bool aIsFeltSpawned) {
   EnsureBrowserCommandlineSafe(argc, argv);

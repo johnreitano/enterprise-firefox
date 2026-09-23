@@ -3,10 +3,10 @@
 
 "use strict";
 
-// Bug 2072053: on Windows the launcher process announces on stderr the pid of
+// Bug 2072053: on Windows the launcher process announces on stdout the pid of
 // the process that runs as the browser, and felt authenticates its IPC peer
 // against that pid. The announcement is exactly one line of a fixed form;
-// every other stderr line is browser output and must not be mistaken for one.
+// every other stdout line is browser output and must not be mistaken for one.
 
 const { parseAnnouncedBrowserPid } = ChromeUtils.importESModule(
   "chrome://felt/content/FeltProcessParent.sys.mjs"

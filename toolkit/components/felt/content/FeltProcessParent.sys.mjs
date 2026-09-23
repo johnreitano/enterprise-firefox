@@ -58,7 +58,7 @@ const PROCESS_START_REASON = {
 // browser and connects to felt's IPC endpoint: with the launcher process
 // interposed, that is the browser child the launcher creates. The launcher
 // (browser/app/winlauncher/LauncherProcessWin.cpp) therefore announces the
-// browser's pid as one line of this form on the spawned process's stderr, a
+// browser's pid as one line of this form on the spawned process's stdout, a
 // pipe only felt's own process tree can write to. Keep the format in sync.
 const FELT_BROWSER_PID_LINE = /^FELT_BROWSER_PID=(\d{1,10})$/;
 
@@ -66,7 +66,7 @@ const FELT_BROWSER_PID_LINE = /^FELT_BROWSER_PID=(\d{1,10})$/;
  * Reads the browser pid the Windows launcher process announced, if `line` is
  * such an announcement.
  *
- * @param {string} line - One line of the spawned process's stderr.
+ * @param {string} line - One line of the spawned process's stdout.
  * @returns {number|null} The announced pid, or null for any other line.
  */
 export function parseAnnouncedBrowserPid(line) {
@@ -986,25 +986,25 @@ export class FeltProcessParent extends JSProcessActorParent {
       throw e;
     }
 
-    this.onPipeDataAvailable(this.proc.stdout, this.proc.pid, (pid, chunk) => {
-      lazy.logProcess.info(`[${pid}]: ${chunk}`);
-    });
-
-    // The Windows launcher process announces on stderr which pid runs as the
+    // The Windows launcher process announces on stdout which pid runs as the
     // browser (see parseAnnouncedBrowserPid). Only the first announcement
     // counts: it precedes any code that is not ours in the process tree (a
-    // later one could come from a content process, which inherits stderr), and
+    // later one could come from a content process, which inherits stdout), and
     // resolve() ignores later calls.
     let announceBrowserPid;
     const browserPidAnnounced = new Promise(resolve => {
       announceBrowserPid = resolve;
     });
-    this.onPipeDataAvailable(this.proc.stderr, this.proc.pid, (pid, chunk) => {
+    this.onPipeDataAvailable(this.proc.stdout, this.proc.pid, (pid, chunk) => {
       const announcedPid = parseAnnouncedBrowserPid(chunk);
       if (announcedPid !== null) {
         announceBrowserPid(announcedPid);
         return;
       }
+      lazy.logProcess.info(`[${pid}]: ${chunk}`);
+    });
+
+    this.onPipeDataAvailable(this.proc.stderr, this.proc.pid, (pid, chunk) => {
       lazy.logProcess.error(`[${pid}]: ${chunk}`);
     });
 
