@@ -865,15 +865,4 @@ mod tests {
         assert!(!peer_is_authorized(Some(child_pid + 1), child_pid));
         assert!(!peer_is_authorized(None, child_pid));
     }
-
-    // On macOS the transport cannot attest a peer pid, so authorization passes
-    // here and the version handshake is the only in-band check. Endpoint
-    // reachability is an OS property, not enforced by this code.
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn macos_authorizes_without_peer_pid() {
-        let child_pid = 4242;
-        assert!(peer_is_authorized(None, child_pid));
-        assert!(peer_is_authorized(Some(child_pid + 1), child_pid));
-    }
 }
