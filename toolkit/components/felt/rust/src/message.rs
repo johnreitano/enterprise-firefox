@@ -46,6 +46,8 @@ impl nsICookieWrapper {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum FeltMessage {
+    VersionProbe(u32),
+    VersionValidated(bool),
     ClientChannel(ipc_channel::ipc::IpcSender<FeltMessage>),
     Cookie(nsICookieWrapper),
     BoolPreference((String, bool)),

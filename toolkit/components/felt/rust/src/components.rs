@@ -20,7 +20,7 @@ use xpcom::{xpcom_method, RefPtr};
 
 use log::{error, trace, warn};
 
-use crate::message::FeltMessage;
+use crate::message::{FeltMessage, FELT_IPC_VERSION};
 #[cfg(target_os = "linux")]
 use crate::utils;
 use crate::utils::{Tokens, CONSOLE_URL, TOKENS, TOKEN_EXPIRY_SKEW};
@@ -67,6 +67,11 @@ fn peer_is_authorized(_peer_pid: Option<u32>, _expected_pid: u32) -> bool {
 #[cfg(not(target_os = "macos"))]
 fn peer_is_authorized(peer_pid: Option<u32>, expected_pid: u32) -> bool {
     peer_pid_matches(peer_pid, expected_pid)
+}
+
+/// The protocol-version check, kept separate from authorization.
+fn version_supported(version: u32) -> bool {
+    version == FELT_IPC_VERSION
 }
 
 #[allow(non_snake_case)]
@@ -464,8 +469,35 @@ impl FeltXPCOM {
             ipc_channel::ipc::IpcReceiver<FeltMessage>,
         ) = ipc_channel::ipc::channel().unwrap();
         if let Err(err) = tx.send(FeltMessage::ClientChannel(tx_firefox_to_felt)) {
-            trace!("FeltXPCOM:IpcChannel() failed to send ClientChannel: {}", err);
+            trace!(
+                "FeltXPCOM:IpcChannel() failed to send ClientChannel: {}",
+                err
+            );
             return Err(NS_ERROR_FAILURE);
+        }
+
+        let version_ok = match rx.recv() {
+            Ok(FeltMessage::VersionProbe(version)) => version_supported(version),
+            Ok(msg) => {
+                trace!("FeltXPCOM:rx.recv() INVALID MSG {:?}", msg);
+                false
+            }
+            Err(err) => {
+                trace!("FeltXPCOM:rx.recv() ERR {}", err);
+                false
+            }
+        };
+        if let Err(err) = tx.send(FeltMessage::VersionValidated(version_ok)) {
+            trace!(
+                "FeltXPCOM:tx.send(FeltMessage::VersionValidated({})) err={}",
+                version_ok,
+                err
+            );
+            return Err(NS_ERROR_FAILURE);
+        }
+        if !version_ok {
+            warn!("FeltXPCOM:IpcChannel() refused IPC peer: unsupported protocol version");
+            return Err(NS_ERROR_PORT_ACCESS_NOT_ALLOWED);
         }
 
         trace!("FeltXPCOM:IpcChannel() peer authenticated");
@@ -812,6 +844,15 @@ mod tests {
         assert!(!peer_pid_matches(None, child_pid));
     }
 
+    // The protocol-version check is separate from authorization: only the
+    // current wire version is supported.
+    #[test]
+    fn only_the_current_protocol_version_is_supported() {
+        assert!(version_supported(FELT_IPC_VERSION));
+        assert!(!version_supported(FELT_IPC_VERSION + 1));
+        assert!(!version_supported(FELT_IPC_VERSION - 1));
+    }
+
     // On attested platforms authorization requires a matching pid: a same-user
     // peer with a different pid, or a transport that reports no pid, is refused,
     // and the intended child is admitted. This includes Windows, where the
@@ -835,5 +876,4 @@ mod tests {
         assert!(peer_is_authorized(None, child_pid));
         assert!(peer_is_authorized(Some(child_pid + 1), child_pid));
     }
-
 }
