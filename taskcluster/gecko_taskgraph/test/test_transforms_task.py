@@ -13,6 +13,7 @@ from gecko_taskgraph.transforms.task import (
     get_default_priority,
     get_treeherder_link,
     get_treeherder_project,
+    is_shared_worker,
     try_task_config_env,
 )
 
@@ -260,6 +261,33 @@ def test_try_task_config_env_overrides_unrestricted_test_paths(run_transform):
 
 TASK_PRIORITY_CONFIG = {
     "by-project": {
+        "enterprise-(firefox|thunderbird)": {
+            "by-shared-worker": {
+                "true": {
+                    "by-head-ref": {
+                        "enterprise-release": "very-high",
+                        "enterprise-beta": {
+                            "by-shipping": {"true": "high", "default": "very-low"},
+                        },
+                        "enterprise-main": "low",
+                        "default": "lowest",
+                    },
+                },
+                "default": {
+                    "by-head-ref": {
+                        "enterprise-release": "highest",
+                        "enterprise-beta": {
+                            "by-shipping": {"true": "very-high", "default": "low"},
+                        },
+                        "enterprise-main": "medium",
+                        "default": "very-low",
+                    },
+                },
+            },
+        },
+        "enterprise-(firefox|thunderbird)-try": {
+            "by-shared-worker": {"true": "lowest", "default": "very-low"},
+        },
         "mozilla-release": "highest",
         "mozilla-esr.*": {
             "by-shipping": {"true": "very-high", "default": "low"},
@@ -275,28 +303,175 @@ TASK_PRIORITY_CONFIG = {
 
 
 @pytest.mark.parametrize(
-    "project,shipping,expected",
+    "project,head_ref,shared_worker,shipping,expected",
     [
         # Beta and ESR are integration branches by default, and are only
         # raised when the push is flagged as shipping.
-        pytest.param("mozilla-beta", False, "low", id="beta"),
-        pytest.param("mozilla-beta", True, "very-high", id="beta-shipping"),
-        pytest.param("mozilla-esr140", False, "low", id="esr"),
-        pytest.param("mozilla-esr140", True, "very-high", id="esr-shipping"),
+        pytest.param("mozilla-beta", "", False, False, "low", id="beta"),
+        pytest.param("mozilla-beta", "", False, True, "very-high", id="beta-shipping"),
+        pytest.param("mozilla-esr140", "", False, False, "low", id="esr"),
+        pytest.param("mozilla-esr140", "", False, True, "very-high", id="esr-shipping"),
         # Every other project ignores the shipping flag.
-        pytest.param("mozilla-release", True, "highest", id="release-shipping"),
-        pytest.param("mozilla-central", True, "medium", id="central-shipping"),
-        pytest.param("autoland", True, "low", id="autoland-shipping"),
-        pytest.param("try", True, "very-low", id="try-shipping"),
-        pytest.param("mozilla-central", False, "medium", id="central"),
-        pytest.param("autoland", False, "low", id="autoland"),
-        pytest.param("try", False, "very-low", id="try"),
+        pytest.param(
+            "mozilla-release", "", False, True, "highest", id="release-shipping"
+        ),
+        pytest.param(
+            "mozilla-central", "", False, True, "medium", id="central-shipping"
+        ),
+        pytest.param("autoland", "", False, True, "low", id="autoland-shipping"),
+        pytest.param("try", "", False, True, "very-low", id="try-shipping"),
+        pytest.param("mozilla-central", "", False, False, "medium", id="central"),
+        pytest.param("autoland", "", False, False, "low", id="autoland"),
+        pytest.param("try", "", False, False, "very-low", id="try"),
+        # Enterprise keys off the branch rather than the project, mirroring
+        # the mozilla-* priorities on the pools it owns.
+        pytest.param(
+            "enterprise-firefox",
+            "enterprise-release",
+            False,
+            False,
+            "highest",
+            id="enterprise-release",
+        ),
+        pytest.param(
+            "enterprise-firefox",
+            "enterprise-beta",
+            False,
+            False,
+            "low",
+            id="enterprise-beta",
+        ),
+        pytest.param(
+            "enterprise-firefox",
+            "enterprise-beta",
+            False,
+            True,
+            "very-high",
+            id="enterprise-beta-shipping",
+        ),
+        pytest.param(
+            "enterprise-firefox",
+            "enterprise-main",
+            False,
+            True,
+            "medium",
+            id="enterprise-main",
+        ),
+        pytest.param(
+            "enterprise-firefox",
+            "some-branch",
+            False,
+            False,
+            "very-low",
+            id="enterprise-other-branch",
+        ),
+        pytest.param(
+            "enterprise-firefox-try",
+            "enterprise-main",
+            False,
+            False,
+            "very-low",
+            id="enterprise-try",
+        ),
+        # On pools shared with gecko, every tier drops one notch so that
+        # Firefox tasks always win the queue.
+        pytest.param(
+            "enterprise-firefox",
+            "enterprise-release",
+            True,
+            False,
+            "very-high",
+            id="enterprise-release-shared",
+        ),
+        pytest.param(
+            "enterprise-firefox",
+            "enterprise-beta",
+            True,
+            False,
+            "very-low",
+            id="enterprise-beta-shared",
+        ),
+        pytest.param(
+            "enterprise-firefox",
+            "enterprise-beta",
+            True,
+            True,
+            "high",
+            id="enterprise-beta-shipping-shared",
+        ),
+        pytest.param(
+            "enterprise-firefox",
+            "enterprise-main",
+            True,
+            True,
+            "low",
+            id="enterprise-main-shared",
+        ),
+        pytest.param(
+            "enterprise-firefox",
+            "some-branch",
+            True,
+            False,
+            "lowest",
+            id="enterprise-other-branch-shared",
+        ),
+        pytest.param(
+            "enterprise-firefox-try",
+            "enterprise-main",
+            True,
+            False,
+            "lowest",
+            id="enterprise-try-shared",
+        ),
+        # Thunderbird shares the Enterprise priorities.
+        pytest.param(
+            "enterprise-thunderbird",
+            "enterprise-main",
+            False,
+            False,
+            "medium",
+            id="enterprise-thunderbird-main",
+        ),
+        pytest.param(
+            "enterprise-thunderbird",
+            "enterprise-main",
+            True,
+            False,
+            "low",
+            id="enterprise-thunderbird-main-shared",
+        ),
     ],
 )
-def test_get_default_priority(project, shipping, expected):
+def test_get_default_priority(project, head_ref, shared_worker, shipping, expected):
     # GraphConfig is hashable, which get_default_priority requires as it is cached.
     graph_config = GraphConfig({"task-priority": TASK_PRIORITY_CONFIG}, root_dir=".")
-    assert get_default_priority(graph_config, project, shipping) == expected
+    assert (
+        get_default_priority(graph_config, project, head_ref, shared_worker, shipping)
+        == expected
+    )
+
+
+@pytest.mark.parametrize(
+    "provisioner_id,worker_type,expected",
+    [
+        pytest.param("releng-hardware", "gecko-t-osx-1500-m4", True, id="osx-test"),
+        pytest.param("releng-hardware", "gecko-3-b-osx-1015", True, id="osx-build"),
+        pytest.param("releng-hardware", "gecko-t-linux-talos", True, id="talos"),
+        pytest.param("releng-hardware", "win10-64-2009-hw", True, id="win-hardware"),
+        pytest.param("proj-autophone", "gecko-t-bitbar-gw-unit-p2", True, id="bitbar"),
+        pytest.param("enterprise-t", "t-osx-1500-m4", False, id="own-test"),
+        pytest.param("enterprise-3", "b-linux-amd", False, id="own-build"),
+        pytest.param(
+            "releng-hardware", "enterprise-3-b-osx-arm64", False, id="own-osx-build"
+        ),
+        pytest.param(
+            "scriptworker-k8s", "enterprise-3-signing", False, id="own-scriptworker"
+        ),
+    ],
+)
+def test_is_shared_worker(provisioner_id, worker_type, expected):
+    graph_config = GraphConfig({"trust-domain": "enterprise"}, root_dir=".")
+    assert is_shared_worker(graph_config, provisioner_id, worker_type) is expected
 
 
 if __name__ == "__main__":
