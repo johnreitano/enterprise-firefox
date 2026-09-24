@@ -300,6 +300,7 @@ static void MaybeBreakForBrowserDebugging() {
 // toolkit/components/felt/content/FeltProcessParent.sys.mjs, so the format must
 // stay in sync with that file.
 static void AnnounceFeltBrowserPid(DWORD aPid) {
+  MOZ_ASSERT(aPid != 0);
   fprintf(stdout, "\nFELT_BROWSER_PID=%lu\n", aPid);
   fflush(stdout);
 }
