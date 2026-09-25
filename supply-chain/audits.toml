@@ -4171,24 +4171,14 @@ This is patches applied on top of the upstream release, ensuring:
 [[audits.ipc-channel]]
 who = "John Reitano <jreitano@mozilla.com>"
 criteria = "safe-to-deploy"
-delta = "0.21.0@git:2e47e642b34aebfaaf953497c3834f96c365c8a0 -> 0.21.0@git:4fe32fd10d10b597889d1df254a6334654dda78b"
+delta = "0.21.0@git:2e47e642b34aebfaaf953497c3834f96c365c8a0 -> 0.21.0@git:e27888a6cdde52cdcb0937c462294669013a5e6f"
 importable = false
 notes = """
-Adds IpcReceiver::peer_pid() reporting the connected peer's OS pid (Linux
-SO_PEERCRED via nix getsockopt, Windows GetNamedPipeClientProcessId; None on macOS and other
-backends), for FELT peer authentication (Bug 2072053).
-"""
-
-[[audits.ipc-channel]]
-who = "John Reitano <jreitano@mozilla.com>"
-criteria = "safe-to-deploy"
-delta = "0.21.0@git:4fe32fd10d10b597889d1df254a6334654dda78b -> 0.21.0@git:e27888a6cdde52cdcb0937c462294669013a5e6f"
-importable = false
-notes = """
-Adds IpcOneShotServer::accept_with_peer_pid(). On macOS it requests the Mach
-audit trailer (using mach2's constants and types) and reads the sender's pid
-with libbsm's audit_token_to_pid; elsewhere it uses the receiver's peer_pid().
-For FELT peer authentication (Bug 2072053).
+Adds peer pid reporting for FELT peer authentication (Bug 2072053):
+IpcReceiver::peer_pid() (Linux SO_PEERCRED via nix getsockopt, Windows
+GetNamedPipeClientProcessId) and IpcOneShotServer::accept_with_peer_pid(),
+which on macOS requests the Mach audit trailer (using mach2's constants and
+types) and reads the sender's pid with libbsm's audit_token_to_pid.
 """
 
 [[audits.itertools]]
