@@ -136,6 +136,16 @@ export const MONITOR_CONDITION_MET_TOPIC = "smartwindow-monitor-condition-met";
 // passive dot on the monitor toolbar button.
 export const MONITOR_RUN_FAILED_TOPIC = "smartwindow-monitor-run-failed";
 
+// Scheduled runs starting at least this late record the "delayed" reason.
+export const DELAYED_RUN_THRESHOLD_MS = 5 * 60 * 1000;
+
+// Why a run happened, recorded as the telemetry reason on the run events.
+export const RUN_REASONS = Object.freeze({
+  MANUAL: "manual",
+  TRIGGER_TIME: "trigger_time",
+  DELAYED: "delayed",
+});
+
 const MONITOR_RESULT_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -191,6 +201,8 @@ export class Monitor {
    *   Page content extracted when the monitor was created, used as the
    *   baseline for change detection. The page content covers all watch URLs
    *   in the same concatenated format as run-time extraction.
+   * @param {number} [options.runCount] - Lifetime number of runs started,
+   *   surfaced as execution_seq in telemetry.
    */
   constructor({
     id = crypto.randomUUID(),
@@ -209,6 +221,7 @@ export class Monitor {
     expiry = null,
     history = [],
     initialSnapshot = null,
+    runCount = 0,
   } = {}) {
     // validate the schedule is an actual schedule object and not a serialized object
     if (!schedule?.getNextRunTime) {
@@ -238,6 +251,7 @@ export class Monitor {
     this.expiry = expiry;
     this.history = Array.isArray(history) ? history : [];
     this.initialSnapshot = initialSnapshot;
+    this.runCount = runCount;
 
     // final verification that the monitor is valid
     if (!this.id || !this.monitorPrompt || !this.watchUrls.length) {
@@ -273,6 +287,7 @@ export class Monitor {
       expiry: savedMonitor.expiry ?? null,
       history,
       initialSnapshot: savedMonitor.initialSnapshot ?? null,
+      runCount: savedMonitor.runCount,
     });
   }
 
@@ -304,6 +319,7 @@ export class Monitor {
       nextRunTime: this.nextRunTime,
       checkedAt,
     });
+    const reason = getRunReason(manual, delayMs);
 
     // make sure that a run is not already in progress, otherwise we would have overlapping runs
     // may happen with manual runs or if the previous run took longer than the schedule interval
@@ -331,14 +347,21 @@ export class Monitor {
       conditionMet: false,
     };
     this.addHistoryEntry(historyEntry);
+    this.runCount += 1;
     this.updatedAt = checkedAt.toISOString();
 
     let result = null;
     let checkPromise = null;
     let timedOut = false;
-    const runStats = { model: null, modelLatencyMs: null };
+    const runStats = {
+      reason,
+      executionSeq: this.runCount,
+      model: null,
+      modelLatencyMs: null,
+    };
     const abortController = new AbortController();
     this.#abortController = abortController;
+    recordRunRequest(this, { ...runStats, delayMs });
     try {
       // save the running state to disk
       await lazy.MonitorAgent._saveAndNotify(this);
@@ -384,8 +407,12 @@ export class Monitor {
           checkPromise.catch(() => {});
         }
         this.#finishRun(abortController);
-        recordMonitorRunTelemetry(this, {
-          manual,
+        recordRunEnd(this, {
+          ...runStats,
+          cancelCode: getCancelCode(
+            abortController.signal.reason,
+            historyEntry.errorCode
+          ),
           failed: historyEntry.status === "error",
           errorCode: historyEntry.errorCode ?? null,
           outcome:
@@ -394,8 +421,6 @@ export class Monitor {
               : null,
           durationMs: Math.round(ChromeUtils.now() - runStarted),
           delayMs,
-          model: runStats.model,
-          modelLatencyMs: runStats.modelLatencyMs,
         });
       }
     }
@@ -408,8 +433,9 @@ export class Monitor {
    * @param {string} [options.flowId] - Monitor conversation flow ID.
    * @param {Date} [options.now] - Monitor check time.
    * @param {AbortSignal} [options.signal] - Signal for monitor-layer aborts.
-   * @param {{ model: string|null, modelLatencyMs: number|null }} [options.runStats] -
-   *   Filled in with the model used and the model call time, for telemetry.
+   * @param {{ reason: string, executionSeq: number, model: string|null, modelLatencyMs: number|null }} [options.runStats] -
+   *   Telemetry context of the run; filled in with the model used and the
+   *   model call time.
    * @returns {Promise<{ explanation: string, conditionMet: boolean }>}
    */
   async runMonitorCheck({
@@ -499,6 +525,9 @@ export class Monitor {
       signal
     );
     throwIfAborted(signal);
+    if (runStats) {
+      recordRunStart(this, runStats);
+    }
     const modelCallStarted = ChromeUtils.now();
     let response;
     try {
@@ -751,6 +780,7 @@ export class Monitor {
       initialSnapshot: this.initialSnapshot
         ? { ...this.initialSnapshot }
         : null,
+      runCount: this.runCount,
     };
   }
 
@@ -998,10 +1028,64 @@ function scheduledRunDelayMs({ manual, nextRunTime, checkedAt }) {
   return Math.max(0, checkedAt.getTime() - dueTime);
 }
 
-function recordMonitorRunTelemetry(
+function getRunReason(manual, delayMs) {
+  if (manual) {
+    return RUN_REASONS.MANUAL;
+  }
+  return delayMs !== null && delayMs >= DELAYED_RUN_THRESHOLD_MS
+    ? RUN_REASONS.DELAYED
+    : RUN_REASONS.TRIGGER_TIME;
+}
+
+// A run only counts as canceled when the abort that ended it is the same
+// cancel or interrupt the history entry recorded. A dispose that lands after
+// the check finished, during the final save, must not turn a completed run
+// into a cancel.
+function getCancelCode(abortReason, errorCode) {
+  if (
+    !(abortReason instanceof MonitorRunError) ||
+    abortReason.code !== errorCode
+  ) {
+    return null;
+  }
+  return [
+    MONITOR_ERROR_CODES.CANCELED,
+    MONITOR_ERROR_CODES.INTERRUPTED,
+  ].includes(abortReason.code)
+    ? abortReason.code
+    : null;
+}
+
+function buildRunTelemetryExtra(monitor, { reason, executionSeq }) {
+  return {
+    ...lazy.MonitorAgent._telemetryExtra(monitor),
+    reason,
+    execution_seq: executionSeq,
+  };
+}
+
+function recordRunRequest(monitor, runStats) {
+  const extra = buildRunTelemetryExtra(monitor, runStats);
+  if (runStats.delayMs != null) {
+    extra.delay = runStats.delayMs;
+  }
+  Glean.smartWindow.agenticActionExecuteRequest.record(extra);
+}
+
+function recordRunStart(monitor, runStats) {
+  const extra = buildRunTelemetryExtra(monitor, runStats);
+  if (runStats.model) {
+    extra.model = runStats.model;
+  }
+  Glean.smartWindow.agenticActionExecuteStart.record(extra);
+}
+
+function recordRunEnd(
   monitor,
   {
-    manual,
+    reason,
+    executionSeq,
+    cancelCode,
     failed,
     errorCode,
     outcome,
@@ -1011,17 +1095,20 @@ function recordMonitorRunTelemetry(
     modelLatencyMs,
   }
 ) {
-  const extra = lazy.MonitorAgent._telemetryExtra(monitor);
-
-  if (manual) {
-    Glean.smartWindow.monitorRunManual.record(extra);
-  } else {
-    Glean.smartWindow.monitorRunScheduled.record(
-      delayMs == null ? extra : { ...extra, delay: delayMs }
-    );
+  const extra = buildRunTelemetryExtra(monitor, { reason, executionSeq });
+  extra.duration = durationMs;
+  if (model) {
+    extra.model = model;
+  }
+  if (cancelCode) {
+    Glean.smartWindow.agenticActionExecuteCancel.record({
+      ...extra,
+      error_code: cancelCode,
+    });
+    return;
   }
 
-  const completeExtra = { ...extra, success: !failed, duration: durationMs };
+  const completeExtra = { ...extra, success: !failed };
   if (failed && errorCode) {
     completeExtra.error_code = errorCode;
   }
@@ -1031,13 +1118,10 @@ function recordMonitorRunTelemetry(
   if (modelLatencyMs != null) {
     completeExtra.latency = modelLatencyMs;
   }
-  if (model) {
-    completeExtra.model = model;
-  }
   if (delayMs != null) {
     completeExtra.delay = delayMs;
   }
-  Glean.smartWindow.monitorComplete.record(completeExtra);
+  Glean.smartWindow.agenticActionExecuteComplete.record(completeExtra);
 }
 
 /**

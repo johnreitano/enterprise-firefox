@@ -59,6 +59,7 @@
 #include "mozilla/dom/HTMLBodyElement.h"
 #include "mozilla/dom/HTMLDocumentBinding.h"
 #include "mozilla/dom/HTMLIFrameElement.h"
+#include "mozilla/dom/Range.h"
 #include "mozilla/dom/Selection.h"
 #include "mozilla/dom/ShadowIncludingTreeIterator.h"
 #include "mozilla/dom/nsCSPContext.h"
@@ -76,7 +77,6 @@
 #include "nsMimeTypes.h"
 #include "nsNodeInfoManager.h"
 #include "nsParser.h"
-#include "nsRange.h"
 #include "nsSandboxFlags.h"
 
 using namespace mozilla;

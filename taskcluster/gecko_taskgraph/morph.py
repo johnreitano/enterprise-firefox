@@ -352,7 +352,12 @@ def add_try_task_duplicates(taskgraph, label_to_taskid, parameters, graph_config
                 "-".join(label_parts[:-1]) if chunk_index == -2 else task.label
             )
 
-            if label_parts[chunk_index].isnumeric() and label_no_chunk in glob_tasks:
+            # A task's chunk count is only known once the decision task has
+            # resolved it, so a selection made from `mach try`'s task list can
+            # name the task unchunked while the graph ends up chunking it.
+            if label_parts[chunk_index].isnumeric() and (
+                label_no_chunk in glob_tasks or label_no_chunk in tasks
+            ):
                 task.attributes["task_duplicates"] = count
             elif task.label in tasks:
                 task.attributes["task_duplicates"] = count

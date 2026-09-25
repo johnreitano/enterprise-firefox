@@ -576,8 +576,9 @@ class MochitestServer:
             self._httpdPath = SCRIPT_DIR
         self._httpdPath = os.path.abspath(self._httpdPath)
 
-        self._trainHop = "browser.newtabpage.trainhopAddon.version=any" in options.get(
-            "extraPrefs", []
+        self._trainHop = (
+            "browser.newtabpage.trainhopAddonDeployment.version=any"
+            in options.get("extraPrefs", [])
         )
 
         MochitestServer.instance_count += 1
@@ -1096,6 +1097,7 @@ class MochitestDesktop:
         self.browserProcessId = None
 
         self.haveDumpedScreen = False
+        self.appPid = None
         # Create variables to count the number of passes, fails, todos.
         self.countpass = 0
         self.countfail = 0
@@ -2393,7 +2395,10 @@ toolbar#nav-bar {
         certutil = os.path.join(options.utilityPath, "certutil" + bin_suffix)
         pk12util = os.path.join(options.utilityPath, "pk12util" + bin_suffix)
         toolsEnv = env
-        if "browser.newtabpage.trainhopAddon.version=any" in options.extraPrefs:
+        if (
+            "browser.newtabpage.trainhopAddonDeployment.version=any"
+            in options.extraPrefs
+        ):
             toolsEnv["LD_LIBRARY_PATH"] = os.path.join(os.path.dirname(here), "bin")
         if mozinfo.info["asan"]:
             # Disable leak checking when running these tools
@@ -2806,7 +2811,21 @@ toolbar#nav-bar {
             )
             return
         self.haveDumpedScreen = True
-        dump_screen(utilityPath, self.log)
+        # The browser can quit before the macOS capture lands; keep it on screen.
+        pid = self.appPid if mozinfo.isMac else None
+        if pid:
+            try:
+                os.kill(pid, signal.SIGSTOP)
+            except OSError:
+                pid = None
+        try:
+            dump_screen(utilityPath, self.log)
+        finally:
+            if pid:
+                try:
+                    os.kill(pid, signal.SIGCONT)
+                except OSError:
+                    pass
 
     def killAndGetStack(self, processPID, utilityPath, debuggerInfo, dump_screen=False):
         """
@@ -3108,6 +3127,7 @@ toolbar#nav-bar {
                     outputTimeout=timeout,
                 )
                 proc = runner.process_handler
+                self.appPid = proc.pid
                 self.log.info(f"runtests.py | Application pid: {proc.pid}")
 
                 gecko_id = f"GECKO({proc.pid})"
@@ -3161,6 +3181,7 @@ toolbar#nav-bar {
             # see https://bugzilla.mozilla.org/show_bug.cgi?id=913970
             self.log.info("runtests.py | Waiting for browser...")
             status = proc.wait()
+            self.appPid = None
             if status is None:
                 self.log.warning(
                     "runtests.py | Failed to get app exit code - running/crashed?"

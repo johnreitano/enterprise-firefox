@@ -136,6 +136,10 @@ bool OverscrollHandoffChain::HasAutoscrollApzc() const {
   return AnyApzc(&AsyncPanZoomController::IsAutoscroll);
 }
 
+bool OverscrollHandoffChain::HasAnimatingApzc() const {
+  return AnyApzc(&AsyncPanZoomController::IsAnimationRunning);
+}
+
 RefPtr<AsyncPanZoomController> OverscrollHandoffChain::FindFirstScrollable(
     const InputData& aInput, ScrollDirections* aOutAllowedScrollDirections,
     IncludeOverscroll aIncludeOverscroll) const {

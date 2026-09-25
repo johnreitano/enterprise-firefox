@@ -35,7 +35,6 @@ from gecko_taskgraph.optimize.schema import (
 )
 from gecko_taskgraph.transforms.job import JobDescriptionSchema
 from gecko_taskgraph.transforms.job.run_task import RunTaskSchema
-from gecko_taskgraph.transforms.test import linux_perf_platform_restrictions
 from gecko_taskgraph.transforms.test.other import get_mobile_project
 from gecko_taskgraph.util.chunking import manifest_loaders
 
@@ -482,6 +481,22 @@ def set_defaults(config, tasks):
         yield task
 
 
+@transforms.add
+def drop_artifact_build_unsupported(config, tasks):
+    """Artifact builds don't produce everything some suites need (gtest, for
+    instance, needs the compiled test binaries), so drop the tasks that declared
+    `supports-artifact-builds: false` rather than scheduling jobs that can only
+    fail. Dropping them here keeps them out of the full task graph entirely, so
+    they can't be selected on try, pulled in as a dependency, or added later via
+    the add-new-jobs action."""
+    try_config = config.params.get("try_task_config", {})
+    use_artifact_builds = try_config.get("use-artifact-builds", False)
+    for task in tasks:
+        if use_artifact_builds and not task["supports-artifact-builds"]:
+            continue
+        yield task
+
+
 transforms.add_validate(TestDescriptionSchema)
 
 
@@ -563,10 +578,6 @@ def define_tags(config, tasks):
             tags.setdefault("test-variant", variant)
 
         yield task
-
-
-# Restrict most perf tests to Ubuntu 24.04, keeping only allowed exceptions on 18.04.
-transforms.add(linux_perf_platform_restrictions.restrict_tests_to_2404)
 
 
 @transforms.add

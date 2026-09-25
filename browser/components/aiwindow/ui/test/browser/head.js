@@ -61,8 +61,12 @@ const {
   "moz-src:///browser/components/aiwindow/models/ConversationSuggestions.sys.mjs"
 );
 
-const { _clearDismissedResumeMemoriesForTesting } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/aiwindow/ui/modules/ResumeActivityDismissals.sys.mjs"
+const {
+  ResumeActivity,
+  _clearDismissedResumeMemoriesForTesting,
+  _resetResumeSectionHiddenForTesting,
+} = ChromeUtils.importESModule(
+  "moz-src:///browser/components/aiwindow/ui/modules/ResumeActivity.sys.mjs"
 );
 
 async function modelFor(choiceId) {

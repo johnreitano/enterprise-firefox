@@ -25,8 +25,6 @@ from mozbuild.frontend.data import (
     BaseProgram,
     ChromeManifestEntry,
     ConfigFileSubstitution,
-    DeclaredLicensedPaths,
-    DeclaredLicenseNotice,
     Exports,
     FinalTargetFiles,
     FinalTargetPreprocessedFiles,
@@ -51,7 +49,9 @@ from mozbuild.frontend.l10n_manifest import (
     build_l10n_manifest_from_substs,
     write_l10n_manifest,
 )
+from mozbuild.frontend.reader import SandboxValidationError
 from mozbuild.jar import DeprecatedJarManifest, JarManifestParser
+from mozbuild.licenses import LicenseCollection, LicenseError
 from mozbuild.preprocessor import Preprocessor
 
 
@@ -118,28 +118,20 @@ class CommonBackend(BuildBackend):
         self._configs = set()
         self._generated_sources = set()
         self._l10n_manifest_data = []
-        self._license_notices = {}
-        self._license_coverage = defaultdict(set)
+        self._licenses = LicenseCollection()
 
     def consume_object(self, obj):
         self._configs.add(obj.config)
 
-        if isinstance(obj, DeclaredLicenseNotice):
-            existing = self._license_notices.get(obj.id)
-            if existing and existing["declared_in"] != obj.relsrcdir:
-                raise Exception(
-                    f'LICENSES["{obj.id}"] is declared in both '
-                    f"{existing['declared_in']} and {obj.relsrcdir}."
-                )
-            self._license_notices[obj.id] = obj.asdict() | {
-                "declared_in": obj.relsrcdir
-            }
-            self.backend_input_files.add(obj.text_path)
-            self._license_coverage[obj.id].update(obj.paths)
-            return True
-
-        if isinstance(obj, DeclaredLicensedPaths):
-            self._license_coverage[obj.id].update(obj.paths or [obj.relsrcdir])
+        # A duplicate id is only detectable once a second moz.build has been
+        # read, so unlike the rest of the license validation this cannot happen
+        # in the emitter. Report it the same way the emitter would.
+        try:
+            consumed = self._licenses.add(obj)
+        except LicenseError as error:
+            raise SandboxValidationError(str(error), obj._context)
+        if consumed:
+            self.backend_input_files.update(self._licenses.text_paths)
             return True
 
         if isinstance(obj, XPIDLModule):
@@ -256,35 +248,16 @@ class CommonBackend(BuildBackend):
                 fh.write(f.target_basename + "\n")
 
     def _write_licenses_json(self):
-        """Aggregate every LICENSES declaration into one machine-readable file.
+        """Write the tree's LICENSES declarations for the generator and the SBOM.
 
-        This is the single source of truth for both the generated
-        about:license page and the CycloneDX SBOM. Only licenses reachable in
-        this configuration appear, because an unconfigured directory is never
-        traversed.
-
-        Coverage naming an id with no notice is dropped rather than rejected: a
-        configuration that traverses a LICENSED_UNDER directory need not
-        traverse the one holding the matching LICENSES declaration, which is
-        how a JS shell or a mar-tools build sees js/ and intl/ but never
-        toolkit/content/licenses. The `licenses` linter checks the tree-wide
-        declarations, where a missing id really is a typo.
+        Only licenses reachable in this configuration appear, because an
+        unconfigured directory is never traversed.
         """
-        licenses = []
-        for license_id in sorted(self._license_notices):
-            notice = dict(self._license_notices[license_id])
-            text_path = notice.pop("text_path")
-            # A .html notice is structured markup (MPL, the LGPLs) and is
-            # emitted verbatim; a .txt one is plain text wrapped in <pre>.
-            notice["html"] = text_path.endswith(".html")
-            with open(text_path, encoding="utf-8") as fh:
-                notice["text"] = fh.read()
-            notice["paths"] = sorted(self._license_coverage.get(license_id, ()))
-            licenses.append(notice)
-
         path = mozpath.join(self.environment.topobjdir, "licenses.json")
         with self._write_file(path) as fh:
-            json.dump({"licenses": licenses}, fh, sort_keys=True, indent=2)
+            json.dump(
+                {"licenses": self._licenses.records()}, fh, sort_keys=True, indent=2
+            )
 
     def consume_finished(self):
         if len(self._idl_manager.modules):

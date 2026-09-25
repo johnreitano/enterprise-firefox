@@ -1942,8 +1942,6 @@ bool MOZ_NEVER_INLINE JS_HAZ_JSNATIVE_CALLER js::Interpret(JSContext* cx,
   RootedField<JSScript*> rootScript0(roots);
   RootedField<Scope*> rootScope0(roots);
 
-  DebugOnly<uint32_t> blockDepth;
-
   /* State communicated between non-local jumps: */
   bool interpReturnOK;
   bool frameHalfInitialized;

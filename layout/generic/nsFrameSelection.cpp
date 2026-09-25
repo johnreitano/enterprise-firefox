@@ -45,7 +45,6 @@
 #include "nsITableCellLayout.h"
 #include "nsLayoutUtils.h"
 #include "nsPresContext.h"
-#include "nsRange.h"
 #include "nsString.h"
 #include "nsTArray.h"
 #include "nsTableCellFrame.h"
@@ -62,6 +61,7 @@
 #include "mozilla/dom/Document.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/Highlight.h"
+#include "mozilla/dom/Range.h"
 #include "mozilla/dom/Selection.h"
 #include "mozilla/dom/SelectionBinding.h"
 #include "mozilla/dom/ShadowRoot.h"
@@ -153,7 +153,7 @@ static nsresult MaybeUpdateSelectionCacheOnRepaintSelection(Selection* aSel);
 #endif  // RUN_MAYBE_UPDATE_SELECTION_CACHE_REPAINT_SELECTION
 
 #ifdef PRINT_RANGE
-static void printRange(nsRange* aDomRange);
+static void printRange(dom::Range* aDomRange);
 #  define DEBUG_OUT_RANGE(x) printRange(x)
 #else
 #  define DEBUG_OUT_RANGE(x)
@@ -282,8 +282,8 @@ struct MOZ_RAII AutoPrepareFocusRange {
       // Scripted command or the user is starting a new explicit multi-range
       // selection.
       for (const auto& range : ranges) {
-        MOZ_ASSERT(range->IsDynamicRange());
-        range->AsDynamicRange()->SetIsGenerated(false);
+        MOZ_ASSERT(range->IsRange());
+        range->AsRange()->SetIsGenerated(false);
       }
       return;
     }
@@ -297,7 +297,7 @@ struct MOZ_RAII AutoPrepareFocusRange {
     // represents the focus in a multi-range selection.  The anchor from a user
     // perspective is the most distant generated range on the opposite side.
     // Find that range and make it the mAnchorFocusRange.
-    nsRange* const newAnchorFocusRange =
+    dom::Range* const newAnchorFocusRange =
         FindGeneratedRangeMostDistantFromAnchor(*aSelection);
 
     if (!newAnchorFocusRange) {
@@ -321,7 +321,7 @@ struct MOZ_RAII AutoPrepareFocusRange {
   }
 
  private:
-  static nsRange* FindGeneratedRangeMostDistantFromAnchor(
+  static dom::Range* FindGeneratedRangeMostDistantFromAnchor(
       const Selection& aSelection) {
     const Span ranges = aSelection.mStyledRanges.Ranges();
     // This function is only called for selections with type == eNormal.
@@ -329,14 +329,14 @@ struct MOZ_RAII AutoPrepareFocusRange {
     // Therefore, all ranges must be dynamic.
     if (aSelection.GetDirection() == eDirNext) {
       for (const auto& range : ranges) {
-        if (range->AsDynamicRange()->IsGenerated()) {
-          return range->AsDynamicRange();
+        if (range->AsRange()->IsGenerated()) {
+          return range->AsRange();
         }
       }
     } else {
       for (const auto& range : Reversed(ranges)) {
-        if (range->AsDynamicRange()->IsGenerated()) {
-          return range->AsDynamicRange();
+        if (range->AsRange()->IsGenerated()) {
+          return range->AsRange();
         }
       }
     }
@@ -352,10 +352,10 @@ struct MOZ_RAII AutoPrepareFocusRange {
       // This function is only called for selections with type == eNormal.
       // (see MOZ_ASSERT in constructor).
       // Therefore, all ranges must be dynamic.
-      if (!ranges[i]->IsDynamicRange()) {
+      if (!ranges[i]->IsRange()) {
         continue;
       }
-      nsRange* range = ranges[i]->AsDynamicRange();
+      dom::Range* range = ranges[i]->AsRange();
       if (range->IsGenerated()) {
         range->UnregisterSelection(aSelection);
         aSelection.SelectFrames(presContext, *range, false);
@@ -383,7 +383,7 @@ struct MOZ_RAII AutoPrepareFocusRange {
 
 ////////////BEGIN nsFrameSelection methods
 
-template Result<RefPtr<nsRange>, nsresult>
+template Result<RefPtr<dom::Range>, nsresult>
 nsFrameSelection::CreateRangeExtendedToSomewhere(
     PresShell& aPresShell,
     const mozilla::LimitersAndCaretData& aLimitersAndCaretData,
@@ -726,7 +726,7 @@ void nsFrameSelection::UndefineCaretBidiLevel() {
 }
 
 #ifdef PRINT_RANGE
-void printRange(nsRange* aDomRange) {
+void printRange(Range* aDomRange) {
   if (!aDomRange) {
     printf("NULL Range\n");
   }
@@ -801,7 +801,7 @@ nsresult nsFrameSelection::MoveCaret(nsDirection aDirection,
   }
 
   const RefPtr<Selection> sel = &NormalSelection();
-  if (const nsRange* anchorFocusRange = sel->GetAnchorFocusRange()) {
+  if (const dom::Range* anchorFocusRange = sel->GetAnchorFocusRange()) {
     if (NS_WARN_IF(!anchorFocusRange->IsPositioned())) {
       return NS_ERROR_FAILURE;
     }
@@ -890,7 +890,7 @@ nsresult nsFrameSelection::MoveCaret(nsDirection aDirection,
   }
 
   if (doCollapse) {
-    const nsRange* anchorFocusRange = sel->GetAnchorFocusRange();
+    const dom::Range* anchorFocusRange = sel->GetAnchorFocusRange();
     if (anchorFocusRange) {
       RefPtr<nsINode> node;
       uint32_t offset;
@@ -1294,7 +1294,7 @@ void nsFrameSelection::MaintainedRange::MaintainAnchorFocusRange(
 
   mAmount = aAmount;
 
-  const nsRange* anchorFocusRange = aNormalSelection.GetAnchorFocusRange();
+  const dom::Range* anchorFocusRange = aNormalSelection.GetAnchorFocusRange();
   if (anchorFocusRange && aAmount != eSelectNoAmount) {
     mRange = anchorFocusRange->CloneRange();
     return;
@@ -1501,7 +1501,7 @@ nsresult nsFrameSelection::TakeFocus(nsIContent& aNewFocus,
         selection->RemoveCollapsedRanges();
 
         ErrorResult error;
-        RefPtr<nsRange> newRange = nsRange::Create(
+        RefPtr<dom::Range> newRange = dom::Range::Create(
             &aNewFocus, aContentOffset, &aNewFocus, aContentOffset, error);
         if (NS_WARN_IF(error.Failed())) {
           return error.StealNSResult();
@@ -2318,7 +2318,7 @@ nsresult nsFrameSelection::ClearNormalSelection() {
   return err.StealNSResult();
 }
 
-static nsIContent* GetFirstSelectedContent(const nsRange* aRange) {
+static nsIContent* GetFirstSelectedContent(const dom::Range* aRange) {
   if (!aRange) {
     return nullptr;
   }
@@ -2664,7 +2664,7 @@ nsresult nsFrameSelection::TableSelection::HandleMouseUpOrDown(
         MOZ_ASSERT(aNormalSelection.RangeCount() == rangeCount);
         // Strong reference, because sometimes we want to remove
         // this range, and then we might be the only owner.
-        RefPtr<nsRange> range = aNormalSelection.GetRangeAt(i);
+        RefPtr<dom::Range> range = aNormalSelection.GetRangeAt(i);
         if (MOZ_UNLIKELY(!range)) {
           return NS_ERROR_NULL_POINTER;
         }
@@ -2783,7 +2783,7 @@ nsresult nsFrameSelection::TableSelection::UnselectCells(
   int32_t maxColIndex = std::max(aStartColumnIndex, aEndColumnIndex);
 
   // Strong reference because we sometimes remove the range
-  RefPtr<nsRange> range = GetFirstCellRange(aNormalSelection);
+  RefPtr<dom::Range> range = GetFirstCellRange(aNormalSelection);
   nsIContent* cellNode = GetFirstSelectedContent(range);
   MOZ_ASSERT(!range || cellNode, "Must have cellNode if had a range");
 
@@ -3076,7 +3076,8 @@ nsresult nsFrameSelection::TableSelection::SelectRowOrColumn(
 }
 
 // static
-nsIContent* nsFrameSelection::GetFirstCellNodeInRange(const nsRange* aRange) {
+nsIContent* nsFrameSelection::GetFirstCellNodeInRange(
+    const dom::Range* aRange) {
   if (!aRange) {
     return nullptr;
   }
@@ -3093,11 +3094,11 @@ nsIContent* nsFrameSelection::GetFirstCellNodeInRange(const nsRange* aRange) {
   return childContent;
 }
 
-nsRange* nsFrameSelection::TableSelection::GetFirstCellRange(
+dom::Range* nsFrameSelection::TableSelection::GetFirstCellRange(
     const mozilla::dom::Selection& aNormalSelection) {
   MOZ_ASSERT(aNormalSelection.Type() == SelectionType::eNormal);
 
-  nsRange* firstRange = aNormalSelection.GetRangeAt(0);
+  dom::Range* firstRange = aNormalSelection.GetRangeAt(0);
   if (!GetFirstCellNodeInRange(firstRange)) {
     return nullptr;
   }
@@ -3108,11 +3109,11 @@ nsRange* nsFrameSelection::TableSelection::GetFirstCellRange(
   return firstRange;
 }
 
-nsRange* nsFrameSelection::TableSelection::GetNextCellRange(
+dom::Range* nsFrameSelection::TableSelection::GetNextCellRange(
     const mozilla::dom::Selection& aNormalSelection) {
   MOZ_ASSERT(aNormalSelection.Type() == SelectionType::eNormal);
 
-  nsRange* range =
+  dom::Range* range =
       aNormalSelection.GetRangeAt(AssertedCast<uint32_t>(mSelectedCellIndex));
 
   // Get first node in next range of selection - test if it's a cell
@@ -3190,8 +3191,8 @@ nsresult CreateAndAddRange(nsINode* aContainer, int32_t aOffset,
 
   // Set range around child at given offset
   ErrorResult error;
-  RefPtr<nsRange> range =
-      nsRange::Create(aContainer, aOffset, aContainer, aOffset + 1, error);
+  RefPtr<dom::Range> range =
+      dom::Range::Create(aContainer, aOffset, aContainer, aOffset + 1, error);
   if (NS_WARN_IF(error.Failed())) {
     return error.StealNSResult();
   }

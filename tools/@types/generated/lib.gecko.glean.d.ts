@@ -7914,7 +7914,7 @@ interface GleanImpl {
     unableToApplyNotify: GleanCounter;
     unableToApplySubsequent: GleanCounter;
     updateOutcome: GleanEventWithExtras<{ can_stage?: string|boolean, is_background?: string|boolean, is_patch?: string|boolean, is_success?: string|boolean, previous_version?: string, target_version?: string, total_retries?: string|number }>;
-    bitshresult: Record<string, GleanCounter>;
+    bitsError: GleanEventWithExtras<{ code?: string, code_type?: string, error_action?: string|number, error_stage?: string|number, error_type?: string|number, patch_type?: string }>;
     moveResult: Record<string, GleanCounter>;
     noWindowAutoRestarts: GleanCounter;
     suppressPrompts: GleanBoolean;

@@ -28,7 +28,13 @@ import mozilla.components.feature.listentopage.content.TextChunker
 import mozilla.components.feature.listentopage.playback.ArticleDisplayData
 import mozilla.components.feature.listentopage.playback.AudioFileCache
 import mozilla.components.feature.listentopage.playback.ChunkAudio
+import mozilla.components.feature.listentopage.playback.ChunkPosition
 import mozilla.components.feature.listentopage.playback.PlaybackController
+import mozilla.components.feature.listentopage.playback.PlaybackIntent
+import mozilla.components.feature.listentopage.playback.SEEK_BACK_INCREMENT_MS
+import mozilla.components.feature.listentopage.playback.SEEK_FORWARD_INCREMENT_MS
+import mozilla.components.feature.listentopage.playback.SynthesisJobPriorityLock
+import mozilla.components.feature.listentopage.playback.chunkPositionAt
 import mozilla.components.feature.listentopage.settings.ListenSettings
 import mozilla.components.feature.listentopage.synthesis.NoOfflineVoiceAvailableException
 import mozilla.components.feature.listentopage.synthesis.NothingToReadException
@@ -92,11 +98,28 @@ class ListenMiddleware(
     // What the session has made of the article, held so that the audio can be thrown away when the session ends.
     private var synthesisQueue: SynthesisQueue? = null
 
+    // Whether the user has asked this session to start reading. The article and its voices are made ready as soon as
+    // the session starts, but nothing is synthesized or played until then.
+    private var playRequested = false
+
     // Which chunk of the article the player last reported reading out.
     private var playingChunk = NO_CHUNK
 
     // The last chunk that was enqueued to the player.
     private var appendedThrough = NO_CHUNK
+
+    // The chunk that started the most chunk most recently seeked in the player.
+    private var playlistStartChunk = 0
+
+    // Lock with associated priorities to manage which playback operations override each other
+    private val synthesisJobPriorityLock = SynthesisJobPriorityLock()
+
+    // The chunk the session is making again after a playback failure, and how many times it has tried.
+    private var recoveringChunk = NO_CHUNK
+    private var recoveryAttempts = 0
+
+    // Whether the player was just moved by a seek.
+    private var seeked = false
 
     // The scope every piece of this session's synthesis runs in, so that ending the session cancels all of it at once,
     // including work that is still waiting its turn.
@@ -131,7 +154,7 @@ class ListenMiddleware(
 
             ListenAction.Session.StopRequested -> endSession(releasePlayback = true)
 
-            is ListenAction.Content.ContentReady -> store.loadVoicesAndPlay(action.languageTag)
+            is ListenAction.Content.ContentReady -> store.loadVoicesAndPlayIfRequested(action.languageTag)
 
             is ListenAction.Voices.VoiceSelected -> {
                 // Saved even when the voice is the one already reading, because the voice a load picks for itself is
@@ -145,6 +168,13 @@ class ListenMiddleware(
                 }
             }
 
+            is ListenAction.Playback.SeekRequested -> store.seekToArticlePosition(action.positionMs)
+
+            ListenAction.Controls.PlayPauseClicked -> store.togglePlayback()
+            ListenAction.Controls.RewindClicked -> store.skipBy(-SEEK_BACK_INCREMENT_MS)
+            ListenAction.Controls.ForwardClicked -> store.skipBy(SEEK_FORWARD_INCREMENT_MS)
+
+            is ListenAction.Controls -> Unit
             is ListenAction.Playback,
             ListenAction.Content.ContentUnavailable,
             is ListenAction.Voices.AvailableVoicesLoaded,
@@ -166,15 +196,20 @@ class ListenMiddleware(
     }
 
     /**
-     * Reports to the Store what [playback] represents in terms of the article. Will also manipulate the queue as
-     * needed, since the player does not understand the context of the queue or full article.
+     * Reports to the Store what [report] represents in terms of the article. Will also manipulate the queue as needed,
+     * since the player does not understand the context of the queue or full article.
      */
-    private fun ListenStore.reportPlayback(playback: PlaybackState) {
+    private fun ListenStore.reportPlayback(report: PlaybackState) {
+        // The player counts the items of its playlist, which resets after a seek since the playlist is forced to
+        // restart at the new chunk. The rest of the playback operations work off of that new chunk, so we update it in
+        // State here.
+        val playback = report.copy(chunk = report.chunk.copy(index = playlistStartChunk + report.chunk.index))
+
         // Every report moves the article on.
         reportArticleProgress(playback)
 
         when (playback.phase) {
-            PlaybackPhase.Failed -> dispatch(ListenAction.Playback.PlaybackFailed)
+            PlaybackPhase.Failed -> recoverOrReportFailure()
             PlaybackPhase.Ended -> refillOrEnd(this::dispatch)
 
             // If the player reaches a chunk that is not playing yet, it indicates the chunk is still loading
@@ -250,31 +285,76 @@ class ListenMiddleware(
             return
         }
 
+        val displayData = browserStore.state.findTab(tabId).describeArticle()
         article =
             Article(
                 tabId = tabId,
                 text = content.text,
                 languageTag = language,
-                displayData = browserStore.state.findTab(tabId).describeArticle(),
+                displayData = displayData,
             )
-        dispatch(ListenAction.Content.ContentReady(languageTag = language))
+        dispatch(
+            ListenAction.Content.ContentReady(
+                languageTag = language,
+                title = displayData.title,
+                site = displayData.site,
+            )
+        )
     }
 
     /**
-     * Loads the voices of the article language, unless they are loaded already, and then reads the article out.
+     * Loads the voices of the article language, unless they are loaded already, and then reads the article out if the
+     * user has already asked for it.
      *
      * The load and the synthesis are one job rather than two because the engine reads with the voice it was last given:
      * starting the synthesis alongside the load reads the opening of the article in whichever voice the engine happens
      * to default to. A language with no offline voice is not read out at all.
      */
-    private fun ListenStore.loadVoicesAndPlay(langTag: String) {
+    private fun ListenStore.loadVoicesAndPlayIfRequested(langTag: String) {
         voicesJob?.cancel()
         voicesJob = scope.launch {
             if (state.voiceState.loadState != VoiceLoadState.Loaded && !loadVoices(langTag)) {
                 return@launch
             }
 
-            synthesizeAndPlay(state.tabId, this@loadVoicesAndPlay::dispatch)
+            if (playRequested) {
+                synthesizeAndPlay(state.tabId, this@loadVoicesAndPlayIfRequested::dispatch)
+            }
+        }
+    }
+
+    /**
+     * Starts reading the article on the first press, and afterwards pauses or resumes it depending on what the player
+     * last reported.
+     *
+     * A press before the article is ready is remembered, and the article is read out once its voices are loaded.
+     */
+    private fun ListenStore.togglePlayback() {
+        if (!playRequested) {
+            playRequested = true
+
+            // Without an article the voice load has not started yet, and while it runs it reads the article out once
+            // it is done.
+            if (article != null && voicesJob?.isActive != true) {
+                voicesJob = scope.launch { synthesizeAndPlay(state.tabId, this@togglePlayback::dispatch) }
+            }
+            return
+        }
+
+        when (state.playbackState.phase) {
+            PlaybackPhase.Playing,
+            PlaybackPhase.Buffering -> scope.launch { playbackController.pause() }
+
+            PlaybackPhase.Paused,
+            PlaybackPhase.Failed -> scope.launch { playbackController.resume() }
+
+            PlaybackPhase.Ended -> {
+                seekToArticlePosition(0)
+                scope.launch { playbackController.resume() }
+            }
+
+            // The opening is still being synthesized, and plays on its own once it is ready.
+            PlaybackPhase.Idle -> Unit
         }
     }
 
@@ -344,7 +424,9 @@ class ListenMiddleware(
 
             withContext(ioDispatcher) { synthesizer().setVoice(voice) }
 
-            synthesizeAndPlay(state.tabId, this@changeVoiceTo::dispatch, resumeAtMs)
+            if (playRequested) {
+                synthesizeAndPlay(state.tabId, this@changeVoiceTo::dispatch, resumeAtMs)
+            }
         }
     }
 
@@ -362,16 +444,25 @@ class ListenMiddleware(
 
         playingChunk = NO_CHUNK
         appendedThrough = NO_CHUNK
+        playlistStartChunk = firstChunkIndex
+        recoveringChunk = NO_CHUNK
+        recoveryAttempts = 0
+
+        val lock = synthesisJobPriorityLock.tryClaim(PlaybackIntent.Restart) ?: return
 
         synthesizing(dispatch) {
             val queue = SynthesisQueue(synthesizer(), ChunkAudio(audioCache), chunker, ioDispatcher)
             synthesisQueue = queue
 
-            val opening = queue.startReading(article.text, article.languageTag)
-            playbackController.play(file = opening, articleDisplayData = article.displayData)
-            appendedThrough = firstChunkIndex
-            if (resumeAtMs > 0) {
-                playbackController.seekTo(resumeAtMs)
+            try {
+                val opening = queue.startReading(article.text, article.languageTag)
+                playbackController.play(file = opening, articleDisplayData = article.displayData)
+                appendedThrough = firstChunkIndex
+                if (resumeAtMs > 0) {
+                    playbackController.seekTo(resumeAtMs)
+                }
+            } finally {
+                lock.release()
             }
 
             // Runs ahead of the opening while it plays, so the chunk after it is queued behind it rather than started
@@ -416,6 +507,106 @@ class ListenMiddleware(
         }
     }
 
+    /** Makes the chunk the player failed on again, or reports the failure if the chunk cannot be remade. */
+    private fun ListenStore.recoverOrReportFailure() {
+        val queue = synthesisQueue
+        val progress = state.articleProgress
+        val target = progress.chunkDurationsMs.chunkPositionAt(progress.positionMs)
+        if (queue == null || target == null) {
+            // No way to remake a chunk that we can't find
+            dispatch(ListenAction.Playback.PlaybackFailed)
+            return
+        }
+
+        if (target.chunkIndex != recoveringChunk) {
+            recoveringChunk = target.chunkIndex
+            recoveryAttempts = 0
+        }
+
+        val lock = synthesisJobPriorityLock.tryClaim(PlaybackIntent.Recovery) ?: return
+
+        if (recoveryAttempts >= MAX_RECOVERY_ATTEMPTS) {
+            lock.release()
+            dispatch(ListenAction.Playback.PlaybackFailed)
+            return
+        }
+        recoveryAttempts += 1
+
+        scope.launch {
+            queue.discard(target.chunkIndex)
+            remakeAndRestartAt(target, lock, queue)
+        }
+    }
+
+    /**
+     * Moves playback to [positionMs] into the article.
+     *
+     * The lengths come from the Store, rather than the queue. The Store should have data that matches the last lengths
+     * reported to the player, so this keeps them in sync even if the queue has been actively synthesizing lengths for
+     * other chunks.
+     */
+    private fun ListenStore.seekToArticlePosition(positionMs: Long) {
+        val queue = synthesisQueue ?: return
+        val target = state.articleProgress.chunkDurationsMs.chunkPositionAt(positionMs) ?: return
+        val lock = synthesisJobPriorityLock.tryClaim(PlaybackIntent.Seek) ?: return
+
+        scope.launch {
+            if (!lock.isHeld) return@launch
+
+            // Check if seek is within already synthesized chunks
+            if (target.chunkIndex in playlistStartChunk..appendedThrough && queue.fileFor(target.chunkIndex) != null) {
+                playbackController.seekTo(target.chunkIndex - playlistStartChunk, target.positionMs)
+                seeked = true
+                lock.release()
+                return@launch
+            }
+
+            remakeAndRestartAt(target, lock, queue)
+        }
+    }
+
+    /** Drops the work in flight, makes the audio of [target] and starts the playlist again there. */
+    private fun ListenStore.remakeAndRestartAt(
+        target: ChunkPosition,
+        lock: SynthesisJobPriorityLock.Handle,
+        queue: SynthesisQueue,
+    ) {
+        dispatch(ListenAction.Playback.PlaybackWaiting)
+
+        stopSynthesizing {}
+
+        synthesizing(this::dispatch) {
+            try {
+                // Ensure another seek has not occurred
+                if (!lock.isHeld) return@synthesizing
+
+                val file = queue.audioFor(target.chunkIndex) ?: return@synthesizing
+
+                // Check again in case of repeated seeks while waiting for the above synthesis
+                if (!lock.isHeld) return@synthesizing
+
+                playbackController.restartAt(file, target.positionMs)
+                seeked = true
+                playlistStartChunk = target.chunkIndex
+                playingChunk = target.chunkIndex
+                appendedThrough = target.chunkIndex
+            } finally {
+                lock.release()
+            }
+
+            queue.workAheadOf(target.chunkIndex)
+        }
+    }
+
+    /**
+     * Moves playback [offsetMs] through the article from where it is, kept inside the article. It goes through the
+     * article rather than the player, whose own skip stops at the edges of the chunk it is playing.
+     */
+    private fun ListenStore.skipBy(offsetMs: Long) {
+        val progress = state.articleProgress
+        seekToArticlePosition((progress.positionMs + offsetMs).coerceIn(0, progress.durationMs))
+    }
+
     /**
      * Fills the window around [playingChunk] without reporting what it fails with.
      *
@@ -425,7 +616,7 @@ class ListenMiddleware(
      */
     private suspend fun SynthesisQueue.workAheadOf(playingChunk: Int) {
         try {
-            moveWindowTo(playingChunk)
+            moveWindowTo(playingChunk, queuedThrough = appendedThrough)
         } catch (e: CancellationException) {
             throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
@@ -488,6 +679,7 @@ class ListenMiddleware(
         voicesJob?.cancel()
         tabClosureJob?.cancel()
         article = null
+        playRequested = false
 
         val emptying = synthesisQueue
         synthesisQueue = null
@@ -548,21 +740,34 @@ class ListenMiddleware(
      */
     private fun ListenStore.reportArticleProgress(playback: PlaybackState) {
         val queue = synthesisQueue ?: return
+        val mapper = queue.mapper()
+        val previous = if (seeked) state.articleProgress.copy(positionMs = 0) else state.articleProgress
+        seeked = false
         val progress =
-            queue.progress(
-                previous = state.articleProgress,
-                playingChunk = playback.chunk.index,
-                chunkPositionMs = playback.positionMs,
-                chunkEnded = playback.phase == PlaybackPhase.Ended,
-            )
+            mapper
+                .progress(
+                    previous = previous,
+                    playingChunk = playback.chunk.index,
+                    chunkPositionMs = playback.positionMs,
+                    chunkEnded = playback.phase == PlaybackPhase.Ended,
+                )
+                .copy(chunkDurationsMs = mapper.chunkLengthsMs())
 
         if (progress != state.articleProgress) {
-            dispatch(ListenAction.Playback.ArticleProgressChanged(progress.positionMs, progress.durationMs))
+            dispatch(
+                ListenAction.Playback.ArticleProgressChanged(
+                    positionMs = progress.positionMs,
+                    durationMs = progress.durationMs,
+                    chunkDurationsMs = progress.chunkDurationsMs,
+                )
+            )
         }
     }
 }
 
 private const val NO_CHUNK = -1
+
+internal const val MAX_RECOVERY_ATTEMPTS = 3
 
 /**
  * The page this tab shows: in reader mode the article the reader view renders, rather than the reader view's own URL.

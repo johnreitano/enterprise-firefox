@@ -7,6 +7,8 @@ subsuite = "taskgraph"
 
 ["test_actions_util.py"]
 
+["test_android_taskgraph.py"]
+
 ["test_decision.py"]
 
 ["test_files_changed.py"]

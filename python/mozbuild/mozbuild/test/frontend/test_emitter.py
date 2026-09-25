@@ -2090,6 +2090,17 @@ class TestEmitterBasic(unittest.TestCase):
         with self.assertRaisesRegex(SandboxValidationError, "does not exist"):
             self.read_topsrcdir(reader)
 
+    def test_licenses_no_text_file_at_all(self):
+        # No `text`, and no moz.yaml above it naming one either.
+        reader = self.reader("licenses-no-text")
+        with self.assertRaisesRegex(SandboxValidationError, "requires a text file"):
+            self.read_topsrcdir(reader)
+
+    def test_licenses_declared_twice_in_one_file(self):
+        reader = self.reader("licenses-declared-twice")
+        with self.assertRaisesRegex(SandboxValidationError, "declared twice here"):
+            self.read_topsrcdir(reader)
+
 
 if __name__ == "__main__":
     main()

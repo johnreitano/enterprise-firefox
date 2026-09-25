@@ -45,6 +45,7 @@ if CONFIG["OS_TARGET"] == "Darwin":
     # which would make Rect/Point/Size ambiguous in all subsequent unified files.
     SOURCES += [
         "TestMacIOSurfaceHelpers.cpp",
+        "TestNativeLayerCA.mm",
     ]
 
 UNIFIED_SOURCES += [

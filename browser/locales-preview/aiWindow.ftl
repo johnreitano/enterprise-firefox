@@ -360,6 +360,13 @@ ai-tab-create-page-prompt =
        *[other] Create an { -ai-tab-brand-name } from these tabs:
     }
 
+# A rating cell in a generated table, for example "4.5 / 5". Both numbers
+# arrive already formatted for the locale.
+# Variables:
+#   $value (String) - The item's rating.
+#   $max (String) - The highest possible rating.
+ai-tab-table-rating = { $value } / { $max }
+
 ## Smartbar command palette
 ## Slash commands shown in the smartbar when the user types "/".
 
@@ -523,3 +530,13 @@ aiwindow-resume-section-show-more = Show more ({ $count })
 # Variables:
 #   $count (Number) - Total number of resume cards in the section
 aiwindow-resume-section-show-less = Show less ({ $count })
+
+# Shown in place of the cards when there are no journeys to suggest yet. A
+# "journey" is a past browsing or chat session the user can pick back up
+# from where they left off.
+aiwindow-resume-section-empty-no-suggestions-heading = Nothing to suggest right now
+aiwindow-resume-section-empty-no-suggestions-description = When there’s something to pick back up, you’ll see it here.
+# Shown in place of the cards when the user has dismissed every suggestion.
+aiwindow-resume-section-empty-all-dismissed-heading = All caught up
+aiwindow-resume-section-empty-all-dismissed-description = That’s all the suggestions for now. Check back later for more.
+aiwindow-resume-section-hide = Hide for now

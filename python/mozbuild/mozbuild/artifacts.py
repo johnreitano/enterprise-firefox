@@ -300,6 +300,8 @@ class ArtifactJob:
                 yield name
             elif name.endswith(self._extra_archive_suffixes):
                 yield name
+            elif name == self._licenses_artifact:
+                yield name
             else:
                 self.log(
                     logging.DEBUG,
@@ -323,7 +325,15 @@ class ArtifactJob:
         with JarWriter(**kwargs) as writer:
             yield writer
 
+    _licenses_artifact = "public/build/licenses.json"
+
     def process_artifact(self, filename, processed_filename):
+        if self._get_orig_basename(filename) == "licenses.json":
+            with self.get_writer(file=processed_filename) as writer, open(
+                filename, "rb"
+            ) as fh:
+                writer.add(b"licenses.artifact.json", fh)
+            return
         if filename.endswith(ArtifactJob._test_zip_archive_suffix) and self._tests_re:
             return self.process_tests_zip_artifact(filename, processed_filename)
         if filename.endswith(ArtifactJob._test_tar_archive_suffix) and self._tests_re:
@@ -1001,6 +1011,7 @@ class UnfilteredProjectPackageArtifactJob(ArtifactJob):
         for cls in (LinuxArtifactJob, MacArtifactJob, WinArtifactJob)
     ])
     job_configuration = GeckoJobConfiguration
+    _licenses_artifact = None
 
     @property
     def _extra_archives(self):

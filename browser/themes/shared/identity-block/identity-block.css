@@ -12,6 +12,8 @@
 }
 
 #identity-box {
+  column-gap: var(--urlbar-component-gap);
+
   &[pageproxystate="invalid"] {
     pointer-events: none;
     -moz-user-focus: ignore;
@@ -328,6 +330,10 @@
   #identity-box {
     /* Keep displaying the moz-extension or chrome UI chicklet */
     &[pageproxystate="valid"]:not(.chromeUI, .extensionPage) {
+      /* The box is usually empty in this state, so drop the gaps the input
+         container would otherwise put on either side of it. */
+      margin-inline: calc(-1 * var(--urlbar-component-gap));
+
       #identity-icon-box {
         display: none;
       }

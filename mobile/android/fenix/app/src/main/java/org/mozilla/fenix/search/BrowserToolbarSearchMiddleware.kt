@@ -601,7 +601,12 @@ class BrowserToolbarSearchMiddleware(
                         )
                         components.useCases.fenixBrowserUseCases.loadUrlOrSearch(
                             searchTermOrURL = it.qrScannerState.lastScanData,
-                            newTab = appStore.state.searchState.sourceTabId == null,
+                            newTab =
+                                if (settings.enableHomepageAsNewTab) {
+                                    false
+                                } else {
+                                    appStore.state.searchState.sourceTabId == null
+                                },
                             flags = EngineSession.LoadUrlFlags.external(),
                             private = browsingModeManager.mode.isPrivate,
                         )

@@ -308,6 +308,7 @@ class WindowGlobalParent final : public WindowContext,
   mozilla::ipc::IProtocol* AsNativeActor() override { return this; }
 
   // IPC messages
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY
   mozilla::ipc::IPCResult RecvLoadURI(
       const MaybeDiscarded<dom::BrowsingContext>& aTargetBC,
       nsDocShellLoadState* aLoadState, bool aSetNavigating);
@@ -399,6 +400,7 @@ class WindowGlobalParent final : public WindowContext,
   mozilla::ipc::IPCResult RecvAddCertException(
       bool aTemporary, AddCertExceptionResolver&& aResolver);
 
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY
   mozilla::ipc::IPCResult RecvReloadWithHttpsOnlyException();
 
   mozilla::ipc::IPCResult RecvGetStorageAccessPermission(

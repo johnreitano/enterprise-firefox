@@ -12,6 +12,7 @@
 #include "mozilla/ContentCache.h"
 #include "mozilla/EventForwards.h"
 #include "mozilla/RefPtr.h"
+#include "mozilla/WeakPtr.h"
 #include "mozilla/dom/BrowserBridgeParent.h"
 #include "mozilla/dom/PBrowserParent.h"
 #include "mozilla/dom/TabContext.h"
@@ -27,7 +28,6 @@
 #include "nsIRemoteTab.h"
 #include "nsIWidget.h"
 #include "nsTArray.h"
-#include "nsWeakReference.h"
 
 class imgIContainer;
 class nsCycleCollectionTraversalCallback;
@@ -78,9 +78,6 @@ namespace ipc {
 class StructuredCloneData;
 }  // namespace ipc
 
-#define DOM_BROWSERPARENT_IID \
-  {0x58b47b52, 0x77dc, 0x44cf, {0x8b, 0xe5, 0x8e, 0x78, 0x24, 0xd9, 0xae, 0xc5}}
-
 /**
  * BrowserParent implements the parent actor part of the PBrowser protocol. See
  * PBrowser for more information.
@@ -88,7 +85,7 @@ class StructuredCloneData;
 class BrowserParent final : public PBrowserParent,
                             public nsIDOMEventListener,
                             public nsIAuthPromptProvider,
-                            public nsSupportsWeakReference,
+                            public SupportsWeakPtr,
                             public TabContext,
                             public LiveResizeListener {
   using TapType = GeckoContentController_TapType;
@@ -101,7 +98,6 @@ class BrowserParent final : public PBrowserParent,
   // Helper class for ContentParent::RecvCreateWindow.
   struct AutoUseNewTab;
 
-  NS_INLINE_DECL_STATIC_IID(DOM_BROWSERPARENT_IID)
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS_FINAL
   NS_DECL_NSIAUTHPROMPTPROVIDER
   // nsIDOMEventListener interfaces
@@ -110,7 +106,7 @@ class BrowserParent final : public PBrowserParent,
   NS_DECL_CYCLE_COLLECTION_CLASS_AMBIGUOUS(BrowserParent, nsIDOMEventListener)
 
   BrowserParent(ContentParent* aManager, const TabId& aTabId,
-                const TabContext& aContext,
+                uint64_t aRootOuterWindowId, const TabContext& aContext,
                 CanonicalBrowsingContext* aBrowsingContext,
                 uint32_t aChromeFlags);
 
@@ -813,7 +809,8 @@ class BrowserParent final : public PBrowserParent,
  private:
   // This is used when APZ needs to find the BrowserParent associated with a
   // layer to dispatch events.
-  typedef nsTHashMap<nsUint64HashKey, nsWeakPtr> LayerToBrowserParentTable;
+  typedef nsTHashMap<nsUint64HashKey, WeakPtr<BrowserParent>>
+      LayerToBrowserParentTable;
   static LayerToBrowserParentTable* sLayerToBrowserParentTable;
 
   static void AddBrowserParentToTable(layers::LayersId aLayersId,
@@ -879,6 +876,7 @@ class BrowserParent final : public PBrowserParent,
 
  private:
   TabId mTabId;
+  uint64_t mRootOuterWindowId;
 
   // The root browsing context loaded in this BrowserParent.
   RefPtr<CanonicalBrowsingContext> mBrowsingContext;

@@ -2511,7 +2511,8 @@ void gfxPlatform::InitGPUProcessPrefs() {
     return;
   }
 
-  if (IsHeadless()) {
+  if (IsHeadless() &&
+      !StaticPrefs::layers_gpu_process_allow_headless_AtStartup()) {
     gpuProc.ForceDisable(FeatureStatus::Blocked, "Headless mode is enabled",
                          "FEATURE_FAILURE_HEADLESS_MODE"_ns);
     return;

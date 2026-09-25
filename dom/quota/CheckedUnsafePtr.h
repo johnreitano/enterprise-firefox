@@ -132,8 +132,10 @@ struct CheckedUnsafePtrCheckData {
 class CheckedUnsafePtrBaseCheckingEnabled {
   friend class CheckedUnsafePtrBaseAccess;
 
- protected:
+ public:
   CheckedUnsafePtrBaseCheckingEnabled() = delete;
+
+ protected:
   CheckedUnsafePtrBaseCheckingEnabled(
       const CheckedUnsafePtrBaseCheckingEnabled& aOther) = default;
   CheckedUnsafePtrBaseCheckingEnabled(const char* aFunction, const char* aFile,
@@ -150,7 +152,7 @@ class CheckedUnsafePtrBaseCheckingEnabled {
 
   template <typename Ptr>
   using DisableForCheckedUnsafePtr = std::enable_if_t<
-      !std::is_base_of<CheckedUnsafePtrBaseCheckingEnabled, Ptr>::value>;
+      !std::is_base_of_v<CheckedUnsafePtrBaseCheckingEnabled, Ptr>>;
 
   // When constructing an CheckedUnsafePtr from a different kind of pointer it's
   // not possible to determine whether it's dangling; therefore it's undefined
@@ -201,8 +203,7 @@ class CheckedUnsafePtrBase;
 
 template <typename T, typename U, typename S = std::nullptr_t>
 using EnableIfCompatible = std::enable_if_t<
-    std::is_base_of<
-        T, std::remove_reference_t<decltype(*std::declval<U>())>>::value,
+    std::is_base_of_v<T, std::remove_reference_t<decltype(*std::declval<U>())>>,
     S>;
 
 template <typename T>
@@ -390,7 +391,7 @@ class MOZ_EMPTY_BASES CheckCheckedUnsafePtrs
  protected:
   static constexpr bool ShouldCheck() {
     static_assert(
-        std::is_base_of<CheckCheckedUnsafePtrs, Derived>::value,
+        std::is_base_of_v<CheckCheckedUnsafePtrs, Derived>,
         "cannot instantiate with a type that's not a subclass of this class");
     return true;
   }
@@ -508,7 +509,7 @@ class MOZ_EMPTY_BASES SupportsCheckedUnsafePtr
 template <typename T>
 class CheckedUnsafePtr : public detail::CheckedUnsafePtrBase<T> {
   static_assert(
-      std::is_base_of<detail::SupportsCheckedUnsafePtrTag, T>::value,
+      std::is_base_of_v<detail::SupportsCheckedUnsafePtrTag, T>,
       "type T must be derived from instantiation of SupportsCheckedUnsafePtr");
 
  public:

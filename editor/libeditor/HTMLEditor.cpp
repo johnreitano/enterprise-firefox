@@ -1187,7 +1187,7 @@ void HTMLEditor::InitializeSelectionAncestorLimit(
   bool tryToCollapseSelectionAtFirstEditableNode = true;
   if (SelectionRef().RangeCount() == 1 && SelectionRef().IsCollapsed()) {
     Element* editingHost = ComputeEditingHost();
-    const nsRange* range = SelectionRef().GetRangeAt(0);
+    const dom::Range* range = SelectionRef().GetRangeAt(0);
     if (range->GetStartContainer() == editingHost && !range->StartOffset()) {
       // JS or user operation has already collapsed selection at start of
       // the editing host.  So, we don't need to try to change selection
@@ -1234,7 +1234,7 @@ nsresult HTMLEditor::MaybeCollapseSelectionAtFirstEditableNode(
   // start of the editing host, we shouldn't reset selection.  E.g., window
   // is activated when the editor had focus before inactivated.
   if (aIgnoreIfSelectionInEditingHost && SelectionRef().RangeCount() == 1) {
-    const nsRange* range = SelectionRef().GetRangeAt(0);
+    const dom::Range* range = SelectionRef().GetRangeAt(0);
     if (!range->Collapsed() ||
         range->GetStartContainer() != editingHost.get() ||
         range->StartOffset()) {
@@ -2257,11 +2257,11 @@ nsresult HTMLEditor::AppendContentToSelectionAsRange(nsIContent& aContent) {
     return NS_ERROR_FAILURE;
   }
 
-  RefPtr<nsRange> range = nsRange::Create(
+  RefPtr<dom::Range> range = dom::Range::Create(
       atContent.ToRawRangeBoundary(),
       atContent.NextPoint().ToRawRangeBoundary(), IgnoreErrors());
   if (NS_WARN_IF(!range)) {
-    NS_WARNING("nsRange::Create() failed");
+    NS_WARNING("Range::Create() failed");
     return NS_ERROR_FAILURE;
   }
 
@@ -2523,7 +2523,7 @@ nsresult HTMLEditor::GetCSSBackgroundColorState(
   // the default background color is transparent
   aOutColor.AssignLiteral("transparent");
 
-  RefPtr<const nsRange> firstRange = SelectionRef().GetRangeAt(0);
+  RefPtr<const dom::Range> firstRange = SelectionRef().GetRangeAt(0);
   if (NS_WARN_IF(!firstRange)) {
     return NS_ERROR_FAILURE;
   }
@@ -3297,7 +3297,7 @@ already_AddRefed<Element> HTMLEditor::GetSelectedElement(const nsAtom* aTagName,
   bool isLinkTag = aTagName && IsLinkTag(*aTagName);
   bool isNamedAnchorTag = aTagName && IsNamedAnchorTag(*aTagName);
 
-  RefPtr<nsRange> firstRange = SelectionRef().GetRangeAt(0);
+  RefPtr<dom::Range> firstRange = SelectionRef().GetRangeAt(0);
   MOZ_ASSERT(firstRange);
 
   const RangeBoundary& startRef = firstRange->StartRef();
@@ -4972,7 +4972,7 @@ bool HTMLEditor::SetCaretInTableCell(Element* aElement) {
  * Uses HTMLEditor::JoinNodesWithTransaction() so action is undoable.
  * Should be called within the context of a batch transaction.
  */
-nsresult HTMLEditor::CollapseAdjacentTextNodes(nsRange& aRange) {
+nsresult HTMLEditor::CollapseAdjacentTextNodes(dom::Range& aRange) {
   AutoTransactionsConserveSelection dontChangeMySelection(*this);
 
   // we can't actually do anything during iteration, so store the text nodes in
@@ -5387,7 +5387,7 @@ Result<SplitNodeResult, nsresult> HTMLEditor::DoSplitNode(
     }
 
     for (uint32_t j : IntegerRange(savingRange.mSelection->RangeCount())) {
-      const nsRange* r = savingRange.mSelection->GetRangeAt(j);
+      const dom::Range* r = savingRange.mSelection->GetRangeAt(j);
       MOZ_ASSERT(r);
       MOZ_ASSERT(r->IsPositioned());
       // XXX Looks like that SavedRange should have mStart and mEnd which
@@ -5555,11 +5555,11 @@ Result<SplitNodeResult, nsresult> HTMLEditor::DoSplitNode(
     AdjustDOMPoint(savedRange.mStartContainer, savedRange.mStartOffset);
     AdjustDOMPoint(savedRange.mEndContainer, savedRange.mEndOffset);
 
-    RefPtr<nsRange> newRange =
-        nsRange::Create(savedRange.mStartContainer, savedRange.mStartOffset,
-                        savedRange.mEndContainer, savedRange.mEndOffset, error);
+    RefPtr<dom::Range> newRange = dom::Range::Create(
+        savedRange.mStartContainer, savedRange.mStartOffset,
+        savedRange.mEndContainer, savedRange.mEndOffset, error);
     if (MOZ_UNLIKELY(error.Failed())) {
-      NS_WARNING("nsRange::Create() failed");
+      NS_WARNING("Range::Create() failed");
       return Err(error.StealNSResult());
     }
     // The `MOZ_KnownLive` annotation is only necessary because of a bug
@@ -5743,7 +5743,7 @@ nsresult HTMLEditor::DoJoinNodes(nsIContent& aContentToKeep,
       const uint32_t rangeCount = savingRange.mSelection->RangeCount();
       for (const uint32_t j : IntegerRange(rangeCount)) {
         MOZ_ASSERT(savingRange.mSelection->RangeCount() == rangeCount);
-        const RefPtr<nsRange> r = savingRange.mSelection->GetRangeAt(j);
+        const RefPtr<dom::Range> r = savingRange.mSelection->GetRangeAt(j);
         MOZ_ASSERT(r);
         MOZ_ASSERT(r->IsPositioned());
         savingRange.mStartContainer = r->GetStartContainer();
@@ -5896,11 +5896,11 @@ nsresult HTMLEditor::DoJoinNodes(nsIContent& aContentToKeep,
     AdjustDOMPoint(savedRange.mStartContainer, savedRange.mStartOffset);
     AdjustDOMPoint(savedRange.mEndContainer, savedRange.mEndOffset);
 
-    const RefPtr<nsRange> newRange = nsRange::Create(
+    const RefPtr<dom::Range> newRange = dom::Range::Create(
         savedRange.mStartContainer, savedRange.mStartOffset,
         savedRange.mEndContainer, savedRange.mEndOffset, IgnoreErrors());
     if (!newRange) {
-      NS_WARNING("nsRange::Create() failed");
+      NS_WARNING("Range::Create() failed");
       return NS_ERROR_FAILURE;
     }
 
@@ -6525,7 +6525,7 @@ nsresult HTMLEditor::SetBlockBackgroundColorWithCSSAsSubAction(
 
   AutoClonedSelectionRangeArray selectionRanges(SelectionRef());
   MOZ_ALWAYS_TRUE(selectionRanges.SaveAndTrackRanges(*this));
-  for (const OwningNonNull<nsRange>& domRange : selectionRanges.Ranges()) {
+  for (const OwningNonNull<dom::Range>& domRange : selectionRanges.Ranges()) {
     EditorDOMRange range(domRange);
     if (NS_WARN_IF(!range.IsPositioned())) {
       continue;
@@ -6973,7 +6973,7 @@ Element* HTMLEditor::GetSelectionContainerElement() const {
     MOZ_ASSERT(rangeCount, "If 0, Selection::IsCollapsed() should return true");
 
     if (rangeCount == 1) {
-      const nsRange* range = SelectionRef().GetRangeAt(0);
+      const dom::Range* range = SelectionRef().GetRangeAt(0);
 
       const RangeBoundary& startRef = range->StartRef();
       const RangeBoundary& endRef = range->EndRef();
@@ -7001,7 +7001,7 @@ Element* HTMLEditor::GetSelectionContainerElement() const {
     } else {
       for (const uint32_t i : IntegerRange(rangeCount)) {
         MOZ_ASSERT(SelectionRef().RangeCount() == rangeCount);
-        const nsRange* range = SelectionRef().GetRangeAt(i);
+        const dom::Range* range = SelectionRef().GetRangeAt(i);
         MOZ_ASSERT(range);
         nsINode* startContainer = range->GetStartContainer();
         if (!focusNode) {
@@ -7280,7 +7280,7 @@ Element* HTMLEditor::ComputeEditingHostInternal(
     // editing host because selection ranges may be visible for users.
     nsIContent* selectionCommonAncestor = nullptr;
     for (uint32_t i : IntegerRange(SelectionRef().RangeCount())) {
-      nsRange* range = SelectionRef().GetRangeAt(i);
+      dom::Range* range = SelectionRef().GetRangeAt(i);
       MOZ_ASSERT(range);
       nsIContent* commonAncestor =
           nsIContent::FromNodeOrNull(range->GetCommonAncestorContainer(
@@ -7605,7 +7605,7 @@ Result<widget::IMEState, nsresult> HTMLEditor::GetPreferredIMEState() const {
     }
     // Don't show IME when first selection range is in a non-editable node.
     // (Currently, first selection range determines whether input is allowed.)
-    const nsRange* range = selection->GetRangeAt(0);
+    const dom::Range* range = selection->GetRangeAt(0);
     return range->IsPositioned() && range->GetStartContainer()->IsEditable() &&
            range->GetEndContainer()->IsEditable();
   }();

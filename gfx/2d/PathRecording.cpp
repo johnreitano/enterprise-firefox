@@ -316,6 +316,52 @@ Maybe<Path::Line> PathOps::AsLine() const {
 
   return Nothing();
 }
+
+Maybe<Rect> PathOps::AsRect() const {
+  if (mPathData.length() !=
+      4 * (sizeof(OpType) + sizeof(Point)) + sizeof(OpType)) {
+    return Nothing();
+  }
+
+  const uint8_t* nextByte = mPathData.begin();
+  Point pts[4];
+  for (size_t i = 0; i < 4; ++i) {
+    const OpType opType = *reinterpret_cast<const OpType*>(nextByte);
+    nextByte += sizeof(OpType);
+    if (opType != (i == 0 ? OpType::OP_MOVETO : OpType::OP_LINETO)) {
+      return Nothing();
+    }
+    NEXT_PARAMS(Point)
+    pts[i] = params;
+  }
+  if (*reinterpret_cast<const OpType*>(nextByte) != OpType::OP_CLOSE) {
+    return Nothing();
+  }
+
+  // This mirrors Skia's check for trivial rect contours.
+  const Point v0 = pts[1] - pts[0];
+  const Point v1 = pts[2] - pts[1];
+  const Point v2 = pts[3] - pts[2];
+  const Point v3 = pts[0] - pts[3];
+  auto axisAlignedOrthogonal = [](const Point& aA, const Point& aB) {
+    // Assuming A is axis-aligned, check whether B is orthogonal to it.
+    return ((aA.x == 0) != (aB.x == 0)) && ((aA.y == 0) != (aB.y == 0));
+  };
+  // Check if the vectors are axis-aligned and form right angles.
+  if (((v0.x == 0) != (v0.y == 0)) && axisAlignedOrthogonal(v0, v1) &&
+      axisAlignedOrthogonal(v1, v2) && axisAlignedOrthogonal(v2, v3)) {
+    const float left = std::min(pts[0].x, pts[2].x);
+    const float top = std::min(pts[0].y, pts[2].y);
+    const float right = std::max(pts[0].x, pts[2].x);
+    const float bottom = std::max(pts[0].y, pts[2].y);
+    const Rect rect(left, top, right - left, bottom - top);
+    // Ensure rect conversion from points to origin/size is lossless.
+    if (rect.XMost() == right && rect.YMost() == bottom) {
+      return Some(rect);
+    }
+  }
+  return Nothing();
+}
 #undef NEXT_PARAMS
 
 size_t PathOps::NumberOfOps() const {
@@ -469,6 +515,7 @@ PathRecording::PathRecording(BackendType aBackend, FillRule aFillRule,
       mBackendType(aBackend),
       mPathOps(aPathOps) {}
 
+// Ensure any state referring to the path's identity is cleared before reuse.
 void PathRecording::ResetCachedState() {
   if (!mStoredRecorders.empty()) {
     for (size_t i = 0; i < mStoredRecorders.size(); i++) {
@@ -503,9 +550,12 @@ already_AddRefed<PathBuilder> PathRecording::MoveToBuilder(
     FillRule aFillRule, already_AddRefed<PathBuilder> aBuilder) {
   RefPtr builder(aBuilder.downcast<PathBuilderRecording>());
   if (builder) {
+    ResetCachedState();
     builder->mBackendType = mBackendType;
     builder->mFillRule = aFillRule;
     builder->mPath = do_AddRef(this);
+    builder->mCurrentPoint = mCurrentPoint;
+    builder->mBeginPoint = mBeginPoint;
   } else {
     builder = MakeRefPtr<PathBuilderRecording>(mBackendType, aFillRule,
                                                do_AddRef(this));

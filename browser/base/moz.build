@@ -10,6 +10,9 @@ SPHINX_TREES["sslerrorreport"] = "content/docs/sslerrorreport"
 with Files("content/docs/sslerrorreport/**"):
     SCHEDULES.exclusive = ["docs"]
 
+with Files("content/test/browser-safebrowsing/**"):
+    BUG_COMPONENT = ("Toolkit", "Safe Browsing")
+
 MOCHITEST_CHROME_MANIFESTS += [
     "content/test/chrome/chrome.toml",
 ]
@@ -50,6 +53,7 @@ BROWSER_CHROME_MANIFESTS += [
     "content/test/browser-popups/browser.toml",
     "content/test/browser-protectionsUI/browser.toml",
     "content/test/browser-referrer/browser.toml",
+    "content/test/browser-safebrowsing/browser.toml",
     "content/test/browser-sanitize/browser.toml",
     "content/test/browser-scroll-to-text-fragment/browser.toml",
     "content/test/browser-siteIdentity/browser.toml",
@@ -79,6 +83,14 @@ PERFTESTS_MANIFESTS += ["content/test/perftest.toml"]
 DEFINES["MOZ_APP_VERSION"] = CONFIG["MOZ_APP_VERSION"]
 DEFINES["MOZ_APP_VERSION_DISPLAY"] = CONFIG["MOZ_APP_VERSION_DISPLAY"]
 
-DEFINES["APP_LICENSE_BLOCK"] = "%s/content/overrides/app-license.html" % SRCDIR
+# Firefox's about:license: the shared page plus the Mozilla binaries notice.
+# jar.mn overrides chrome://global/content/license.html with this copy.
+GENERATED_FILES += ["license.html"]
+GENERATED_FILES["license.html"].script = "/toolkit/content/gen_license_html.py"
+GENERATED_FILES["license.html"].inputs = [
+    "/toolkit/content/license.html.mako",
+    "!/licenses.json",
+    "content/overrides/app-license.html",
+]
 
 JAR_MANIFESTS += ["jar.mn"]

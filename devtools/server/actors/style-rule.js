@@ -603,23 +603,33 @@ class StyleRuleActor extends Actor {
           const registeredProperty = registeredProperties.find(
             prop => prop.name === decl.name
           );
-          if (
-            registeredProperty &&
-            // For now, we don't handle variable based on top of substitution functions.
-            // Those guards should be removed as part of Bug 2070169.
-            !decl.value.includes("attr(") &&
-            !decl.value.includes("env(") &&
-            !decl.value.includes("var(") &&
-            !InspectorUtils.valueMatchesSyntax(
-              targetDocument,
-              decl.value,
-              registeredProperty.syntax
-            )
-          ) {
-            // if the value doesn't match the syntax, it's invalid
-            decl.invalidAtComputedValueTime = true;
-            // pass the syntax down to the client so it can easily be used in a warning message
-            decl.syntax = registeredProperty.syntax;
+          if (registeredProperty) {
+            const declarationValue = decl.value;
+            let substitutedValue = null;
+            if (
+              declarationValue.includes("var(") ||
+              declarationValue.includes("attr(") ||
+              declarationValue.includes("env(")
+            ) {
+              substitutedValue = InspectorUtils.getSubstitutedValue(
+                declarationValue,
+                this.pageStyle.selectedElement,
+                this._pseudoElement
+              );
+            }
+
+            if (
+              !InspectorUtils.valueMatchesSyntax(
+                targetDocument,
+                substitutedValue || declarationValue,
+                registeredProperty.syntax
+              )
+            ) {
+              // if the value doesn't match the syntax, it's invalid
+              decl.invalidAtComputedValueTime = true;
+              // pass the syntax down to the client so it can easily be used in a warning message
+              decl.syntax = registeredProperty.syntax;
+            }
           }
 
           // We only compute `inherits` for css variable declarations.

@@ -551,6 +551,8 @@ tags = "vertical-tabs"
 ["browser_tab_close_dependent_window.js"]
 tags = "vertical-tabs"
 
+["browser_tab_detach_fullscreen.js"]
+
 ["browser_tab_detach_restore.js"]
 https_first_disabled = true
 tags = "vertical-tabs"

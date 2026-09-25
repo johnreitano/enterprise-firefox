@@ -874,7 +874,7 @@ RawRangeBoundary TextComposition::FirstIMESelectionStartRef() const {
     return RawRangeBoundary();
   }
 
-  const nsRange* firstRange = nullptr;
+  const dom::Range* firstRange = nullptr;
   static const SelectionType kIMESelectionTypes[] = {
       SelectionType::eIMERawClause, SelectionType::eIMESelectedRawClause,
       SelectionType::eIMEConvertedClause, SelectionType::eIMESelectedClause};
@@ -887,7 +887,7 @@ RawRangeBoundary TextComposition::FirstIMESelectionStartRef() const {
     const uint32_t rangeCount = selection->RangeCount();
     for (const uint32_t i : IntegerRange(rangeCount)) {
       MOZ_ASSERT(selection->RangeCount() == rangeCount);
-      const nsRange* range = selection->GetRangeAt(i);
+      const dom::Range* range = selection->GetRangeAt(i);
       MOZ_ASSERT(range);
       if (MOZ_UNLIKELY(NS_WARN_IF(!range)) ||
           MOZ_UNLIKELY(NS_WARN_IF(!range->GetStartContainer()))) {
@@ -937,7 +937,7 @@ RawRangeBoundary TextComposition::LastIMESelectionEndRef() const {
     return RawRangeBoundary();
   }
 
-  const nsRange* lastRange = nullptr;
+  const dom::Range* lastRange = nullptr;
   static const SelectionType kIMESelectionTypes[] = {
       SelectionType::eIMERawClause, SelectionType::eIMESelectedRawClause,
       SelectionType::eIMEConvertedClause, SelectionType::eIMESelectedClause};
@@ -950,7 +950,7 @@ RawRangeBoundary TextComposition::LastIMESelectionEndRef() const {
     const uint32_t rangeCount = selection->RangeCount();
     for (const uint32_t i : IntegerRange(rangeCount)) {
       MOZ_ASSERT(selection->RangeCount() == rangeCount);
-      const nsRange* range = selection->GetRangeAt(i);
+      const dom::Range* range = selection->GetRangeAt(i);
       MOZ_ASSERT(range);
       if (MOZ_UNLIKELY(NS_WARN_IF(!range)) ||
           MOZ_UNLIKELY(NS_WARN_IF(!range->GetEndContainer()))) {

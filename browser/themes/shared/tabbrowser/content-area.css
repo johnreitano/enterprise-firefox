@@ -879,7 +879,7 @@ split-view-footer {
     margin-top: -5px;
 
     /* When the dialog is in a splitview, the offset is a little larger */
-    .deck-selected.split-view-panel & {
+    .split-view-panel & {
       margin-top: -8px;
     }
   }

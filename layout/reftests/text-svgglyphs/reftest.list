@@ -20,7 +20,7 @@ skip-if(!Android&&isDebugBuild) fuzzy(0-8,0-13000) == svg-glyph-objectopacity2.s
 skip-if(!Android&&isDebugBuild) fuzzy(0-2,0-200) == svg-glyph-paintnone.svg svg-glyph-paintnone-ref.svg
 skip-if(!Android&&isDebugBuild) fuzzy(0-2,0-4300) == svg-glyph-cachedopacity.svg svg-glyph-cachedopacity-ref.svg
 skip-if(!Android&&isDebugBuild) == svg-glyph-objectvalue.svg svg-glyph-objectvalue-ref.svg
-skip-if(!Android&&isDebugBuild) fails-if(useDrawSnapshot) != svg-glyph-objectvalue.svg svg-glyph-objectvalue-75.svg
+skip-if(!Android&&isDebugBuild) != svg-glyph-objectvalue.svg svg-glyph-objectvalue-75.svg
 skip-if(!Android&&isDebugBuild) == svg-glyph-objectvalue-75.svg svg-glyph-objectvalue-75-ref.svg
 skip-if(!Android&&isDebugBuild) == svg-glyph-objectvalue-150.svg svg-glyph-objectvalue-150-ref.svg
 skip-if(!Android&&isDebugBuild) fuzzy(0-15,0-152) == svg-glyph-mask.svg svg-glyph-mask-ref.svg

@@ -491,7 +491,10 @@ this.AccessibilityUtils = (function () {
       }
       // Use tabIndex rather than a11y focusable state because all tabs might
       // have tabindex="-1".
-      if (tab.DOMNode.tabIndex == 0) {
+      if (
+        tab.DOMNode.tabIndex == 0 &&
+        hasFocusableShadowAncestors(tab.DOMNode)
+      ) {
         if (foundFocusable) {
           // Only one tab within a tablist should be focusable.
           // ToDo: Fine-tune the a11y-check error message generated in this case.
@@ -508,6 +511,27 @@ this.AccessibilityUtils = (function () {
       }
     }
     return foundFocusable;
+  }
+
+  /**
+   * Determine if a node is keyboard focusable by ensuring none of its shadow
+   * host ancestors have a negative tabindex.
+   *
+   * @param {Node} node
+   *   The node to check within the shadow tree.
+   * @returns {boolean}
+   *   `true` if the node is not trapped behind an unfocusable shadow host.
+   */
+  function hasFocusableShadowAncestors(node) {
+    let root = node.getRootNode();
+    while (ShadowRoot.isInstance(root)) {
+      const host = root.host;
+      if (host.hasAttribute("tabindex") && host.tabIndex < 0) {
+        return false;
+      }
+      root = host.getRootNode();
+    }
+    return true;
   }
 
   /**

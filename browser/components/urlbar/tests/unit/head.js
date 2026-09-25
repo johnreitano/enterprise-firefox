@@ -458,9 +458,6 @@ async function cleanupPlaces() {
  * @param {boolean} [options.isSponsored]
  *   Whether the result is sponsored. Relevant to results from
  *   UrlbarProviderTopSites.
- * @param {boolean} [options.sendAttributionRequest]
- *   The result's sendAttributionRequest. Relevant to results from
- *   UrlbarProviderTopSites.
  * @param {string} [options.providerName]
  *   The name of the provider offering this result. The test suite will not
  *   check which provider offered a result unless this option is specified.
@@ -479,7 +476,6 @@ function makeBookmarkResult(
     lastVisit = undefined,
     isPinned = undefined,
     isSponsored = undefined,
-    sendAttributionRequest = undefined,
     providerName = undefined,
   }
 ) {
@@ -513,9 +509,6 @@ function makeBookmarkResult(
   }
   if (isSponsored !== undefined) {
     payload.isSponsored = isSponsored;
-  }
-  if (sendAttributionRequest !== undefined) {
-    payload.sendAttributionRequest = sendAttributionRequest;
   }
 
   return new UrlbarResult({
@@ -936,9 +929,6 @@ function makeSearchResult(
  * @param {boolean} [options.isSponsored]
  *   Whether the result is sponsored. Relevant to results from
  *   UrlbarProviderTopSites.
- * @param {boolean} [options.sendAttributionRequest]
- *   The result's sendAttributionRequest. Relevant to results from
- *   UrlbarProviderTopSites.
  * @returns {UrlbarResult}
  */
 function makeVisitResult(
@@ -956,7 +946,6 @@ function makeVisitResult(
     lastVisit = undefined,
     isPinned = undefined,
     isSponsored = undefined,
-    sendAttributionRequest = undefined,
   }
 ) {
   let payload = {
@@ -977,9 +966,6 @@ function makeVisitResult(
   }
   if (isSponsored !== undefined) {
     payload.isSponsored = isSponsored;
-  }
-  if (sendAttributionRequest !== undefined) {
-    payload.sendAttributionRequest = sendAttributionRequest;
   }
 
   if (

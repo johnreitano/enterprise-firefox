@@ -129,22 +129,18 @@ def add_command_arguments(config, tasks):
             .partition("-shippable")[0]
             .partition("-enterprise")[0]
         )
-        task["run"]["options"] = [
-            "version={}".format(release_config["version"]),
-            "build-number={}".format(release_config["build_number"]),
-            f"platform={platform}",
-        ]
+        env = task["worker"]["env"]
+        env["REPACK_VERSION"] = release_config["version"]
+        env["REPACK_BUILD_NUMBER"] = str(release_config["build_number"])
+        env["REPACK_PLATFORM"] = platform
         if task["extra"]["limit-locales"]:
-            for locale in all_locales:
-                task["run"]["options"].append(f"limit-locale={locale}")
+            env["REPACK_LIMIT_LOCALES"] = " ".join(sorted(all_locales))
         if "partner" in config.kind and config.params["release_partners"]:
-            for partner in config.params["release_partners"]:
-                task["run"]["options"].append(f"partner={partner}")
+            env["REPACK_PARTNERS"] = " ".join(config.params["release_partners"])
 
-        # The upstream taskIds are stored a special environment variable, because we want to use
-        # task-reference's to resolve dependencies, but the string handling of MOZHARNESS_OPTIONS
-        # blocks that. It's space-separated string of ids in the end.
-        task["worker"].setdefault("env", {})["UPSTREAM_TASKIDS"] = {
+        # The upstream taskIds are a space-separated string of task-reference's
+        # so that they resolve to the dependencies' ids.
+        env["UPSTREAM_TASKIDS"] = {
             # We only want signing related tasks here, not build (used by mac builds for signing artifact resolution)
             "task-reference": " ".join([
                 f"<{dep}>"
@@ -154,7 +150,7 @@ def add_command_arguments(config, tasks):
         }
 
         # Forward the release type for bouncer product construction
-        task["worker"]["env"]["RELEASE_TYPE"] = config.params["release_type"]
+        env["RELEASE_TYPE"] = config.params["release_type"]
 
         yield task
 

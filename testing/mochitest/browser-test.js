@@ -59,6 +59,11 @@ const SIMPLETEST_OVERRIDES = [
   "requestCompleteLog",
 ];
 
+// An uncaught error with one of these names, from any process, fails the
+// running test. Currently this is only the accesskey check by menupopup and
+// panel-list code.
+const FAILING_UNCAUGHT_ERROR_NAMES = ["AccessKeyConflictError"];
+
 setTimeout(testInit, 0);
 
 var TabDestroyObserver = {
@@ -929,6 +934,21 @@ Tester.prototype = {
     try {
       var msg = "Console message: " + aConsoleMessage.message;
       if (this.currentTest) {
+        if (
+          aConsoleMessage instanceof Ci.nsIScriptError &&
+          FAILING_UNCAUGHT_ERROR_NAMES.some(name =>
+            aConsoleMessage.errorMessage.startsWith(`${name}:`)
+          )
+        ) {
+          this.currentTest.addResult(
+            new testResult({
+              name: msg,
+              pass: false,
+              allowFailure: this.currentTest.allowFailure,
+            })
+          );
+          return;
+        }
         this.currentTest.addResult(new testMessage(msg));
       } else {
         this.structuredLogger.info(

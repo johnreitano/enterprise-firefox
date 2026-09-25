@@ -897,6 +897,7 @@ items from that key's value."
             "value": duration,
             "extraOptions": self.perfherder_resource_options(),
             "shouldAlert": should_alert,
+            "alertNotifyEmails": ["ahochheiden@mozilla.com"],
             "subtests": [],
         }
 

@@ -3978,10 +3978,12 @@ function WindowIsClosing(event) {
     Glean.messagingSystem.lastWindowCloseTriggerBypassed.add(1);
   } else if (
     isLastWindow &&
-    // Web app (Taskbar Tabs) windows aren't a normal browsing window this
-    // trigger targets, even though they keep the toolbar visible and don't
-    // change windowtype, so they otherwise look like one to the checks here.
+    // Web app (Taskbar Tabs) and mini windows aren't a normal browsing window
+    // this trigger targets, even though they keep the toolbar visible and
+    // don't change windowtype, so they otherwise look like one to the checks
+    // here.
     !TaskbarTabsUtils.isTaskbarTabWindow(window) &&
+    !document.documentElement.hasAttribute("mini-window") &&
     !shouldWarnForTabs &&
     ASRouter.initialized &&
     // Pre-check for messages so we don't hold up every last-window close when

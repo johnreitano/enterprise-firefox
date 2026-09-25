@@ -372,11 +372,12 @@ class MacroAssemblerLOONG64 : public Assembler {
   void minMaxPtr(Register lhs, ImmWord rhs, Register dest, bool isMax);
 
   // Evaluate srcDest = minmax<isMax>{Float32,Double}(srcDest, other).
-  // Handle NaN specially if handleNaN is true.
+  // Handle NaN specially if handleNaN is true. Handle zeroes specially if
+  // handleZero is true.
   void minMaxDouble(FloatRegister srcDest, FloatRegister other, bool handleNaN,
-                    bool isMax);
+                    bool handleZero, bool isMax);
   void minMaxFloat32(FloatRegister srcDest, FloatRegister other, bool handleNaN,
-                     bool isMax);
+                     bool handleZero, bool isMax);
 
   FaultingCodeRange loadDouble(const Address& addr, FloatRegister dest);
   FaultingCodeRange loadDouble(const BaseIndex& src, FloatRegister dest);
@@ -453,6 +454,9 @@ class MacroAssemblerLOONG64 : public Assembler {
                                   AnyRegister value, Register memoryBase,
                                   Register ptr, Register ptrScratch,
                                   Register tmp);
+
+  template <typename T>
+  void RoundHelper(RoundingMode mode, FloatRegister src, FloatRegister dest);
 };
 
 class MacroAssembler;

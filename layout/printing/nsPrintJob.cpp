@@ -67,6 +67,7 @@ static const char sPrintSettingsServiceContractID[] =
 #include "mozilla/ServoStyleSet.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/HTMLFrameElement.h"
+#include "mozilla/dom/Range.h"
 #include "mozilla/gfx/DrawEventRecorder.h"
 #include "mozilla/layout/RemotePrintJobChild.h"
 #include "nsComponentManagerUtils.h"
@@ -81,7 +82,6 @@ static const char sPrintSettingsServiceContractID[] =
 #include "nsISupportsUtils.h"
 #include "nsIWebBrowserChrome.h"
 #include "nsPageSequenceFrame.h"
-#include "nsRange.h"
 
 #ifdef ACCESSIBILITY
 #  include "mozilla/a11y/DocManager.h"
@@ -1172,7 +1172,7 @@ nsresult nsPrintJob::UpdateSelectionAndShrinkPrintObject(
     const uint32_t rangeCount = selection->RangeCount();
     for (const uint32_t inx : IntegerRange(rangeCount)) {
       MOZ_ASSERT(selection->RangeCount() == rangeCount);
-      const RefPtr<nsRange> range{selection->GetRangeAt(inx)};
+      const RefPtr<dom::Range> range{selection->GetRangeAt(inx)};
       selectionPS->AddRangeAndSelectFramesAndNotifyListeners(*range,
                                                              IgnoreErrors());
     }
@@ -1499,7 +1499,7 @@ struct MOZ_STACK_CLASS SelectionRangeState {
   }
 
   // Selects all the nodes that are _not_ included in a given set of ranges.
-  MOZ_CAN_RUN_SCRIPT void SelectComplementOf(Span<const RefPtr<nsRange>>);
+  MOZ_CAN_RUN_SCRIPT void SelectComplementOf(Span<const RefPtr<dom::Range>>);
   // Removes the selected ranges from the document.
   MOZ_CAN_RUN_SCRIPT void RemoveSelectionFromDocument();
 
@@ -1509,7 +1509,7 @@ struct MOZ_STACK_CLASS SelectionRangeState {
     uint32_t mOffset;
   };
 
-  MOZ_CAN_RUN_SCRIPT void SelectRange(nsRange*);
+  MOZ_CAN_RUN_SCRIPT void SelectRange(dom::Range*);
   MOZ_CAN_RUN_SCRIPT void SelectNodesExceptInSubtree(const Position& aStart,
                                                      const Position& aEnd);
 
@@ -1522,7 +1522,7 @@ struct MOZ_STACK_CLASS SelectionRangeState {
 };
 
 void SelectionRangeState::SelectComplementOf(
-    Span<const RefPtr<nsRange>> aRanges) {
+    Span<const RefPtr<dom::Range>> aRanges) {
   for (const auto& range : aRanges) {
     auto start = Position{range->GetMayCrossShadowBoundaryStartContainer(),
                           range->MayCrossShadowBoundaryStartOffset()};
@@ -1532,7 +1532,7 @@ void SelectionRangeState::SelectComplementOf(
   }
 }
 
-void SelectionRangeState::SelectRange(nsRange* aRange) {
+void SelectionRangeState::SelectRange(dom::Range* aRange) {
   if (aRange && !aRange->AreNormalRangeAndCrossShadowBoundaryRangeCollapsed()) {
     mSelection->AddRangeAndSelectFramesAndNotifyListeners(*aRange,
                                                           IgnoreErrors());
@@ -1563,9 +1563,9 @@ void SelectionRangeState::SelectNodesExceptInSubtree(const Position& aStart,
     }
   }
 
-  RefPtr<nsRange> range =
-      nsRange::Create(start.mNode, start.mOffset, aStart.mNode, aStart.mOffset,
-                      IgnoreErrors(), AllowRangeCrossShadowBoundary::Yes);
+  RefPtr<dom::Range> range = dom::Range::Create(
+      start.mNode, start.mOffset, aStart.mNode, aStart.mOffset, IgnoreErrors(),
+      AllowRangeCrossShadowBoundary::Yes);
   SelectRange(range);
 
   start = aEnd;
@@ -1592,9 +1592,9 @@ void SelectionRangeState::RemoveSelectionFromDocument() {
   for (auto& entry : mPositions) {
     const Position& pos = entry.GetData();
     nsINode* root = entry.GetKey();
-    RefPtr<nsRange> range =
-        nsRange::Create(pos.mNode, pos.mOffset, root, root->GetChildCount(),
-                        IgnoreErrors(), AllowRangeCrossShadowBoundary::Yes);
+    RefPtr<dom::Range> range =
+        dom::Range::Create(pos.mNode, pos.mOffset, root, root->GetChildCount(),
+                           IgnoreErrors(), AllowRangeCrossShadowBoundary::Yes);
     SelectRange(range);
   }
   for (uint32_t i = 0; i < mSelection->RangeCount(); i++) {
@@ -1613,7 +1613,7 @@ void SelectionRangeState::RemoveSelectionFromDocument() {
 MOZ_CAN_RUN_SCRIPT_BOUNDARY static nsresult DeleteNonSelectedNodes(
     Document& aDoc) {
   MOZ_ASSERT(aDoc.IsStaticDocument());
-  const auto* printRanges = static_cast<nsTArray<RefPtr<nsRange>>*>(
+  const auto* printRanges = static_cast<nsTArray<RefPtr<dom::Range>>*>(
       aDoc.GetProperty(nsGkAtoms::printselectionranges));
   if (!printRanges) {
     return NS_OK;

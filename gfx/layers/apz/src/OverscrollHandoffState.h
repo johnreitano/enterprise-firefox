@@ -103,6 +103,10 @@ class OverscrollHandoffChain {
   // Determine whether any APZC along this handoff chain is autoscroll.
   bool HasAutoscrollApzc() const;
 
+  // Determine whether any APZC along this handoff chain has an animation
+  // running.
+  bool HasAnimatingApzc() const;
+
   // Find the first APZC in this handoff chain that can be scrolled by |aInput|.
   // Since overscroll-behavior can restrict handoff in some directions,
   // |aOutAllowedScrollDirections| is populated with the scroll directions

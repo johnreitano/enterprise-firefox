@@ -24,8 +24,8 @@ Please obtain an API Token (Settings >> Conduit API Tokens)
 
 2. Download the [MozillaBuild Package.](https://ftp.mozilla.org/pub/mozilla/libraries/win32/MozillaBuildSetup-Latest.exe) Installation directory should be:
 
-   ```shell
-   $ c:\mozilla-build\
+   ```text
+   c:\mozilla-build\
    ```
 
 3. Before moving on to the next steps, make sure to fulfill the {ref}`Windows prerequisites <Building Firefox On Windows>`

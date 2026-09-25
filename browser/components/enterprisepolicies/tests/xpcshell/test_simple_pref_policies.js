@@ -1539,7 +1539,8 @@ const POLICIES_TESTS = [
         },
       },
     },
-    // Locking on restart persists the session behind OS auth instead of signing out.
+    // Locking on an update-driven restart persists the session behind OS auth
+    // instead of signing out.
     lockedPrefs: {
       "enterprise.locking.restart": true,
     },
@@ -1554,6 +1555,32 @@ const POLICIES_TESTS = [
     },
     lockedPrefs: {
       "enterprise.locking.restart": false,
+    },
+  },
+  {
+    policies: {
+      SignOut: {
+        Crash: {
+          Action: "lock",
+        },
+      },
+    },
+    // Locking on crash keeps the session resumable when repeated crashes stop
+    // the browser from restarting.
+    lockedPrefs: {
+      "enterprise.locking.crash": true,
+    },
+  },
+  {
+    policies: {
+      SignOut: {
+        Crash: {
+          Action: "signout",
+        },
+      },
+    },
+    lockedPrefs: {
+      "enterprise.locking.crash": false,
     },
   },
 ];

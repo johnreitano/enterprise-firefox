@@ -29,11 +29,8 @@ async function setupPrefs() {
 }
 
 async function resetPrefs() {
-  // We set 5 prefs in setupPrefs, so we should reset 5 prefs.
-  // 1 popPrefEnv from pushPrefEnv
-  // and 4 popPrefEnv happen internally in setDefaultTopSites.
-  await SpecialPowers.popPrefEnv();
-  await SpecialPowers.popPrefEnv();
+  // setupPrefs pushes 3 pref environments: 1 from its own pushPrefEnv and
+  // 2 inside setDefaultTopSites.
   await SpecialPowers.popPrefEnv();
   await SpecialPowers.popPrefEnv();
   await SpecialPowers.popPrefEnv();
@@ -44,21 +41,31 @@ let initialWidth;
 // Sizes the content area rather than the outer window: the window decoration
 // in between varies by OS and pixel density, so a fixed outer size gives a
 // different viewport per platform. setPrimaryContentSize takes device pixels.
-function setSize(width, height) {
-  initialHeight = window.innerHeight;
-  initialWidth = window.innerWidth;
-  let resizePromise = BrowserTestUtils.waitForEvent(window, "resize", false);
+async function setSize(width, height) {
   const dpr = window.devicePixelRatio;
+  const contentRect = gBrowser.selectedBrowser.getBoundingClientRect();
+  initialWidth ??= contentRect.width;
+  initialHeight ??= contentRect.height;
+  const deviceWidth = Math.round(width * dpr);
+  const deviceHeight = Math.round(height * dpr);
+  // Asking for the size the content area already has changes nothing, so no
+  // resize event comes and waiting for one would hang until the test times out.
+  if (
+    Math.round(contentRect.width * dpr) === deviceWidth &&
+    Math.round(contentRect.height * dpr) === deviceHeight
+  ) {
+    return;
+  }
+  let resizePromise = BrowserTestUtils.waitForEvent(window, "resize", false);
   window.docShell.treeOwner
     .QueryInterface(Ci.nsIDocShellTreeOwner)
-    .setPrimaryContentSize(Math.round(width * dpr), Math.round(height * dpr));
-  return resizePromise;
+    .setPrimaryContentSize(deviceWidth, deviceHeight);
+  await resizePromise;
 }
 
+// The first size setSize saw is the one the file found; the rest are its own.
 function resetSize() {
-  let resizePromise = BrowserTestUtils.waitForEvent(window, "resize", false);
-  window.resizeTo(initialWidth, initialHeight);
-  return resizePromise;
+  return setSize(initialWidth, initialHeight);
 }
 
 add_task(async function test_newtab_last_LinkMenu() {

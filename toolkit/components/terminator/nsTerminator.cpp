@@ -9,7 +9,7 @@
  * common case in which Firefox just won't shutdown.
  *
  * We spawn a thread during quit-application. If any of the shutdown
- * steps takes more than n milliseconds (63000 by default), kill the
+ * steps takes more than n milliseconds (70000 by default), kill the
  * process as fast as possible, without any cleanup.
  */
 

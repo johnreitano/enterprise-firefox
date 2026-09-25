@@ -82,6 +82,20 @@ class TestSerialization(unittest.TestCase):
         self.assertEqual(component["purl"], "pkg:github/facebook/zstd@v1.5.7")
         self.assertEqual(component["type"], "library")
 
+    def test_root_component_is_named_after_the_product(self):
+        # The same shippable builds that generate an SBOM include GeckoView, so
+        # the root must not be hardcoded to Firefox desktop.
+        self.assertEqual(render([record()])["metadata"]["component"]["name"], "Firefox")
+
+        document = json.loads(
+            to_json(
+                build_bom(
+                    [record()], "155.0a1", REVISION, TIMESTAMP, product_name="Fennec"
+                )
+            )
+        )
+        self.assertEqual(document["metadata"]["component"]["name"], "Fennec")
+
     def test_serial_number_is_derived_from_revision(self):
         first = render([record()])["serialNumber"]
         second = render([record()])["serialNumber"]

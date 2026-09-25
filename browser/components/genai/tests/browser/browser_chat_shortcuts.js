@@ -789,6 +789,11 @@ add_task(async function test_panel_actions_layout() {
       Assert.ok(button.iconSrc, `${button.id} has an icon`);
     }
 
+    Assert.equal(
+      buttons[0].buttonEl.getAttribute("aria-label"),
+      "Ask about this text",
+      "AI action uses the provider-agnostic label"
+    );
     Assert.stringMatches(
       buttons[1].buttonEl.getAttribute("aria-label"),
       /^Search .+ for “hi”$/,

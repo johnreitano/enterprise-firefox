@@ -445,6 +445,104 @@ add_task(async function test_ml_smoke_test_llama_overlap_guard() {
   }
 });
 
+// Abandoning a generator has to end the underlying run, otherwise the
+// LlamaRunner concurrency guard rejects the next request.
+add_task(
+  async function test_ml_smoke_test_llama_abandoned_generator_allows_next() {
+    const { cleanup } = await setup();
+    try {
+      const engine = await createEngine({
+        taskName: "text-generation",
+        modelId: "Mozilla/test-llama",
+        modelFile: "TinyStories-656K.Q8_0.gguf",
+        kvCacheDtype: "q8_0",
+        modelRevision: "main",
+        backend: "llama.cpp",
+        numContext: 256,
+      });
+
+      const request = {
+        prompt: [
+          { role: "system", content: "blah" },
+          { role: "user", content: "Once upon a time there was" },
+        ],
+        nPredict: 200,
+      };
+
+      let chunks = 0;
+      for await (const chunk of engine.runWithGenerator(request)) {
+        Assert.ok(chunk, "Received a chunk before abandoning the generator");
+        chunks++;
+        break;
+      }
+      Assert.equal(chunks, 1, "Abandoned the generator after one chunk");
+
+      // Both forms hit the same LlamaRunner guard.
+      const result = await engine.run(request);
+      Assert.ok(
+        result.finalOutput.length,
+        "The request after an abandoned generator generated text"
+      );
+    } finally {
+      await EngineProcess.destroyMLEngine();
+      await cleanup();
+    }
+  }
+);
+
+// An abandoned run is still recorded as run_inference_success_flow, so
+// engine_run has to report it too.
+add_task(
+  async function test_ml_smoke_test_llama_abandoned_records_engine_run() {
+    const { cleanup } = await setup();
+    try {
+      const engine = await createEngine({
+        taskName: "text-generation",
+        modelId: "Mozilla/test-llama",
+        modelFile: "TinyStories-656K.Q8_0.gguf",
+        kvCacheDtype: "q8_0",
+        modelRevision: "main",
+        backend: "llama.cpp",
+        numContext: 256,
+      });
+
+      const request = {
+        prompt: [
+          { role: "system", content: "blah" },
+          { role: "user", content: "Once upon a time there was" },
+        ],
+        nPredict: 200,
+      };
+
+      for await (const chunk of engine.runWithGenerator(request)) {
+        Assert.ok(chunk, "Received a chunk before abandoning the generator");
+        break;
+      }
+
+      await waitForCondition(
+        () =>
+          Glean.firefoxAiRuntime.runInferenceSuccessFlow.testGetValue()?.length,
+        "Waiting for the abandoned run to complete in the child."
+      );
+
+      await waitForCondition(
+        () => Glean.firefoxAiRuntime.engineRun.testGetValue()?.length,
+        "Waiting for engine_run to be recorded for the abandoned run."
+      );
+
+      const [engineRun] = Glean.firefoxAiRuntime.engineRun.testGetValue();
+      Assert.equal(
+        engineRun.extra.backend,
+        "llama.cpp",
+        "The recorded run reports the backend that generated it"
+      );
+    } finally {
+      await EngineProcess.destroyMLEngine();
+      await cleanup();
+    }
+  }
+);
+
 /**
  * Runs a full end-to-end test on the llama.cpp backend with a model that loads in llama but crashes during inference.
  */

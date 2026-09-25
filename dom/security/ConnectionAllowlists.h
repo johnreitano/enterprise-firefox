@@ -10,6 +10,7 @@
 #include <type_traits>
 
 #include "mozilla/Maybe.h"
+#include "mozilla/Variant.h"
 #include "mozilla/net/urlpattern_glue.h"
 #include "nsCOMPtr.h"
 #include "nsISupportsImpl.h"
@@ -97,6 +98,10 @@ class ConnectionAllowlists final {
   };
 
   bool ShouldBlockURL(nsIURI* aURI, nsILoadInfo* aLoadInfo) const;
+
+  static void ReportViolation(const Variant<nsIURI*, nsCString>& aResource,
+                              nsILoadInfo* aLoadInfo,
+                              const Allowlist& aAllowlist);
 
   static Maybe<Allowlist> ParseConnectionAllowlistHeader(
       const nsACString& aHeader, Disposition aDisposition);

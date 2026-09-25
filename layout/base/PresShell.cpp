@@ -116,6 +116,7 @@
 #include "mozilla/dom/PointerEventBinding.h"
 #include "mozilla/dom/PointerEventHandler.h"
 #include "mozilla/dom/PopupBlocker.h"
+#include "mozilla/dom/Range.h"
 #include "mozilla/dom/SVGAnimationElement.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "mozilla/dom/Selection.h"
@@ -189,7 +190,6 @@
 #include "nsPlaceholderFrame.h"
 #include "nsPresContext.h"
 #include "nsQueryObject.h"
-#include "nsRange.h"
 #include "nsReadableUtils.h"
 #include "nsRefreshDriver.h"
 #include "nsRegion.h"
@@ -1844,6 +1844,10 @@ void PresShell::FlushDelayedResize() {
 }
 
 void PresShell::SetLayoutViewportSize(const nsSize& aSize, bool aDelay) {
+  if (mPresContext && aSize == mPresContext->GetVisibleArea().Size()) {
+    mPendingLayoutViewportSize.reset();
+    return;
+  }
   mPendingLayoutViewportSize = Some(aSize);
   if (aDelay || ShouldDelayResize()) {
     SetNeedStyleFlush();
@@ -3196,7 +3200,8 @@ UniquePtr<gfxContext> PresShell::CreateReferenceRenderingContext() {
 
 // https://html.spec.whatwg.org/#scroll-to-the-fragment-identifier
 nsresult PresShell::GoToAnchor(const nsAString& aAnchorName,
-                               const nsRange* aFirstTextDirective, bool aScroll,
+                               const dom::Range* aFirstTextDirective,
+                               bool aScroll,
                                ScrollFlags aAdditionalScrollFlags) {
   if (!mDocument) {
     return NS_ERROR_FAILURE;
@@ -3328,7 +3333,7 @@ nsresult PresShell::GoToAnchor(const nsAString& aAnchorName,
       //
       // NOTE: Intentionally out of order for now with the focus steps, see
       // https://github.com/whatwg/html/issues/7759
-      RefPtr<nsRange> jumpToRange = nsRange::Create(mDocument);
+      RefPtr<dom::Range> jumpToRange = dom::Range::Create(mDocument);
       nsCOMPtr<nsIContent> nodeToSelect = target.get();
       while (nodeToSelect->GetFirstChild()) {
         nodeToSelect = nodeToSelect->GetFirstChild();
@@ -5099,7 +5104,7 @@ nsresult PresShell::RenderDocument(const nsRect& aRect,
  * rectangle surrounding the range.
  */
 nsRect PresShell::ClipListToRange(nsDisplayListBuilder* aBuilder,
-                                  nsDisplayList* aList, nsRange* aRange) {
+                                  nsDisplayList* aList, dom::Range* aRange) {
   // iterate though the display items and add up the bounding boxes of each.
   // This will allow the total area of the frames within the range to be
   // determined. To do this, remove an item from the bottom of the list, check
@@ -5220,7 +5225,7 @@ static bool gDumpRangePaintList = false;
 #endif
 
 UniquePtr<RangePaintInfo> PresShell::CreateRangePaintInfo(
-    nsRange* aRange, nsRect& aSurfaceRect, bool aForPrimarySelection) {
+    dom::Range* aRange, nsRect& aSurfaceRect, bool aForPrimarySelection) {
   nsIFrame* ancestorFrame = nullptr;
   nsIFrame* rootFrame = GetRootFrame();
 
@@ -5580,7 +5585,7 @@ already_AddRefed<SourceSurface> PresShell::RenderNode(
     return nullptr;
   }
 
-  RefPtr<nsRange> range = nsRange::Create(aNode);
+  RefPtr<dom::Range> range = dom::Range::Create(aNode);
   IgnoredErrorResult rv;
   range->SelectNode(*aNode, rv);
   if (rv.Failed()) {
@@ -5632,7 +5637,7 @@ already_AddRefed<SourceSurface> PresShell::RenderSelection(
   NS_ASSERTION(rangeCount > 0, "RenderSelection called with no selection");
   for (const uint32_t r : IntegerRange(rangeCount)) {
     MOZ_ASSERT(aSelection->RangeCount() == rangeCount);
-    RefPtr<nsRange> range = aSelection->GetRangeAt(r);
+    RefPtr<dom::Range> range = aSelection->GetRangeAt(r);
 
     UniquePtr<RangePaintInfo> info = CreateRangePaintInfo(range, area, true);
     if (info) {

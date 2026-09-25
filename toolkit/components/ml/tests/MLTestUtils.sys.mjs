@@ -270,6 +270,9 @@ export class MockLLMEngine {
   /** @type {Map<number, MockedRequest>} */
   #runRequests = new Map();
 
+  /** @type {Set<Function>} */
+  #runRequestWaiters = new Set();
+
   get runRequests() {
     if (!Cu.isInAutomation) {
       throw new Error(
@@ -290,6 +293,37 @@ export class MockLLMEngine {
       throw new Error("There is no next request for the MockLLMEngine.");
     }
     return value;
+  }
+
+  /**
+   * Wait until the engine has a pending run request.
+   *
+   * @returns {Promise<void>}
+   */
+  async waitForRunRequest() {
+    if (!Cu.isInAutomation) {
+      throw new Error(
+        "The MockLLMEngine#waitForRunRequest method must only be used in automation."
+      );
+    }
+    if (this.#runRequests.size) {
+      return;
+    }
+
+    const { promise, resolve } = Promise.withResolvers();
+    this.#runRequestWaiters.add(resolve);
+    try {
+      await promise;
+    } finally {
+      this.#runRequestWaiters.delete(resolve);
+    }
+  }
+
+  #notifyRunRequestWaiters() {
+    for (const resolve of this.#runRequestWaiters) {
+      resolve();
+    }
+    this.#runRequestWaiters.clear();
   }
 
   /**
@@ -345,6 +379,7 @@ export class MockLLMEngine {
      */
     const { promise, resolve, reject } = Promise.withResolvers();
     this.#runRequests.set(requestId, { request, resolve, reject });
+    this.#notifyRunRequestWaiters();
     const response = await promise;
 
     if (typeof response === "string") {
@@ -388,6 +423,7 @@ export class MockLLMEngine {
     // For manual testing without mockResponse, store the request and wait for respond()
     const { resolve, reject, promise } = Promise.withResolvers();
     this.#runRequests.set(requestId, { request, resolve, reject });
+    this.#notifyRunRequestWaiters();
 
     // Wait for respond() to be called with a response
     const response = await promise;

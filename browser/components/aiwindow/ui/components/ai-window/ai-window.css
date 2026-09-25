@@ -28,11 +28,13 @@
     "smartbar"
     "prompts"
     "topsites"
+    "promo"
     "resume-section"
     "."
     "footer";
-  /* Preserve space above the heading as the resume section grows. */
-  grid-template-rows: 0 minmax(var(--space-xlarge), 1fr) auto auto auto auto auto 1fr auto;
+  /* Preserve space above the heading as the resume section grows, and a
+   * minimum gap above the footer so it doesn't crowd short content. */
+  grid-template-rows: 0 minmax(var(--space-xlarge), 1fr) auto auto auto auto auto auto minmax(var(--size-item-xlarge), 1fr) auto;
   align-content: stretch;
 }
 
@@ -332,9 +334,13 @@ smartwindow-footer {
 }
 
 smartwindow-promo {
-  grid-area: footer;
+  grid-area: promo;
   max-width: 580px;
   margin-block-end: calc(var(--space-small) + 20px);
+
+  :host(.chat-active) & {
+    display: none;
+  }
 }
 
 .sr-only {

@@ -1,10 +1,9 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
-// A profile's prefs.js or user.js cannot fail the AutoConfig vendor check or
-// point nsAutoConfig at another file: nsReadConfig clears the profile's
-// values of the AutoConfig input prefs before evaluating the .cfg, which can
-// still set them with pref().
+// AutoConfig reads its inputs from the installation, not from the profile:
+// nsReadConfig clears the profile's values of the AutoConfig input prefs
+// before evaluating the .cfg, which can still set them with pref().
 
 const { TestUtils } = ChromeUtils.importESModule(
   "resource://testing-common/TestUtils.sys.mjs"
@@ -61,8 +60,8 @@ add_task(async function test_profile_prefs() {
   Cc["@mozilla.org/readconfig;1"].getService(Ci.nsISupports);
 
   // Evaluates the named .cfg as the shipped AutoConfig file. The user values
-  // stand in for what a hostile user.js would set, the default values for
-  // what the administrator configured.
+  // stand in for what a profile's prefs.js or user.js would set, the default
+  // values for what the administrator configured.
   function readConfig(cfgName, { userPrefs = {}, defaultPrefs = {} } = {}) {
     Services.prefs.resetPrefs();
     if (installedCfg.exists()) {

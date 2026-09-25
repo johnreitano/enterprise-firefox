@@ -30,6 +30,7 @@ import androidx.navigation.findNavController
 import androidx.navigation.fragment.findNavController
 import androidx.navigation.fragment.navArgs
 import androidx.preference.Preference
+import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -211,6 +212,11 @@ class SettingsFragment : PreferenceFragmentCompat(), SystemInsetsPaddedFragment 
 
         findPreference<Preference>(getPreferenceKey(R.string.pref_key_ai_controls))?.isVisible =
             requireComponents.settings.aiControlsFeatureFlagEnabled
+
+        if (requireComponents.settings.accountSettingsNewUi) {
+            findPreference<PreferenceCategory>(getPreferenceKey(R.string.pref_key_account_category))
+                ?.setTitle(R.string.preferences_account_and_sync_settings)
+        }
     }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {

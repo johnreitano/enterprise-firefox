@@ -3110,6 +3110,10 @@ public class GeckoSessionTestRule implements TestRule {
    * addExternalDelegateDuringNextWait} can temporarily take precedence over delegates added by
    * {@link #delegateUntilTestEnd}.
    *
+   * <p>Register the delegate before triggering the event it is meant to catch. An event that
+   * reaches Gecko or Java while no delegate is registered is dropped or denied, not queued, and the
+   * wait then times out.
+   *
    * @param delegate Delegate instance to register.
    * @param register DelegateRegistrar instance that represents a function to register the delegate.
    * @param unregister DelegateRegistrar instance that represents a function to unregister the

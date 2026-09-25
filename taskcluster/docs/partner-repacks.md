@@ -147,7 +147,7 @@ Some key divergences are:
 - platforms: Typically all (but depends on what's enabled by partner configuration)
 - upstreams: `build-signing` `l10n-signing`
 
-There is one task per platform in this step, calling out to [scripts/desktop_partner_repacks.py](https://hg.mozilla.org/mozilla-central/file/default/testing/mozharness/scripts/desktop_partner_repacks.py) in mozharness to prepare an environment and then perform the repacks.
+There is one task per platform in this step, running [taskcluster/scripts/release/partner-repack.sh](https://hg.mozilla.org/mozilla-central/file/default/taskcluster/scripts/release/partner-repack.sh) to fetch the repack manifests and then perform the repacks.
 The actual repacking is done by [python/mozrelease/mozrelease/partner_repack.py](https://hg.mozilla.org/mozilla-central/file/default/python/mozrelease/mozrelease/partner_repack.py).
 
 It takes as input the build-signing and l10n-signing artifacts, which are all zip/tar.gz/tar.xz

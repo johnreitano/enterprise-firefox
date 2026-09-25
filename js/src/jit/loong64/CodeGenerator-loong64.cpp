@@ -1001,11 +1001,13 @@ void CodeGenerator::visitMinMaxD(LMinMaxD* ins) {
 
   const bool handleNaN =
       !ins->mir()->range() || ins->mir()->range()->canBeNaN();
+  const bool handleZero =
+      !ins->mir()->range() || ins->mir()->range()->canBeZero();
 
   if (ins->mir()->isMax()) {
-    masm.maxDouble(second, first, handleNaN);
+    masm.maxDouble(second, first, handleNaN, handleZero);
   } else {
-    masm.minDouble(second, first, handleNaN);
+    masm.minDouble(second, first, handleNaN, handleZero);
   }
 }
 
@@ -1017,11 +1019,13 @@ void CodeGenerator::visitMinMaxF(LMinMaxF* ins) {
 
   const bool handleNaN =
       !ins->mir()->range() || ins->mir()->range()->canBeNaN();
+  const bool handleZero =
+      !ins->mir()->range() || ins->mir()->range()->canBeZero();
 
   if (ins->mir()->isMax()) {
-    masm.maxFloat32(second, first, handleNaN);
+    masm.maxFloat32(second, first, handleNaN, handleZero);
   } else {
-    masm.minFloat32(second, first, handleNaN);
+    masm.minFloat32(second, first, handleNaN, handleZero);
   }
 }
 

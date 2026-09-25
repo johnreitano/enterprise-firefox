@@ -496,6 +496,7 @@ win64-enterprise-shippable/opt:
         env:
             PERFHERDER_EXTRA_OPTIONS: enterprise
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+            MOZ_GENERATE_SBOM: "1"
     run:
         options: [append-env-variables-from-configs]
         actions: [get-secrets, build]
@@ -725,6 +726,7 @@ win64-aarch64-enterprise-shippable/opt:
         env:
             PERFHERDER_EXTRA_OPTIONS: enterprise
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+            MOZ_GENERATE_SBOM: "1"
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -836,6 +838,7 @@ win32-shippable/opt:
         max-run-time: 10800
         env:
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+            MOZ_GENERATE_SBOM: "1"
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -889,6 +892,7 @@ win64-shippable/opt:
         max-run-time: 10800
         env:
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+            MOZ_GENERATE_SBOM: "1"
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1617,6 +1621,7 @@ win32-devedition/opt:
         max-run-time: 10800
         env:
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+            MOZ_GENERATE_SBOM: "1"
     run:
         actions: [get-secrets, build]
         script: mozharness/scripts/fx_desktop_build.py
@@ -1671,6 +1676,7 @@ win64-devedition/opt:
         max-run-time: 10800
         env:
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+            MOZ_GENERATE_SBOM: "1"
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1832,6 +1838,7 @@ win64-aarch64-shippable/opt:
         max-run-time: 10800
         env:
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+            MOZ_GENERATE_SBOM: "1"
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1885,6 +1892,7 @@ win64-aarch64-devedition/opt:
         max-run-time: 10800
         env:
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+            MOZ_GENERATE_SBOM: "1"
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]

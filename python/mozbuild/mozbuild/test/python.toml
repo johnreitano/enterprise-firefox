@@ -123,6 +123,8 @@ subsuite = "mozbuild"
 
 ["test_legacy_test.py"]
 
+["test_license_collection.py"]
+
 ["test_licenses.py"]
 
 ["test_line_endings.py"]

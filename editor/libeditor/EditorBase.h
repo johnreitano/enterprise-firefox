@@ -56,7 +56,6 @@ class nsISupports;
 class nsITransferable;
 class nsITransaction;
 class nsIWidget;
-class nsRange;
 
 namespace mozilla {
 class AlignStateAtSelection;
@@ -80,6 +79,7 @@ class DragEvent;
 class Element;
 class EventTarget;
 class HTMLBRElement;
+class Range;
 }  // namespace dom
 
 namespace widget {
@@ -722,7 +722,7 @@ class EditorBase : public nsIEditor,
    *                            called by system.
    */
   MOZ_CAN_RUN_SCRIPT nsresult ReplaceTextAsAction(
-      const nsAString& aString, nsRange* aReplaceRange,
+      const nsAString& aString, dom::Range* aReplaceRange,
       AllowBeforeInputEventCancelable aAllowBeforeInputEventCancelable,
       PreventSetSelection aPreventSetSelection = PreventSetSelection::No,
       nsIPrincipal* aPrincipal = nullptr);
@@ -841,7 +841,7 @@ class EditorBase : public nsIEditor,
     RefPtr<RangeItem> mSelectedRange;
 
     // Computing changed range while we're handling sub actions.
-    RefPtr<nsRange> mChangedRange;
+    RefPtr<dom::Range> mChangedRange;
 
     // XXX In strict speaking, mCachedPendingStyles isn't enough to cache
     //     inline styles because inline style can be specified with "style"
@@ -2770,7 +2770,7 @@ class EditorBase : public nsIEditor,
   [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<CaretPoint, nsresult>
   DeleteRangeWithTransaction(nsIEditor::EDirection aDirectionAndAmount,
                              nsIEditor::EStripWrappers aStripWrappers,
-                             nsRange& aRangeToDelete);
+                             dom::Range& aRangeToDelete);
 
   /**
    * DeleteRangesWithTransaction() removes content in aRangesToDelete or content
@@ -2819,7 +2819,7 @@ class EditorBase : public nsIEditor,
    */
   already_AddRefed<DeleteContentTransactionBase>
   CreateTransactionForCollapsedRange(
-      const nsRange& aCollapsedRange,
+      const dom::Range& aCollapsedRange,
       HowToHandleCollapsedRange aHowToHandleCollapsedRange);
 
   /**

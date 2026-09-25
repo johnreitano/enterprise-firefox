@@ -238,3 +238,8 @@ if CONFIG["MOZ_WINDOWSAPPSDK_DIR"]:
             "Microsoft.WindowsAppRuntime.Insights.Resource.dll",
         )
     ]
+
+LICENSED_UNDER += ["chromium"]
+LICENSED_UNDER["chromium"].paths = [
+    "nsWindow.cpp",
+]

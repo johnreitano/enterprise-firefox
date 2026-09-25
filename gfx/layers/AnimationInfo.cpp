@@ -340,13 +340,14 @@ static StyleTransform ResolveTransformOperations(
 }
 
 static Maybe<ScrollTimelineOptions> GetScrollTimelineOptions(
-    dom::AnimationTimeline* aTimeline) {
-  if (!aTimeline || !aTimeline->IsScrollTimeline()) {
+    const dom::Animation* aAnimation) {
+  dom::AnimationTimeline* timeline = aAnimation->GetTimeline();
+  if (!timeline || !timeline->IsScrollTimeline()) {
     return Nothing();
   }
 
-  const dom::ScrollTimeline* timeline = aTimeline->AsScrollTimeline();
-  const auto state = timeline->GetSnapshot();
+  const dom::ScrollTimeline* scrollTimeline = timeline->AsScrollTimeline();
+  const auto state = scrollTimeline->GetSnapshot();
   MOZ_ASSERT(state.IsActive(),
              "We send scroll animation to the compositor only if its timeline "
              "is active");
@@ -356,7 +357,10 @@ static Maybe<ScrollTimelineOptions> GetScrollTimelineOptions(
       nsLayoutUtils::FindIDFor(state.SourceElement(), &source);
   MOZ_ASSERT(success, "We should have a valid ViewID for the scroller");
 
-  return Some(ScrollTimelineOptions(source, state.Axis()));
+  const auto interval = scrollTimeline->IntervalForAttachmentRange(
+      aAnimation->GetTimelineRange());
+  return Some(ScrollTimelineOptions(source, state.Axis(), interval.first,
+                                    interval.second));
 }
 
 static void SetAnimatable(NonCustomCSSPropertyId aProperty,
@@ -500,8 +504,7 @@ void AnimationInfo::AddAnimationForProperty(
       aAnimation->GetEffect()->AsKeyframeEffect()->IterationComposite());
   animation->isNotPlaying() = !aAnimation->IsPlaying();
   animation->isNotAnimating() = false;
-  animation->scrollTimelineOptions() =
-      GetScrollTimelineOptions(aAnimation->GetTimeline());
+  animation->scrollTimelineOptions() = GetScrollTimelineOptions(aAnimation);
   // We set this flag to let the compositor know that the start value of this
   // transition is replaced. The compositor may replace the start value with its
   // last sampled animation value, instead of using the segment.mFromValue we

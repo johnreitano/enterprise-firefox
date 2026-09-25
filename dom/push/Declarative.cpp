@@ -4,6 +4,7 @@
 
 #include "Declarative.h"
 
+#include "js/JSON.h"
 #include "mozilla/dom/dom_push_rust_generated.h"
 #include "mozilla/dom/notification/NotificationUtils.h"
 #include "nsNetUtil.h"
@@ -62,6 +63,32 @@ static NotificationDirection ConvertNotificationDirection(
   return NotificationDirection::Auto;
 }
 
+// Convert JSON to the base 64 format outputted by nsStructuredCloneContainer.
+static nsString ConvertJSONToStructuredCloneBase64(const nsAString& aJSON) {
+  if (aJSON.IsEmpty()) {
+    return EmptyString();
+  }
+  AutoJSAPI jsapi;
+  if (NS_WARN_IF(!jsapi.Init(xpc::PrivilegedJunkScope()))) {
+    return EmptyString();
+  }
+  JSContext* cx = jsapi.cx();
+  RefPtr<nsStructuredCloneContainer> dataObjectContainer =
+      new nsStructuredCloneContainer();
+  JS::Rooted<JS::Value> jsValue(cx);
+  if (NS_WARN_IF(!JS_ParseJSON(cx, aJSON.Data(), aJSON.Length(), &jsValue))) {
+    return EmptyString();
+  }
+  if (NS_WARN_IF(NS_FAILED(dataObjectContainer->InitFromJSVal(jsValue, cx)))) {
+    return EmptyString();
+  }
+  nsString serialized;
+  if (NS_WARN_IF(NS_FAILED(dataObjectContainer->GetDataAsBase64(serialized)))) {
+    return EmptyString();
+  }
+  return serialized;
+}
+
 static Maybe<IPCNotificationOptions> GetNotificationOptionsForDeclarativePush(
     DeclarativePushData&& aPush, nsIURI* aBaseURI) {
   IPCNotificationOptions options;
@@ -81,6 +108,7 @@ static Maybe<IPCNotificationOptions> GetNotificationOptionsForDeclarativePush(
   }
   options.tag() = std::move(aPush.tag);
   options.lang() = std::move(aPush.lang);
+  options.dataSerialized() = ConvertJSONToStructuredCloneBase64(aPush.data);
   for (DeclarativePushAction& action : aPush.actions) {
     IPCNotificationAction ipcAction;
     if (NS_FAILED(NS_NewURI(getter_AddRefs(ipcAction.navigate()),

@@ -211,26 +211,46 @@ export class UrlbarInputBaseTestUtils {
    * Waits to a search to be complete.
    *
    * @param {ChromeWindow} win The window containing the urlbar
+   * @returns {Promise<UrlbarQueryContext>}
    */
   async promiseSearchComplete(win) {
-    let waitForQuery = async () => {
-      await this.promisePopupOpen(win, () => {});
+    let waitForQuery = async awaitedPromise => {
+      let urlbar = this.#urlbar(win);
+      // A query without results leaves the view closed, so also settle on the
+      // query finishing. A pass that finds no newer query than the one already
+      // awaited has nothing to wait for.
+      if (
+        !urlbar.view.isOpen &&
+        urlbar.lastQueryContextPromise !== awaitedPromise
+      ) {
+        await new Promise(resolve => {
+          let done = () => {
+            urlbar.controller.removeListener(listener);
+            resolve();
+          };
+          let listener = {
+            onViewOpen: done,
+            onQueryFinished: done,
+            onQueryCancelled: done,
+          };
+          this.addControllerListener(urlbar.controller, listener);
+        });
+      }
       // Re-read `lastQueryContextPromise` after each await in case the query
       // was restarted (e.g., by the `reopenOnBlur` mechanism in
       // `promiseAutocompleteResultPopup`), and wait for the latest query.
       let promise;
       let context;
       do {
-        promise = this.#urlbar(win).lastQueryContextPromise;
+        promise = urlbar.lastQueryContextPromise;
         context = await promise;
-      } while (this.#urlbar(win).lastQueryContextPromise !== promise);
-      return context;
+      } while (urlbar.lastQueryContextPromise !== promise);
+      return { context, promise };
     };
-    /** @type {UrlbarQueryContext} */
-    let context = await waitForQuery();
+    let { context, promise } = await waitForQuery();
     if (this.#urlbar(win).searchMode) {
       // Search mode may start a second query.
-      context = await waitForQuery();
+      ({ context } = await waitForQuery(promise));
     }
     if (this.#urlbar(win).view.oneOffSearchButtons?._rebuilding) {
       await new Promise(resolve =>

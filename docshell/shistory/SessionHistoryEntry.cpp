@@ -6,6 +6,7 @@
 #include "ipc/IPCMessageUtilsSpecializations.h"
 #include "mozilla/dom/SessionHistoryEntry.h"
 #include "nsCOMPtr.h"
+#include "nsContentUtils.h"
 #include "nsDocShell.h"
 #include "nsDocShellLoadState.h"
 #include "nsFrameLoader.h"
@@ -1557,6 +1558,13 @@ void ParamTraits<mozilla::dom::SessionHistoryInfo>::Write(
 
 bool ParamTraits<mozilla::dom::SessionHistoryInfo>::Read(
     IPC::MessageReader* aReader, mozilla::dom::SessionHistoryInfo* aResult) {
+  if (!aReader->GetActor() ||
+      aReader->GetActor()->ToplevelProtocol()->GetProtocolId() !=
+          PContentMsgStart) {
+    aReader->FatalError("SessionHistoryInfo must be sent over PContent");
+    return false;
+  }
+
   uint64_t sharedId;
   if (!ReadParam(aReader, &aResult->mURI) ||
       !ReadParam(aReader, &aResult->mOriginalURI) ||
@@ -1650,6 +1658,16 @@ bool ParamTraits<mozilla::dom::SessionHistoryInfo>::Read(
     MOZ_ASSERT(contentType.Equals(aResult->mSharedState.Get()->mContentType),
                "We don't expect this to change!");
   } else {
+    if (XRE_IsParentProcess()) {
+      auto* cp = static_cast<mozilla::dom::ContentParent*>(
+          aReader->GetActor()->ToplevelProtocol());
+      if (!nsContentUtils::IsProcessSpecificIdFrom(sharedId,
+                                                   cp->OtherChildID())) {
+        aReader->FatalError(
+            "SessionHistoryInfo with invalid shared state identifier");
+        return false;
+      }
+    }
     aResult->mSharedState.ChangeId(sharedId);
     aResult->mSharedState.Get()->mTriggeringPrincipal =
         triggeringPrincipal.forget();

@@ -857,6 +857,9 @@ scheme = "https"
 
 ["test_invalid_reject_play.html"]
 
+["test_live_duration.html"]
+support-files = ["live_duration.sjs"]
+
 ["test_media_error_redirect_redaction.html"]
 
 ["test_media_selection.html"]

@@ -1148,6 +1148,23 @@ export class FormAutofillParent extends JSWindowActorParent {
     this.sendAsyncMessage("FormAutofill:RepopulateAutocompletePopup");
   }
 
+  async #confirmAddressRemoval(guid) {
+    // Read before awaiting: the prompt below takes focus and the actor may be
+    // destroyed by the time it resolves.
+    const chromeWindow = this.manager.browsingContext.topChromeWindow;
+
+    const confirmed = await lazy.AutocompleteRemoveRecord.confirmRemoval(
+      chromeWindow,
+      "address"
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    // Both stores warn and return for a guid they do not hold.
+    await lazy.gFormAutofillStorage.addresses.remove(guid);
+  }
+
   async #confirmCreditCardRemoval() {
     const promptMessage = FormAutofillUtils.reauthOSPromptMessage(
       "autofill-delete-payment-method-os-prompt-macos",
@@ -1208,10 +1225,7 @@ export class FormAutofillParent extends JSWindowActorParent {
 
       case "FormAutofill:DeleteAddress": {
         try {
-          await lazy.AutocompleteRemoveRecord.confirmRemoval(
-            this.manager.browsingContext.topChromeWindow,
-            "address"
-          );
+          await this.#confirmAddressRemoval(data?.guid);
         } catch (ex) {
           lazy.log.warn("Address removal flow failed:", ex);
         } finally {

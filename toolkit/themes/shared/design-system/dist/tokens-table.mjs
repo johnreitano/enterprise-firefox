@@ -361,10 +361,7 @@ export const tokensTable = {
       name: "--button-background-color-toolbar-active",
     },
     {
-      value: {
-        default: "var(--toolbarbutton-background-color)",
-        forcedColors: "var(--button-background-color-disabled)",
-      },
+      value: "var(--toolbarbutton-background-color-disabled)",
       name: "--button-background-color-toolbar-disabled",
     },
     {
@@ -571,6 +568,13 @@ export const tokensTable = {
         },
       },
       name: "--toolbarbutton-background-color-active",
+    },
+    {
+      value: {
+        default: "var(--toolbarbutton-background-color)",
+        forcedColors: "var(--button-background-color-disabled)",
+      },
+      name: "--toolbarbutton-background-color-disabled",
     },
     {
       value: {
@@ -817,18 +821,6 @@ export const tokensTable = {
         },
       },
       name: "--tab-background-color-selected",
-    },
-    {
-      value: "var(--button-background-color-ghost)",
-      name: "--tab-close-button-background-color",
-    },
-    {
-      value: "var(--toolbarbutton-background-color-hover)",
-      name: "--tab-close-button-background-color-hover",
-    },
-    {
-      value: "var(--toolbarbutton-background-color-active)",
-      name: "--tab-close-button-background-color-active",
     },
     {
       value: "var(--toolbar-field-background-color)",
@@ -2830,21 +2822,6 @@ export const tokensTable = {
       name: "--select-text-color-disabled",
     },
     { value: "var(--text-color)", name: "--panel-list-text-color" },
-    { value: "var(--tab-text-color)", name: "--tab-close-button-text-color" },
-    {
-      value: {
-        default: "var(--tab-text-color)",
-        forcedColors: "var(--button-text-color-hover)",
-      },
-      name: "--tab-close-button-text-color-hover",
-    },
-    {
-      value: {
-        default: "var(--tab-text-color)",
-        forcedColors: "var(--button-text-color-active)",
-      },
-      name: "--tab-close-button-text-color-active",
-    },
     {
       value: {
         default: "var(--toolbox-text-color-current)",
@@ -3400,6 +3377,7 @@ export const tokensTable = {
         light: "var(--color-gray-70)",
         dark: "var(--color-gray-0)",
         nativeTheme: "currentColor",
+        forcedColors: "var(--button-text-color)",
         default: "light-dark(var(--color-gray-70), var(--color-gray-0))",
         platform: {
           default: "currentColor",
@@ -3411,6 +3389,20 @@ export const tokensTable = {
         },
       },
       name: "--toolbarbutton-icon-fill",
+    },
+    {
+      value: {
+        default: "var(--toolbarbutton-icon-fill)",
+        forcedColors: "var(--button-text-color-ghost-hover)",
+      },
+      name: "--toolbarbutton-icon-fill-hover",
+    },
+    {
+      value: {
+        default: "var(--toolbarbutton-icon-fill)",
+        forcedColors: "var(--button-text-color-ghost-active)",
+      },
+      name: "--toolbarbutton-icon-fill-active",
     },
     {
       value: {
@@ -4175,10 +4167,8 @@ export const variableLookupTable = {
     "var(--toolbarbutton-background-color-hover)",
   "button-background-color-toolbar-active":
     "var(--toolbarbutton-background-color-active)",
-  "button-background-color-toolbar-disabled": {
-    default: "var(--toolbarbutton-background-color)",
-    forcedColors: "var(--button-background-color-disabled)",
-  },
+  "button-background-color-toolbar-disabled":
+    "var(--toolbarbutton-background-color-disabled)",
   "button-background-color-toolbar-selected":
     "var(--button-background-color-ghost-active)",
   "button-badge-background-color": "var(--color-accent-attention)",
@@ -4903,6 +4893,7 @@ export const variableLookupTable = {
     light: "var(--color-gray-70)",
     dark: "var(--color-gray-0)",
     nativeTheme: "currentColor",
+    forcedColors: "var(--button-text-color)",
     default: "light-dark(var(--color-gray-70), var(--color-gray-0))",
     platform: {
       default: "currentColor",
@@ -4912,6 +4903,14 @@ export const variableLookupTable = {
         default: "light-dark(var(--color-gray-70), var(--color-gray-0))",
       },
     },
+  },
+  "toolbarbutton-icon-fill-hover": {
+    default: "var(--toolbarbutton-icon-fill)",
+    forcedColors: "var(--button-text-color-ghost-hover)",
+  },
+  "toolbarbutton-icon-fill-active": {
+    default: "var(--toolbarbutton-icon-fill)",
+    forcedColors: "var(--button-text-color-ghost-active)",
   },
   "toolbarbutton-icon-fill-attention": {
     light: "var(--color-blue-60)",
@@ -4971,6 +4970,10 @@ export const variableLookupTable = {
         default: "color-mix(in srgb, currentColor 30%, transparent)",
       },
     },
+  },
+  "toolbarbutton-background-color-disabled": {
+    default: "var(--toolbarbutton-background-color)",
+    forcedColors: "var(--button-background-color-disabled)",
   },
   "toolbarbutton-outline":
     "var(--border-width) solid var(--toolbarbutton-outline-color)",
@@ -5381,11 +5384,6 @@ export const variableLookupTable = {
   "tab-border-color-selected": "var(--toolbarbutton-outline-color-selected)",
   "tab-box-shadow-selected": "var(--box-shadow-level-1)",
   "tab-close-button-padding": "6px",
-  "tab-close-button-background-color": "var(--button-background-color-ghost)",
-  "tab-close-button-background-color-hover":
-    "var(--toolbarbutton-background-color-hover)",
-  "tab-close-button-background-color-active":
-    "var(--toolbarbutton-background-color-active)",
   "tab-close-button-border-color": "var(--tab-border-color)",
   "tab-close-button-border-color-hover": {
     default: "var(--tab-border-color)",
@@ -5394,15 +5392,6 @@ export const variableLookupTable = {
   "tab-close-button-border-color-active": {
     default: "var(--tab-border-color)",
     prefersContrast: "var(--button-border-color-active)",
-  },
-  "tab-close-button-text-color": "var(--tab-text-color)",
-  "tab-close-button-text-color-hover": {
-    default: "var(--tab-text-color)",
-    forcedColors: "var(--button-text-color-hover)",
-  },
-  "tab-close-button-text-color-active": {
-    default: "var(--tab-text-color)",
-    forcedColors: "var(--button-text-color-active)",
   },
   "tab-container-margin-inline-pinned-expanded": {
     default: "var(--space-small)",

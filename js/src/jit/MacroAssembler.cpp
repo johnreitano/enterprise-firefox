@@ -6434,6 +6434,19 @@ static ReturnCallTrampolineData MakeReturnCallTrampoline(MacroAssembler& masm) {
   masm.append(wasm::CodeRangeUnwindInfo::UseFpLr, masm.currentOffset());
   masm.addToStackPtr(Imm32(sizeof(wasm::Frame)));
   masm.abiret();
+#elif defined(JS_CODEGEN_RISCV64)
+  {
+    // This should be 4 instructions, but make room for 5 (25% slack) to be
+    // safe.
+    AutoForbidPoolsAndNops afp(&masm, 5);
+
+    masm.loadPtr(Address(FramePointer, wasm::Frame::returnAddressOffset()), ra);
+    masm.loadPtr(Address(FramePointer, wasm::Frame::callerFPOffset()),
+                 FramePointer);
+    masm.append(wasm::CodeRangeUnwindInfo::UseFpLr, masm.currentOffset());
+    masm.addToStackPtr(Imm32(sizeof(wasm::Frame)));
+    masm.abiret();
+  }
 #else
   masm.pop(FramePointer);
   masm.append(wasm::CodeRangeUnwindInfo::UseFp, masm.currentOffset());
@@ -6671,7 +6684,7 @@ static void CollapseWasmFrameSlow(MacroAssembler& masm,
   masm.mov(&data.trampoline, ScratchRegister);
   // thus, modify ra in only one instruction.
   masm.mov(ScratchRegister, tempForRA);
-#  elif defined(JS_CODEGEN_LOONG64)
+#  elif defined(JS_CODEGEN_LOONG64) || defined(JS_CODEGEN_RISCV64)
   // intermediate values in ra can break the unwinder.
   masm.mov(&data.trampoline, SavedScratchRegister);
   // thus, modify ra in only one instruction.
@@ -7439,12 +7452,12 @@ FaultingCodeRange MacroAssembler::branchWasmRefIsSubtypeAny(
     //    then we will segfault.
     // We could ignore the former check, but better to be precise and ensure
     // that we are getting the optimizations we expect.
-    MOZ_ASSERT_IF(signalNullChecks && fcr.isValid(), canOmitNullCheck);
-    MOZ_ASSERT_IF(signalNullChecks && !fcr.isValid(), !canOmitNullCheck);
+    MOZ_ASSERT_IF(!oom() && signalNullChecks,
+                  canOmitNullCheck == fcr.isValid());
 
     // We should never get a valid FCR if the caller doesn't expect signal
     // handling. This simplifies life for the caller.
-    MOZ_ASSERT_IF(!signalNullChecks, !fcr.isValid());
+    MOZ_ASSERT_IF(!oom() && !signalNullChecks, !fcr.isValid());
   }));
 
   // -----------------------------------

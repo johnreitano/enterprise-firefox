@@ -102,6 +102,14 @@ option(env="MOZ_SOURCE_REPO", nargs=1, help="Project source repository")
 set_config("MOZ_SOURCE_REPO", depends_if("MOZ_SOURCE_REPO")(lambda src: src[0]))
 option(env="MOZ_SOURCE_CHANGESET", nargs=1, help="Source changeset")
 set_config("MOZ_SOURCE_CHANGESET", depends_if("MOZ_SOURCE_CHANGESET")(lambda v: v[0]))
+option(env="MOZ_SOURCE_GIT_REPO", nargs=1, help="Git mirror of the source repository")
+set_config("MOZ_SOURCE_GIT_REPO", depends_if("MOZ_SOURCE_GIT_REPO")(lambda v: v[0]))
+option(
+    env="MOZ_SOURCE_GIT_CHANGESET", nargs=1, help="Source changeset in the git mirror"
+)
+set_config(
+    "MOZ_SOURCE_GIT_CHANGESET", depends_if("MOZ_SOURCE_GIT_CHANGESET")(lambda v: v[0])
+)
 
 option(
     env="MOZ_INCLUDE_SOURCE_INFO",

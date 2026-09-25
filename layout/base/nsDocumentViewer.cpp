@@ -2154,10 +2154,8 @@ MOZ_CAN_RUN_SCRIPT_BOUNDARY NS_IMETHODIMP nsDocumentViewer::GetContentSize(
   nsIFrame* root = presShell->GetRootFrame();
   NS_ENSURE_TRUE(root, NS_ERROR_FAILURE);
 
-  WritingMode wm = root->GetWritingMode();
-
-  nscoord prefISize;
-  {
+  const WritingMode wm = root->GetWritingMode();
+  const nscoord prefISize = [&] {
     const auto& constraints = presShell->GetWindowSizeConstraints();
     aMaxHeight = std::min(aMaxHeight, constraints.mMaxSize.height);
     aMaxWidth = std::min(aMaxWidth, constraints.mMaxSize.width);
@@ -2167,14 +2165,14 @@ MOZ_CAN_RUN_SCRIPT_BOUNDARY NS_IMETHODIMP nsDocumentViewer::GetContentSize(
                                              : constraints.mMinSize.width;
     const nscoord maxISize = wm.IsVertical() ? aMaxHeight : aMaxWidth;
     const IntrinsicSizeInput input(rcx.get(), Nothing(), Nothing());
-    if (aPrefWidth) {
-      prefISize = std::max(root->GetMinISize(input), aPrefWidth);
-    } else {
-      prefISize = root->GetPrefISize(input);
-    }
-    prefISize = nsPresContext::RoundUpAppUnitsToCSSPixel(
-        CSSMinMax(prefISize, minISize, maxISize));
-  }
+
+    nsAutoScriptBlocker blocker;
+    const nscoord pref = aPrefWidth
+                             ? std::max(root->GetMinISize(input), aPrefWidth)
+                             : root->GetPrefISize(input);
+    return nsPresContext::RoundUpAppUnitsToCSSPixel(
+        CSSMinMax(pref, minISize, maxISize));
+  }();
 
   // We should never intentionally get here with this sentinel value, but it's
   // possible that a document with huge sizes might inadvertently have a

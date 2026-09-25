@@ -14,7 +14,11 @@ support-files = [
   "extensionsettings.html",
   "301.sjs",
   "302.sjs",
+  "302exception.sjs",
   "404.sjs",
+  "cached301.sjs",
+  "websitefilter_sw.html",
+  "websitefilter_sw.js",
 ]
 
 ["browser_policies_about_policies.js"]
@@ -61,6 +65,8 @@ https_first_disabled = true
 ["browser_policy_default_browser_setting.js"]
 
 ["browser_policy_disable_buttons.js"]
+
+["browser_policy_disable_developer_tools.js"]
 
 ["browser_policy_disable_feedback_commands.js"]
 

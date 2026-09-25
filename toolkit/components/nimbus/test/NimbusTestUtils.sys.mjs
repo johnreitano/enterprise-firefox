@@ -71,6 +71,23 @@ function validateSchema(schemaOrValidator, value, errorMsg) {
   return value;
 }
 
+/**
+ * Wait until enrollments can be added to `manager`, or to the global
+ * ExperimentManager if the caller did not pass one.
+ *
+ * @param {ExperimentManager?} manager
+ *        A manager the caller has initialized itself.
+ */
+async function waitForEnrollmentReady(manager) {
+  if (manager) {
+    await manager.store.ready();
+  } else {
+    // ExperimentStore.ready() resolves before ExperimentManager.onStartup()
+    // has created the state enrolling needs.
+    await ExperimentAPI.init();
+  }
+}
+
 function validateFeatureValueEnum({ branch }) {
   let { features } = branch;
   for (let feature of features) {
@@ -1045,8 +1062,8 @@ export const NimbusTestUtils = {
 
     NimbusLogging.enableLogging();
 
+    await waitForEnrollmentReady(manager);
     const experimentManager = manager ?? ExperimentAPI.manager;
-    await experimentManager.store.ready();
 
     const enrollment = await experimentManager.enroll(
       recipe,
@@ -1110,8 +1127,8 @@ export const NimbusTestUtils = {
     { featureId, value = {} },
     { manager, source, slug, branchSlug = "control", isRollout = false } = {}
   ) {
+    await waitForEnrollmentReady(manager);
     const experimentManager = manager ?? ExperimentAPI.manager;
-    await experimentManager.store.ready();
 
     const experimentType = isRollout ? "rollout" : "experiment";
     const experimentId =

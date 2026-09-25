@@ -9,12 +9,13 @@
 #include "nsClassHashtable.h"
 #include "nsIObserver.h"
 #include "nsITimer.h"
+#include "nsIURI.h"
+#include "nsTHashMap.h"
 #include "nsTObserverArray.h"
 
 class nsIChannel;
 class nsIHttpChannel;
 class nsIPrincipal;
-class nsIURI;
 
 namespace mozilla {
 

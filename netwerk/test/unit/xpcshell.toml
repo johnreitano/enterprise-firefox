@@ -693,6 +693,12 @@ skip-if = [
 
 ["test_dns_localredirect.js"]
 
+["test_dns_negative_grace.js"]
+skip-if = [
+  "os == 'android'",
+  "os == 'win' && msix",
+]
+
 ["test_dns_negative_refresh_on_use.js"]
 
 ["test_dns_offline.js"]
@@ -909,6 +915,8 @@ skip-if = [
   "os == 'android'",
   "os == 'win' && msix",
 ]
+
+["test_happy_eyeballs_negative_optimistic_dns.js"]
 
 ["test_happy_eyeballs_optimistic_dns.js"]
 run-sequentially = ["true"] # node server exceptions dont replay well

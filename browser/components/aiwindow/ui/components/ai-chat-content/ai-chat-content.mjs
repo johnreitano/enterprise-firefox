@@ -155,6 +155,8 @@ export class AIChatContent extends MozLitElement {
   #uiRenderMap = null;
   // English fallback until connectedCallback()'s l10n lookup resolves.
   #defaultTabGroupLabel = "Tab Group";
+  // Identity of the agent-monitor "create" card we have already auto-focused
+  #focusedMonitorCardId = null;
 
   constructor() {
     super();
@@ -240,6 +242,43 @@ export class AIChatContent extends MozLitElement {
     // here to avoid it lingering from the previous conversation.
     if (changedProperties.has("conversationState")) {
       this.#updateJumpButtonState();
+    }
+    this.#maybeFocusAgentMonitorCard();
+  }
+
+  /**
+   * Give keyboard users an immediate focus target when a new agent-monitor
+   * "create" card is seeded into the chat (e.g. from a /watch command)
+   */
+  #maybeFocusAgentMonitorCard() {
+    const card = this.conversationState.findLast(
+      msg =>
+        msg?.toolUIData?.uiType === UI_TYPES.AGENT_MONITOR &&
+        (msg.toolUIData.properties?.mode ?? "create") === "create" &&
+        !msg.isRestored
+    );
+    if (!card) {
+      return;
+    }
+    const cardId = card.toolUIData.toolCallId ?? card.messageId;
+    if (cardId == null || this.#focusedMonitorCardId === cardId) {
+      return;
+    }
+    this.#focusedMonitorCardId = cardId;
+    this.#focusMonitorNameInput(cardId);
+  }
+
+  async #focusMonitorNameInput(cardId) {
+    const item = this.shadowRoot?.querySelector(
+      `agent-monitor-item[data-tool-call-id="${CSS.escape(cardId)}"]`
+    );
+    if (!item) {
+      return;
+    }
+    await item.updateComplete;
+    // The card can be submitted or cancelled while it renders.
+    if (item.isConnected && item.getAttribute("mode") === "create") {
+      item.focusName();
     }
   }
 
@@ -1458,6 +1497,7 @@ export class AIChatContent extends MozLitElement {
     const { messageId, toolUIData, toolUIDraft } = msg;
     const toolCallId = toolUIData.toolCallId;
     return html`<agent-monitor-item
+      data-tool-call-id=${toolCallId ?? messageId}
       mode=${toolUIData.properties?.mode ?? "create"}
       .agent=${toolUIData.properties?.agent}
       .draft=${toolUIDraft}

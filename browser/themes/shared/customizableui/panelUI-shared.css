@@ -1898,6 +1898,7 @@ panelview .toolbarbutton-1 {
 ) {
   color: var(--button-text-color-menu);
   background-color: var(--button-background-color-menu);
+  fill: currentColor;
 
   &:focus-visible {
     outline: var(--focus-outline);

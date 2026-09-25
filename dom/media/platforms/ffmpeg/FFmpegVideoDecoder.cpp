@@ -788,17 +788,6 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::InitV4L2Decoder() {
 
   StaticMutexAutoLock mon(sMutex);
 
-  // mAcceleratedFormats is already configured so check supported
-  // formats before we do anything.
-  if (mAcceleratedFormats.Length()) {
-    if (!IsFormatAccelerated(mCodecID)) {
-      FFMPEG_LOG("  Format {} is not accelerated",
-                 mLib->avcodec_get_name(mCodecID));
-      return NS_ERROR_NOT_AVAILABLE;
-    }
-    FFMPEG_LOG("  Format {} is accelerated", mLib->avcodec_get_name(mCodecID));
-  }
-
   // Select the appropriate v4l2 codec
   AVCodec* codec = FindVideoHardwareAVCodec(mLib, mCodecID);
   if (!codec) {
@@ -837,15 +826,6 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::InitV4L2Decoder() {
   if (mLib->avcodec_open2(mCodecContext, codec, nullptr) < 0) {
     FFMPEG_LOG("  Couldn't initialise V4L2 decoder");
     return NS_ERROR_DOM_MEDIA_FATAL_ERR;
-  }
-
-  // Set mAcceleratedFormats
-  if (mAcceleratedFormats.IsEmpty()) {
-    // FFmpeg does not correctly report that the V4L2 wrapper decoders are
-    // hardware accelerated, but we know they always are.  If we've gotten
-    // this far then we know this codec has a V4L2 wrapper decoder and so is
-    // accelerateed.
-    mAcceleratedFormats.AppendElement(mCodecID);
   }
 
   AdjustHWDecodeLogging();

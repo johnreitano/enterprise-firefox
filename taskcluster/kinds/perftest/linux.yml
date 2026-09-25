@@ -5,9 +5,7 @@
 task-defaults:
     worker-type:
         by-platform:
-            linux1804-64-shippable/opt: t-linux-talos-1804
             linux2404-64-shippable/opt: t-linux-talos-2404
-            linux1804-64/opt: t-linux-talos-1804
             linux2404-64/opt: t-linux-talos-2404
     fetches:
         toolchain:
@@ -23,10 +21,8 @@ task-defaults:
             - artifact: target.mochitest.tests.tar.zst
             - artifact: target.tar.xz
     platform:
-        - linux1804-64-shippable/opt
         - linux2404-64-shippable/opt
     require-build:
-        linux1804-64-shippable/opt: build-linux64-shippable/opt
         linux2404-64-shippable/opt: build-linux64-shippable/opt
     scopes:
         - secrets:get:project/releng/gecko/build/level-{level}/conditioned-profiles

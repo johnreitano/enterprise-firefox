@@ -58,7 +58,7 @@ data object DefaultTabManagementFeatureHelper : TabManagementFeatureHelper {
         get() = Config.channel.isDebug || FxNimbus.features.tabGroupsOnboarding.value().enabled
 
     override val tabGroupsStripEnabled: Boolean
-        get() = Config.channel.isDebug || FxNimbus.features.tabGroupsStrip.value().enabled
+        get() = FxNimbus.features.tabGroupsStrip.value().enabled
 
     // Opt in via Secret Settings. Defaulting this on adds a browser menu row that pushes Print out
     // of the main menu's visible area, which the Print UI tests rely on.

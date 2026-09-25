@@ -137,14 +137,6 @@ browsertime-tp6:
                                 macosx1470.*shippable.*: [trunk]
                                 default: []
                         default: []
-                twitch:
-                    by-app:
-                        firefox:
-                            by-test-platform:
-                                windows11-64-24h2.*shippable.*: []
-                                ^(?!windows11-64-24h2).*64(?!.*nightlyasrelease).*shippable.*: [trunk]
-                                default: []
-                        default: []
                 default:
                     by-app:
                         firefox:
@@ -171,14 +163,12 @@ browsertime-tp6:
             - linkedin
             - microsoft
             - netflix
-            - nytimes
             - office
             - outlook
             - paypal
             - pinterest
             - reddit
             - tumblr
-            - twitch
             - wikia
             - youtube
     tier:
@@ -197,7 +187,6 @@ browsertime-responsiveness:
         run-visual-metrics: true
         subtests:
             - cnn-nav
-            - [facebook-nav, fbnav]
             - [reddit-billgates-ama, rdt-ama]
             - [reddit-billgates-post-1, rdt-post-1]
             - [reddit-billgates-post-2, rdt-post-2]
@@ -794,7 +783,6 @@ browsertime-tp6-live:
                     - pinterest
                     - reddit
                     - tumblr
-                    - twitch
                     # - twitter Perma fails on osx 10.15.7
                     - wikipedia
                     - yahoo-mail
@@ -821,7 +809,6 @@ browsertime-tp6-live:
                     - pinterest
                     - reddit
                     - tumblr
-                    - twitch
                     - twitter
                     - wikipedia
                     - yahoo-mail
@@ -848,7 +835,6 @@ browsertime-tp6-live:
                     - pinterest
                     - reddit
                     - tumblr
-                    - twitch
                     - twitter
                     - wikipedia
                     - yahoo-mail

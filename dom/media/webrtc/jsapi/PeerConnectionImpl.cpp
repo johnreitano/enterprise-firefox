@@ -1823,7 +1823,7 @@ PeerConnectionImpl::AddIceCandidate(
   // RTCIceTransport.getRemoteCandidates(), in which case it will handle
   // stripping the "a=" off.
   std::string candidate(aCandidate);
-  if (candidate.find("a=") == 0) {
+  if (candidate.starts_with("a=")) {
     candidate = candidate.substr(2);
   }
 

@@ -39,6 +39,7 @@ categories:
         - widget/cocoa
         - widget/windows
         - toolkit/components/ml
+        - toolkit/components/pageextractor
         - accessible
         - media
         - code-quality

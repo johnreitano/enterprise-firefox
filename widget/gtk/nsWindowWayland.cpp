@@ -96,10 +96,12 @@ bool nsWindowWayland::CreateRestoreSession(bool aRestoreWindow) {
     return false;
   }
 
-  // If we have old profile / workspace ID just replace it by
+  // If we have old profile / workspace ID or it's empty just replace it by
   // UUID to avoid protocol error crash (Bug 2059617).
-  nsresult ret;
-  (void)mWorkspaceID.ToInteger(&ret);
+  nsresult ret = NS_OK;
+  if (!mWorkspaceID.IsEmpty()) {
+    (void)mWorkspaceID.ToInteger(&ret);
+  }
   if (NS_SUCCEEDED(ret)) {
     mWorkspaceID = GenerateWorkspaceID();
     aRestoreWindow = false;

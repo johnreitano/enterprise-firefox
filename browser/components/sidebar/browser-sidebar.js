@@ -434,7 +434,8 @@ var SidebarController = {
   get inSingleTabWindow() {
     return (
       !window.toolbar.visible ||
-      window.document.documentElement.hasAttribute("taskbartab")
+      window.document.documentElement.hasAttribute("taskbartab") ||
+      window.document.documentElement.hasAttribute("mini-window")
     );
   },
 

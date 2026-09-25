@@ -284,6 +284,7 @@ STATIC_ATOMS = [
     Atom("comment", "comment"),
     Atom("compact", "compact"),
     Atom("concat", "concat"),
+    Atom("connection_allowlist", "connection-allowlist"),
     Atom("constructor", "constructor"),
     Atom("consumeoutsideclicks", "consumeoutsideclicks"),
     Atom("container", "container"),

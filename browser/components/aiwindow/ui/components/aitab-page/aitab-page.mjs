@@ -6,6 +6,15 @@ import { html, nothing } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/aitab-header.mjs";
+// eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/aitab-list.mjs";
+// eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/aitab-timeline.mjs";
+// eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/aitab-table.mjs";
+// eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/aitab-highlights.mjs";
+import { httpUrl } from "chrome://browser/content/aiwindow/modules/AITabUtils.mjs";
 
 // The same names the child and parent actors use, so a message can be traced
 // straight through without a translation table.
@@ -13,25 +22,8 @@ const GET_PAGE_EVENT = "AITab:GetPage";
 const DELETE_PAGE_EVENT = "AITab:DeletePage";
 
 /**
- * Returns the href as an http(s) URL, or null for anything else. Footer button
- * hrefs can also be in-app route ids, which must not become links.
- *
- * @param {string} href
- * @returns {?string}
- */
-function httpUrl(href) {
-  const parsed = URL.parse(String(href ?? "").trim());
-  return parsed?.protocol == "http:" || parsed?.protocol == "https:"
-    ? parsed.href
-    : null;
-}
-
-/**
  * Root component for about:smartpage. Looks up the page config for the
  * generated page named in the page URL and renders it.
- *
- * Body blocks render as placeholders for now; the text, table, cards, list and
- * timeline components land separately.
  *
  * @property {?object} page - Page config to render, or null when there is none.
  * @property {string} status - One of "loading", "unavailable", "error" or
@@ -144,7 +136,7 @@ export class AITabPage extends MozLitElement {
     return html`
       <aitab-header
         .createdAt=${this.page?.createdAtLabel ?? ""}
-        .heading=${header.title ?? ""}
+        .title=${header.title ?? ""}
         .subhead=${header.subhead ?? ""}
         .references=${header.references?.items ?? []}
         @aitab-page-actions:delete=${() => {
@@ -161,6 +153,21 @@ export class AITabPage extends MozLitElement {
     if (!block?.type) {
       return nothing;
     }
+    switch (block.type.toLowerCase()) {
+      case "list":
+        return html`<aitab-list
+          .title=${block.title ?? ""}
+          description=${block.description ?? ""}
+          .groups=${block.groups ?? []}
+          layout=${block.layout ?? "column"}
+        ></aitab-list>`;
+      case "timeline":
+        return html`<aitab-timeline
+          .title=${block.title ?? ""}
+          description=${block.description ?? ""}
+          .items=${block.items ?? []}
+        ></aitab-timeline>`;
+    }
     return html`
       <section class="aitab-block" data-block-type=${block.type}>
         ${block.title ? html`<h2>${block.title}</h2>` : nothing}
@@ -175,7 +182,7 @@ export class AITabPage extends MozLitElement {
       ? html`<a
           class="aitab-chip"
           data-variant=${variant}
-          href=${url}
+          href=${url.href}
           target="_blank"
           rel="noopener noreferrer"
           >${button.text}</a

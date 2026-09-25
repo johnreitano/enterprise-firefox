@@ -129,6 +129,7 @@ COMPONENT_MAPPING = {
     "mozilla/appservices/adsclient": "components/ads-client",
     "mozilla/appservices/autofill": "components/autofill",
     "mozilla/appservices/crashtest": "components/crashtest",
+    "mozilla/appservices/db_crypto": "components/db-crypto",
     "mozilla/appservices/errorsupport": "components/errorsupport",
     "mozilla/appservices/fxaclient": "components/fxaclient",
     "mozilla/appservices/init_rust_components": "components/init_rust_components",

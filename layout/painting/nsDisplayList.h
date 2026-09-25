@@ -5958,7 +5958,7 @@ class nsDisplayEffectsBase : public nsDisplayWrapList {
   }
 
   gfxRect BBoxInUserSpace() const;
-  gfxPoint UserSpaceOffset() const;
+  CSSPoint UserSpaceOffset() const;
 
   void ComputeInvalidationRegion(nsDisplayListBuilder* aBuilder,
                                  const nsDisplayItemGeometry* aGeometry,

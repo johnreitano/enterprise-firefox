@@ -241,6 +241,7 @@ import org.mozilla.fenix.settings.biometric.BiometricPromptFeature
 import org.mozilla.fenix.settings.downloads.DownloadLocationManager
 import org.mozilla.fenix.snackbar.FenixSnackbarDelegate
 import org.mozilla.fenix.snackbar.SnackbarBinding
+import org.mozilla.fenix.tabgroups.TabGroupsStrip
 import org.mozilla.fenix.tabstray.ext.toDisplayTitle
 import org.mozilla.fenix.tabstray.redux.state.Page
 import org.mozilla.fenix.theme.FirefoxTheme
@@ -905,6 +906,7 @@ abstract class BaseBrowserFragment :
             getBottomToolbarHeight(
                 includeTabStripIfAvailable = customTabSessionId == null,
                 includeNavBarIfEnabled = customTabSessionId == null,
+                includeTabGroupsStrip = customTabSessionId == null,
             )
 
         downloadFeature.onDownloadStopped = { downloadState, _, downloadJobStatus ->
@@ -1193,6 +1195,11 @@ abstract class BaseBrowserFragment :
                             requireContext(),
                             singleMediaPicker,
                             multipleMediaPicker,
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                AndroidPhotoPicker.allHdrCapabilities()
+                            } else {
+                                null
+                            },
                         ),
                 ),
             owner = this,
@@ -1274,7 +1281,11 @@ abstract class BaseBrowserFragment :
                             this.getTopToolbarHeight(includeTabStrip)
                         },
                         getBottomToolbarHeightValue = { includeTabStrip, includeNavBar ->
-                            this.getBottomToolbarHeight(includeTabStrip, includeNavBar)
+                            this.getBottomToolbarHeight(
+                                includeTabStripIfAvailable = includeTabStrip,
+                                includeNavBarIfEnabled = includeNavBar,
+                                includeTabGroupsStrip = includeNavBar,
+                            )
                         },
                     )
                     .apply {
@@ -1484,6 +1495,7 @@ abstract class BaseBrowserFragment :
                 customTabSessionId = customTabSessionId,
                 hideWhenKeyboardShown = true,
                 tabStripContent = { buildTabStrip(appStore, settings) },
+                tabGroupsStripContent = { buildTabGroupsStrip() },
             )
 
         // set the summarize CFR binding only for regular, non-custom tabs
@@ -1513,6 +1525,7 @@ abstract class BaseBrowserFragment :
             settings = settings,
             customTabSession = customTabSessionId?.let { store.state.findCustomTab(it) },
             tabStripContent = buildTabStrip(appStore, settings),
+            tabGroupsStripContent = buildTabGroupsStrip(),
             searchSuggestionsContent = { modifier ->
                 (awesomeBarComposable ?: buildAwesomeBar(activity, toolbarStore, modifier)).SearchSuggestions()
             },
@@ -1594,6 +1607,8 @@ abstract class BaseBrowserFragment :
             )
         }
     }
+
+    private fun buildTabGroupsStrip(): @Composable () -> Unit = { TabGroupsStrip() }
 
     private fun buildAwesomeBar(
         activity: HomeActivity,
@@ -2212,6 +2227,7 @@ abstract class BaseBrowserFragment :
             getBottomToolbarHeight(
                 includeTabStripIfAvailable = customTabSessionId == null,
                 includeNavBarIfEnabled = customTabSessionId == null,
+                includeTabGroupsStrip = customTabSessionId == null,
             )
 
         return topToolbarHeight to bottomToolbarHeight
@@ -2380,6 +2396,7 @@ abstract class BaseBrowserFragment :
             getBottomToolbarHeight(
                 includeTabStripIfAvailable = customTabSessionId == null,
                 includeNavBarIfEnabled = customTabSessionId == null,
+                includeTabGroupsStrip = customTabSessionId == null,
             )
 
         initializeEngineView(

@@ -18,24 +18,11 @@ add_task(async function test_profile_pkcs11_module_autoload() {
   libraryFile.append(ctypes.libraryName("pkcs11testmodule"));
   ok(libraryFile.exists(), "The pkcs11testmodule file should exist");
 
-  // Seed pkcs11.txt as a user with profile write access could. The internal
-  // module record mirrors what NSS writes for itself; NSS uses the directory
-  // passed to NSS_Initialize (the profile) for the actual databases. library=
-  // values are unquoted and read literally, so the path is written as-is.
-  let pkcs11txt =
-    "library=\n" +
-    "name=NSS Internal PKCS #11 Module\n" +
-    "parameters=configdir='.' certPrefix='' keyPrefix='' secmod='secmod.db' " +
-    "flags=optimizeSpace\n" +
-    "NSS=Flags=internal,critical trustOrder=75 cipherOrder=100 " +
-    "slotParams=(1={slotFlags=[RSA,DSA,DH,RC2,RC4,DES,RANDOM,SHA1,MD5,MD2,SSL," +
-    "TLS,AES,Camellia,SEED,SHA256,SHA512] askpw=any timeout=30})\n" +
-    "\n" +
-    `library=${libraryFile.path}\n` +
-    "name=ProfileInjectedModule\n";
-  let pkcs11File = profile.clone();
-  pkcs11File.append("pkcs11.txt");
-  await IOUtils.writeUTF8(pkcs11File.path, pkcs11txt);
+  await writeProfilePKCS11ModuleDB(
+    profile,
+    "ProfileInjectedModule",
+    libraryFile.path
+  );
 
   // Initialize NSS.
   Cc["@mozilla.org/psm;1"].getService(Ci.nsINSSComponent);

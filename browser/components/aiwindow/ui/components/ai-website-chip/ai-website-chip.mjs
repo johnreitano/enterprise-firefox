@@ -41,6 +41,8 @@ export class AIWebsiteChip extends MozLitElement {
     href: { type: String },
     removable: { type: Boolean },
     itemRole: { type: String },
+    // Each host opens links itself, so it names the event it listens for.
+    openLinkEvent: { type: String },
   };
 
   #parentHost = null;
@@ -54,6 +56,7 @@ export class AIWebsiteChip extends MozLitElement {
     this.href = "";
     this.removable = false;
     this.itemRole = "";
+    this.openLinkEvent = "AIChatContent:OpenLink";
   }
 
   connectedCallback() {
@@ -119,7 +122,7 @@ export class AIWebsiteChip extends MozLitElement {
       e.shiftKey || e.metaKey || e.ctrlKey || e.altKey || e.button !== 0;
 
     this.dispatchEvent(
-      new CustomEvent("AIChatContent:OpenLink", {
+      new CustomEvent(this.openLinkEvent, {
         bubbles: true,
         composed: true,
         detail: {

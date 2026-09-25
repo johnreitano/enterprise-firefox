@@ -622,6 +622,7 @@ nsresult WebMDemuxer::ReadMetadata() {
       mSeekPreroll = params.seek_preroll;
       mInfo.mAudio.mRate = rate;
       mInfo.mAudio.mChannels = params.channels;
+      SetOpusOutputChannels(mInfo.mAudio);
 
       uint64_t duration = 0;
       r = nestegg_duration(context, &duration);

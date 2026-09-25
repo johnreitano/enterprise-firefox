@@ -89,24 +89,25 @@ class AppRestartLock(FeltTests):
         self.quit_child_browser_for_restart()
         self._settle_after_child_exit(browser_pid)
 
+        self._await_felt_locking_token(
+            True, "Locking on update-restart must persist an encrypted resume token"
+        )
         assert self.signout_count.value == 0, (
             f"Locking on restart must not post a signout, got {self.signout_count.value}"
-        )
-        assert self._felt_has_locking_token(), (
-            "Locking on update-restart must persist an encrypted resume token"
         )
 
     def test_update_restart_without_locking_clears_preexisting_token(self):
         """Locking disabled: an update-driven restart clears stale credentials."""
         browser_pid = self._begin_restart_test(locking_enabled=False)
         self._seed_locking_token()
-        assert self._felt_has_locking_token(), "The test must begin with a stored token"
+        assert self.felt_has_locking_token(), "The test must begin with a stored token"
 
         self.quit_child_browser_for_restart()
         self._settle_after_child_exit(browser_pid)
 
-        assert not self._felt_has_locking_token(), (
-            "Without locking, an update-restart must clear the stored resume token"
+        self._await_felt_locking_token(
+            False,
+            "Without locking, an update-restart must clear the stored resume token",
         )
         assert self.signout_count.value == 1, (
             "An update-restart without locking must post exactly one signout, "
@@ -121,7 +122,7 @@ class AppRestartLock(FeltTests):
         to sign out."""
         browser_pid = self._start_signed_in()
         self._set_locking_pref(PREF_LOCKING_RESTART, True)
-        assert not self._felt_has_locking_token(), (
+        assert not self.felt_has_locking_token(), (
             "The test must begin with no stored token"
         )
 
@@ -137,7 +138,7 @@ class AppRestartLock(FeltTests):
         )
         self.assert_user_signed_in(env=Environment.FIREFOX)
 
-        assert not self._felt_has_locking_token(), (
+        assert not self.felt_has_locking_token(), (
             "A restart without a pending update must not persist a resume token"
         )
         assert self.signout_count.value == 0, (

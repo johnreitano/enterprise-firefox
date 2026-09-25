@@ -86,6 +86,7 @@
 #include "mozilla/dom/EventTarget.h"       // for EventTarget
 #include "mozilla/dom/HTMLBodyElement.h"
 #include "mozilla/dom/HTMLBRElement.h"
+#include "mozilla/dom/Range.h"        // for Range
 #include "mozilla/dom/Selection.h"    // for Selection, etc.
 #include "mozilla/dom/StaticRange.h"  // for StaticRange
 #include "mozilla/dom/Text.h"
@@ -126,7 +127,6 @@
 #include "nsIWidget.h"                 // for nsIWidget, IMEState, etc.
 #include "nsPIDOMWindow.h"             // for nsPIDOMWindow
 #include "nsPresContext.h"             // for nsPresContext
-#include "nsRange.h"                   // for nsRange
 #include "nsReadableUtils.h"           // for EmptyString, ToNewCString
 #include "nsString.h"                  // for nsAutoString, nsString, etc.
 #include "nsStringFwd.h"               // for nsString
@@ -4173,7 +4173,7 @@ EditorDOMPointType EditorBase::GetFirstSelectionStartPoint() const {
     return EditorDOMPointType();
   }
 
-  const nsRange* range = SelectionRef().GetRangeAt(0);
+  const dom::Range* range = SelectionRef().GetRangeAt(0);
   if (MOZ_UNLIKELY(NS_WARN_IF(!range) || NS_WARN_IF(!range->IsPositioned()))) {
     return EditorDOMPointType();
   }
@@ -4188,7 +4188,7 @@ EditorDOMPointType EditorBase::GetFirstSelectionEndPoint() const {
     return EditorDOMPointType();
   }
 
-  const nsRange* range = SelectionRef().GetRangeAt(0);
+  const dom::Range* range = SelectionRef().GetRangeAt(0);
   if (MOZ_UNLIKELY(NS_WARN_IF(!range) || NS_WARN_IF(!range->IsPositioned()))) {
     return EditorDOMPointType();
   }
@@ -4207,7 +4207,7 @@ nsresult EditorBase::GetEndChildNode(const Selection& aSelection,
     return NS_ERROR_FAILURE;
   }
 
-  const nsRange* range = aSelection.GetRangeAt(0);
+  const dom::Range* range = aSelection.GetRangeAt(0);
   if (NS_WARN_IF(!range)) {
     return NS_ERROR_FAILURE;
   }
@@ -4776,7 +4776,7 @@ EditorBase::CreateTransactionForDeleteSelection(
   // allocate the out-param transaction
   RefPtr<DeleteMultipleRangesTransaction> transaction =
       DeleteMultipleRangesTransaction::Create();
-  for (const OwningNonNull<nsRange>& range : aRangesToDelete.Ranges()) {
+  for (const OwningNonNull<dom::Range>& range : aRangesToDelete.Ranges()) {
     // Same with range as with selection; if it is collapsed and action
     // is eNone, do nothing.
     if (!range->Collapsed()) {
@@ -4811,7 +4811,7 @@ EditorBase::CreateTransactionForDeleteSelection(
 // are not implemented
 already_AddRefed<DeleteContentTransactionBase>
 EditorBase::CreateTransactionForCollapsedRange(
-    const nsRange& aCollapsedRange,
+    const dom::Range& aCollapsedRange,
     HowToHandleCollapsedRange aHowToHandleCollapsedRange) {
   MOZ_ASSERT(aCollapsedRange.Collapsed());
   MOZ_ASSERT(
@@ -5465,14 +5465,14 @@ nsresult EditorBase::HandleDropEvent(DragEvent* aDropEvent) {
   // Don't dispatch "selectionchange" event until inserting all contents.
   SelectionBatcher selectionBatcher(SelectionRef(), __FUNCTION__);
 
-  // Track dropped point with nsRange because we shouldn't insert the
+  // Track dropped point with Range because we shouldn't insert the
   // dropped content into different position even if some event listeners
   // modify selection.  Note that Chrome's behavior is really odd.  So,
   // we don't need to worry about web-compat about this.
   IgnoredErrorResult ignoredError;
-  RefPtr<nsRange> rangeAtDropPoint =
-      nsRange::Create(droppedAt.ToRawRangeBoundary(),
-                      droppedAt.ToRawRangeBoundary(), ignoredError);
+  RefPtr<dom::Range> rangeAtDropPoint =
+      dom::Range::Create(droppedAt.ToRawRangeBoundary(),
+                         droppedAt.ToRawRangeBoundary(), ignoredError);
   if (NS_WARN_IF(ignoredError.Failed()) ||
       NS_WARN_IF(!rangeAtDropPoint->IsPositioned())) {
     editActionData.Abort();
@@ -5663,7 +5663,7 @@ nsresult EditorBase::DeleteSelectionByDragAsAction(bool aDispatchInputEvent) {
 
 Result<CaretPoint, nsresult> EditorBase::DeleteRangeWithTransaction(
     nsIEditor::EDirection aDirectionAndAmount,
-    nsIEditor::EStripWrappers aStripWrappers, nsRange& aRangeToDelete) {
+    nsIEditor::EStripWrappers aStripWrappers, dom::Range& aRangeToDelete) {
   MOZ_ASSERT(IsEditActionDataAvailable());
   MOZ_ASSERT(!Destroyed());
   MOZ_ASSERT(aStripWrappers == eStrip || aStripWrappers == eNoStrip);
@@ -5764,7 +5764,7 @@ Result<CaretPoint, nsresult> EditorBase::DeleteRangesWithTransaction(
   if (!mActionListeners.IsEmpty()) {
     if (!deleteContent) {
       MOZ_ASSERT(!aRangesToDelete.Ranges().IsEmpty());
-      AutoTArray<RefPtr<nsRange>, 8> rangesToDelete(
+      AutoTArray<RefPtr<dom::Range>, 8> rangesToDelete(
           aRangesToDelete.CloneRanges<RefPtr>());
       AutoActionListenerArray listeners(mActionListeners.Clone());
       for (auto& listener : listeners) {
@@ -6031,7 +6031,7 @@ nsresult EditorBase::OnInputText(const nsAString& aStringToInsert) {
 }
 
 nsresult EditorBase::ReplaceTextAsAction(
-    const nsAString& aString, nsRange* aReplaceRange,
+    const nsAString& aString, dom::Range* aReplaceRange,
     AllowBeforeInputEventCancelable aAllowBeforeInputEventCancelable,
     PreventSetSelection aPreventSetSelection, nsIPrincipal* aPrincipal) {
   MOZ_ASSERT(aString.FindChar(nsCRT::CR) == kNotFound);
@@ -6046,14 +6046,14 @@ nsresult EditorBase::ReplaceTextAsAction(
     editActionData.MakeBeforeInputEventNonCancelable();
   }
 
-  RefPtr<nsRange> targetRange = [&]() -> already_AddRefed<nsRange> {
+  RefPtr<dom::Range> targetRange = [&]() -> already_AddRefed<dom::Range> {
     if (aReplaceRange) {
-      RefPtr<nsRange> range = nsRange::Create(
+      RefPtr<dom::Range> range = dom::Range::Create(
           aReplaceRange->GetStartContainer(), aReplaceRange->StartOffset(),
           aReplaceRange->GetEndContainer(), aReplaceRange->EndOffset(),
           IgnoreErrors());
       NS_WARNING_ASSERTION(range && range->IsPositioned(),
-                           "nsRange::Create() failed");
+                           "Range::Create() failed");
       return range.forget();
     }
     nsIContent* const rootContentToSelectAll =
@@ -6063,11 +6063,11 @@ nsresult EditorBase::ReplaceTextAsAction(
     if (NS_WARN_IF(!rootContentToSelectAll)) {
       return nullptr;
     }
-    RefPtr<nsRange> range =
-        nsRange::Create(rootContentToSelectAll, 0, rootContentToSelectAll,
-                        rootContentToSelectAll->Length(), IgnoreErrors());
+    RefPtr<dom::Range> range =
+        dom::Range::Create(rootContentToSelectAll, 0, rootContentToSelectAll,
+                           rootContentToSelectAll->Length(), IgnoreErrors());
     NS_WARNING_ASSERTION(range && range->IsPositioned(),
-                         "nsRange::Create() failed");
+                         "Range::Create() failed");
     return range.forget();
   }();
   if (NS_WARN_IF(!targetRange) || NS_WARN_IF(!targetRange->IsPositioned())) {
@@ -6984,7 +6984,7 @@ bool EditorBase::IsSelectionRangeContainerNotContent() const {
   const uint32_t rangeCount = SelectionRef().RangeCount();
   for (const uint32_t i : IntegerRange(rangeCount)) {
     MOZ_ASSERT(SelectionRef().RangeCount() == rangeCount);
-    const nsRange* range = SelectionRef().GetRangeAt(i);
+    const dom::Range* range = SelectionRef().GetRangeAt(i);
     MOZ_ASSERT(range);
     if (MOZ_UNLIKELY(!range) || MOZ_UNLIKELY(!range->GetStartContainer()) ||
         MOZ_UNLIKELY(!range->GetStartContainer()->IsContent()) ||
@@ -7197,7 +7197,7 @@ EditorBase::AutoEditActionDataSetter::AutoEditActionDataSetter(
          ToString(aEditAction).c_str(), ToString(RefPtr{editingHost}).c_str(),
          NS_ConvertUTF16toUTF8(innerHTML).get(), mSelection->RangeCount()));
     for (const uint32_t index : IntegerRange(mSelection->RangeCount())) {
-      nsRange* const range = mSelection->GetRangeAt(index);
+      dom::Range* const range = mSelection->GetRangeAt(index);
       MOZ_ASSERT(range);
       EditorRawDOMRange editorRange(*range);
       MOZ_LOG(gHTMLEditorEditActionStartLog, LogLevel::Info,
@@ -7551,7 +7551,7 @@ nsresult EditorBase::AutoEditActionDataSetter::MaybeDispatchBeforeInputEvent(
         mTargetRanges.SetCapacity(rangeCount);
         for (const uint32_t i : IntegerRange(rangeCount)) {
           MOZ_ASSERT(editorBase->SelectionRef().RangeCount() == rangeCount);
-          const nsRange* range = editorBase->SelectionRef().GetRangeAt(i);
+          const dom::Range* range = editorBase->SelectionRef().GetRangeAt(i);
           MOZ_ASSERT(range);
           MOZ_ASSERT(range->IsPositioned());
           if (MOZ_UNLIKELY(NS_WARN_IF(!range)) ||
@@ -7725,7 +7725,7 @@ nsresult EditorBase::TopLevelEditSubActionData::AddRangeToChangedRange(
   if (!mChangedRange->IsPositioned()) {
     nsresult rv = mChangedRange->SetStartAndEnd(aStart.ToRawRangeBoundary(),
                                                 aEnd.ToRawRangeBoundary());
-    NS_WARNING_ASSERTION(NS_SUCCEEDED(rv), "nsRange::SetStartAndEnd() failed");
+    NS_WARNING_ASSERTION(NS_SUCCEEDED(rv), "Range::SetStartAndEnd() failed");
     return rv;
   }
 
@@ -7745,7 +7745,7 @@ nsresult EditorBase::TopLevelEditSubActionData::AddRangeToChangedRange(
     ErrorResult error;
     mChangedRange->SetStart(aStart.ToRawRangeBoundary(), error);
     if (error.Failed()) {
-      NS_WARNING("nsRange::SetStart() failed");
+      NS_WARNING("Range::SetStart() failed");
       return error.StealNSResult();
     }
   }
@@ -7763,7 +7763,7 @@ nsresult EditorBase::TopLevelEditSubActionData::AddRangeToChangedRange(
     ErrorResult error;
     mChangedRange->SetEnd(aEnd.ToRawRangeBoundary(), error);
     if (error.Failed()) {
-      NS_WARNING("nsRange::SetEnd() failed");
+      NS_WARNING("Range::SetEnd() failed");
       return error.StealNSResult();
     }
   }

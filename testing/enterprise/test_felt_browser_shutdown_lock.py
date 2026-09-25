@@ -106,11 +106,11 @@ class BrowserShutdownLock(FeltTests):
 
     def _assert_locked(self):
         """Assert the close locked the session: no signout, resume token kept."""
+        self._await_felt_locking_token(
+            True, "Locking must persist an encrypted resume token"
+        )
         assert self.signout_count.value == 0, (
             f"Locking must not post a signout, got {self.signout_count.value}"
-        )
-        assert self._felt_has_locking_token(), (
-            "Locking must persist an encrypted resume token"
         )
 
     def _assert_signed_out(self):
@@ -118,8 +118,8 @@ class BrowserShutdownLock(FeltTests):
         assert self.signout_count.value == 1, (
             f"Expected exactly 1 signout request, got {self.signout_count.value}"
         )
-        assert not self._felt_has_locking_token(), (
-            "Signing out must not leave a resume token behind"
+        self._await_felt_locking_token(
+            False, "Signing out must not leave a resume token behind"
         )
         self.assert_user_signed_out(env=Environment.FELT)
 

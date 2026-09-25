@@ -37,7 +37,8 @@ function moreActionsSecondaryAction(
   entry,
   editLabelId,
   deleteLabelId,
-  deleteMessageName
+  deleteMessageName,
+  guid
 ) {
   return {
     type: "menupopup",
@@ -47,6 +48,7 @@ function moreActionsSecondaryAction(
       {
         label: lazy.l10n.formatValueSync(deleteLabelId),
         fillMessageName: deleteMessageName,
+        fillMessageData: { guid },
       },
     ],
   };
@@ -494,7 +496,8 @@ export class AddressResult extends ProfileAutoCompleteResult {
             ariaLabel,
             "autocomplete-edit-address",
             "autocomplete-delete-address",
-            "FormAutofill:DeleteAddress"
+            "FormAutofill:DeleteAddress",
+            profile.guid
           ),
         }),
       });
@@ -647,7 +650,8 @@ export class CreditCardResult extends ProfileAutoCompleteResult {
               ariaLabel,
               "autocomplete-edit-payment-method",
               "autocomplete-delete-payment-method",
-              "FormAutofill:DeleteCreditCard"
+              "FormAutofill:DeleteCreditCard",
+              profile.guid
             ),
           }),
         };

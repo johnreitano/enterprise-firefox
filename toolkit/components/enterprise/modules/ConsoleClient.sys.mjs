@@ -21,6 +21,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   createEnterpriseLogger:
     "resource://gre/modules/enterprise/EnterpriseCommon.sys.mjs",
   FeltStorage: "resource://gre/modules/enterprise/FeltStorage.sys.mjs",
+  ForcedQuitHandler:
+    "resource://gre/modules/enterprise/ForcedQuitHandler.sys.mjs",
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
   clearTimeout: "resource://gre/modules/Timer.sys.mjs",
 });
@@ -691,26 +693,6 @@ export const ConsoleClient = {
   },
 
   /**
-   * Quit Firefox, ignoring any callbacks installed by the page
-   * preventing the tab/window from closing.
-   *
-   * @param {number} [aFlags] - nsIAppStartup quit flags, to which eRestart can
-   *   be added to come back up. eForceQuit on its own by default.
-   * @returns {void}
-   */
-  quitIgnoringCanClose(aFlags = Ci.nsIAppStartup.eForceQuit) {
-    if (Services.felt.isFeltUI()) {
-      throw new Error(
-        "quitIgnoringCanClose(): Called from Felt context, which is not allowed."
-      );
-    }
-    for (let win of Services.wm.getEnumerator("navigator:browser")) {
-      win.skipNextCanClose = true;
-    }
-    Services.startup.quit(aFlags);
-  },
-
-  /**
    * Refreshes the session by asking FELT to fetch an updated token.
    * Serializes concurrent refresh calls via an internal promise.
    * This should only be called from the browser context.
@@ -746,7 +728,7 @@ export const ConsoleClient = {
       this._refreshPromise = null;
       this._refreshResolve = null;
       Services.felt.performSignout();
-      this.quitIgnoringCanClose();
+      lazy.ForcedQuitHandler.quitIgnoringCanClose();
       reject(
         new Error("_refreshSession: Felt failed to respond to re-auth in time.")
       );
@@ -830,7 +812,7 @@ export const ConsoleClient = {
         break;
       }
       case "felt-firefox-shutdown": {
-        this.quitIgnoringCanClose();
+        lazy.ForcedQuitHandler.quitIgnoringCanClose();
         break;
       }
       case "felt-firefox-access-token-refreshed": {

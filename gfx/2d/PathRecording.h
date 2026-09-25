@@ -119,6 +119,7 @@ class PathOps {
 
   Maybe<Path::Circle> AsCircle() const;
   Maybe<Path::Line> AsLine() const;
+  Maybe<Rect> AsRect() const;
 
   bool IsActive() const { return !mPathData.empty(); }
 
@@ -243,13 +244,9 @@ class PathRecording final : public Path {
     return mPath->GetStrokedBounds(aStrokeOptions, aTransform);
   }
 
-  Maybe<Rect> AsRect() const final {
-    EnsurePath();
-    return mPath->AsRect();
-  }
-
   Maybe<Path::Circle> AsCircle() const final { return mPathOps.AsCircle(); }
   Maybe<Path::Line> AsLine() const final { return mPathOps.AsLine(); }
+  Maybe<Rect> AsRect() const final { return mPathOps.AsRect(); }
 
   void StreamToSink(PathSink* aSink) const final {
     mPathOps.StreamToSink(*aSink);

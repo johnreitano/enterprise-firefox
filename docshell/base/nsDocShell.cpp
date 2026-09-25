@@ -1054,11 +1054,12 @@ bool nsDocShell::MaybeHandleSubframeHistory(
           auto resolve =
               [currentLoadIdentifier, browsingContext, parentDoc, loadState,
                isNavigating, loadGroup, stopDetector](
-                  mozilla::Maybe<LoadingSessionHistoryInfo>&& aResult) {
-                RefPtr<nsDocShell> docShell =
-                    static_cast<nsDocShell*>(browsingContext->GetDocShell());
-                auto unblockParent = MakeScopeExit(
-                    [loadGroup, stopDetector, parentDoc, docShell]() {
+                  mozilla::Maybe<LoadingSessionHistoryInfo>&& aResult)
+                  MOZ_CAN_RUN_SCRIPT {
+                    RefPtr<nsDocShell> docShell = static_cast<nsDocShell*>(
+                        browsingContext->GetDocShell());
+                    auto unblockParent = MakeScopeExit([loadGroup, stopDetector,
+                                                        parentDoc, docShell]() {
                       if (docShell) {
                         docShell->mCheckingSessionHistory = false;
                       }
@@ -1066,26 +1067,26 @@ bool nsDocShell::MaybeHandleSubframeHistory(
                       parentDoc->UnblockOnload(false);
                     });
 
-                if (!docShell || !docShell->mCheckingSessionHistory) {
-                  return;
-                }
+                    if (!docShell || !docShell->mCheckingSessionHistory) {
+                      return;
+                    }
 
-                if (stopDetector->Canceled()) {
-                  return;
-                }
-                if (currentLoadIdentifier ==
-                        browsingContext->GetCurrentLoadIdentifier() &&
-                    aResult.isSome()) {
-                  loadState->SetLoadingSessionHistoryInfo(aResult.value());
-                  // This is an initial subframe load from the session
-                  // history, index doesn't need to be updated.
-                  loadState->SetLoadIsFromSessionHistory(0, false);
-                }
+                    if (stopDetector->Canceled()) {
+                      return;
+                    }
+                    if (currentLoadIdentifier ==
+                            browsingContext->GetCurrentLoadIdentifier() &&
+                        aResult.isSome()) {
+                      loadState->SetLoadingSessionHistoryInfo(aResult.value());
+                      // This is an initial subframe load from the session
+                      // history, index doesn't need to be updated.
+                      loadState->SetLoadIsFromSessionHistory(0, false);
+                    }
 
-                // We got the results back from the parent process, call
-                // LoadURI again with the possibly updated data.
-                docShell->LoadURI(loadState, isNavigating, true);
-              };
+                    // We got the results back from the parent process, call
+                    // LoadURI again with the possibly updated data.
+                    docShell->LoadURI(loadState, isNavigating, true);
+                  };
           auto reject = [loadGroup, stopDetector, browsingContext,
                          parentDoc](mozilla::ipc::ResponseRejectReason) {
             RefPtr<nsDocShell> docShell =
@@ -4059,7 +4060,7 @@ nsresult nsDocShell::ReloadNavigable(
         [docShell, doc, loadType, browsingContext, currentURI, referrerInfo,
          loadGroup, stopDetector](
             std::tuple<bool, Maybe<NotNull<RefPtr<nsDocShellLoadState>>>,
-                       Maybe<bool>>&& aResult) {
+                       Maybe<bool>>&& aResult) MOZ_CAN_RUN_SCRIPT {
           auto scopeExit = MakeScopeExit([loadGroup, stopDetector]() {
             if (loadGroup) {
               loadGroup->RemoveRequest(stopDetector, nullptr, NS_OK);
@@ -4089,8 +4090,8 @@ nsresult nsDocShell::ReloadNavigable(
                 gSHLog, LogLevel::Debug,
                 ("nsDocShell %p Reload - LoadHistoryEntry", docShell.get()));
             loadState.ref()->SetNotifiedBeforeUnloadListeners(true);
-            docShell->LoadHistoryEntry(loadState.ref(), loadType,
-                                       reloadingActiveEntry.ref());
+            docShell->LoadHistoryEntry(MOZ_KnownLive(loadState.ref().get()),
+                                       loadType, reloadingActiveEntry.ref());
           } else {
             MOZ_LOG(gSHLog, LogLevel::Debug,
                     ("nsDocShell %p ReloadDocument", docShell.get()));
@@ -4113,7 +4114,8 @@ nsresult nsDocShell::ReloadNavigable(
       if (loadState.isSome()) {
         MOZ_LOG(gSHLog, LogLevel::Debug,
                 ("nsDocShell %p Reload - LoadHistoryEntry", this));
-        LoadHistoryEntry(loadState.ref(), loadType, reloadingActiveEntry.ref());
+        LoadHistoryEntry(MOZ_KnownLive(loadState.ref().get()), loadType,
+                         reloadingActiveEntry.ref());
       } else {
         MOZ_LOG(gSHLog, LogLevel::Debug,
                 ("nsDocShell %p ReloadDocument", this));
@@ -10619,13 +10621,13 @@ nsresult nsDocShell::ScrollToAnchor(bool aCurHasRef, bool aNewHasRef,
   // https://html.spec.whatwg.org/#scroll-to-fragid:~:text=This%20algorithm%20will%20be%20called%20twice
 
   const RefPtr fragmentDirective = GetDocument()->FragmentDirective();
-  const nsTArray<RefPtr<nsRange>> textDirectiveRanges =
+  const nsTArray<RefPtr<dom::Range>> textDirectiveRanges =
       fragmentDirective->FindTextFragmentsInDocument();
   fragmentDirective->HighlightTextDirectives(textDirectiveRanges);
   const bool scrollToTextDirective =
       !textDirectiveRanges.IsEmpty() &&
       fragmentDirective->IsTextDirectiveAllowedToBeScrolledTo();
-  const RefPtr<nsRange> textDirectiveToScroll =
+  const RefPtr<dom::Range> textDirectiveToScroll =
       scrollToTextDirective ? textDirectiveRanges[0] : nullptr;
 
   // If we have no new anchor, we do not want to scroll, unless there is a

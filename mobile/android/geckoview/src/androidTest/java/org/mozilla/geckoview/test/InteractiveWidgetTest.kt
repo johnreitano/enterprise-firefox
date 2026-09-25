@@ -414,16 +414,16 @@ class InteractiveWidgetTest : BaseSessionTest() {
 
         mainSession.evaluateJS("document.querySelector('#fixed').scrollIntoView()")
 
-        mainSession.flushApzRepaints()
         mainSession.promiseAllPaintsDone()
+        mainSession.flushApzRepaints()
 
         val scrollY = mainSession.evaluateJS("window.scrollY") as Double
         val pageTop = mainSession.evaluateJS("window.visualViewport.pageTop") as Double
 
         mainSession.evaluateJS("document.querySelector('#fixed').scrollIntoView()")
 
-        mainSession.flushApzRepaints()
         mainSession.promiseAllPaintsDone()
+        mainSession.flushApzRepaints()
 
         assertThat(
             "scrollIntoView should not change the layout scroll position when the target is already in the visual viewport",

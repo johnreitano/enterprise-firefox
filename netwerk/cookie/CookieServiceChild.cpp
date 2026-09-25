@@ -389,12 +389,6 @@ CookieServiceChild::SetCookieStringFromHttp(nsIURI* aHostURI,
   return NS_ERROR_NOT_IMPLEMENTED;
 }
 
-NS_IMETHODIMP
-CookieServiceChild::RunInTransaction(
-    nsICookieTransactionCallback* /*aCallback*/) {
-  return NS_ERROR_NOT_IMPLEMENTED;
-}
-
 void CookieServiceChild::GetCookiesFromHost(
     const nsACString& aBaseDomain, const OriginAttributes& aOriginAttributes,
     nsTArray<RefPtr<Cookie>>& aCookies) {

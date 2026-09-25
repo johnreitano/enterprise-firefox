@@ -9,9 +9,15 @@
 
 #include "mozilla/Logging.h"
 #include "mozilla/StaticPrefs_security.h"
+#include "mozilla/dom/ConnectionAllowlistViolationReportBody.h"
+#include "mozilla/dom/Document.h"
+#include "mozilla/dom/ReportingUtils.h"
 #include "mozilla/ipc/PBackgroundSharedTypes.h"
 #include "mozilla/net/SFV.h"
 #include "mozilla/net/URLPatternGlue.h"
+#include "nsGlobalWindowInner.h"
+#include "nsIGlobalObject.h"
+#include "nsILoadInfo.h"
 #include "nsNetUtil.h"
 #include "nsScriptSecurityManager.h"
 #include "nsString.h"
@@ -230,7 +236,7 @@ bool ConnectionAllowlists::ShouldBlockURL(nsIURI* aURI,
 
     // 1.2. Report a violation given url, environment, and connection
     // allowlist.
-    // TODO
+    ReportViolation(AsVariant(aURI), aLoadInfo, *allowlist);
 
     // 1.3. If connection allowlist's disposition is enforce, return blocked.
     if (allowlist->mDisposition == Disposition::Enforce) {
@@ -241,6 +247,70 @@ bool ConnectionAllowlists::ShouldBlockURL(nsIURI* aURI,
 
   // 2. Return allowed.
   return false;
+}
+
+// https://wicg.github.io/connection-allowlists/#abstract-opdef-report-a-violation
+/* static */
+void ConnectionAllowlists::ReportViolation(
+    const Variant<nsIURI*, nsCString>& aResource, nsILoadInfo* aLoadInfo,
+    const Allowlist& aAllowlist) {
+  // 1. If allowlist’s reporting endpoint is null, return.
+  if (aAllowlist.mReportingEndpoint.IsEmpty()) {
+    return;
+  }
+
+  // The report is queued on the environment that initiated the load.
+  // TODO: This will fail when blocking in the parent process for e.g.
+  // navigation.
+  RefPtr<nsGlobalWindowInner> window =
+      nsGlobalWindowInner::GetInnerWindowWithId(aLoadInfo->GetInnerWindowID());
+  if (!window) {
+    LOG("Not reporting a violation, no global for the load.");
+    return;
+  }
+
+  Document* doc = window->GetExtantDoc();
+  if (NS_WARN_IF(!doc) || NS_WARN_IF(!doc->GetDocumentURI())) {
+    return;
+  }
+
+  // 2. Let violation be a new ConnectionAllowlistViolationReport, initialized
+  // as follows:
+  //
+  // url
+  //   environment’s creation URL, stripped for use in reports.
+  nsAutoCString url;
+  ReportingUtils::StripURL(doc->GetDocumentURI(), url);
+
+  // connection
+  //   If resource URL is a URL, then resource URL, stripped for use in reports.
+  //   Otherwise, resource URL.
+  nsAutoCString connection;
+  if (aResource.is<nsIURI*>()) {
+    nsCOMPtr<nsIURI> uri = aResource.as<nsIURI*>();
+    ReportingUtils::StripURL(uri, connection);
+  } else {
+    connection = aResource.as<nsCString>();
+  }
+
+  // allowlist
+  //   A new list containing the result of serializing each pattern in
+  //   allowlist’s allowlist
+  //
+  // disposition
+  //   allowlist’s disposition.
+  RefPtr<ConnectionAllowlistViolationReportBody> violation =
+      new ConnectionAllowlistViolationReportBody(
+          window, url, connection, aAllowlist.mSerializedPatterns.Clone(),
+          aAllowlist.mDisposition == Disposition::Enforce
+              ? ConnectionAllowlistDisposition::Enforce
+              : ConnectionAllowlistDisposition::Report);
+
+  // 3. Generate and queue a report given environment as the context,
+  // "connection-allowlist" as the type, allowlist’s reporting endpoint as the
+  // destination, and violation as the data.
+  ReportingUtils::Report(window, nsGkAtoms::connection_allowlist,
+                         aAllowlist.mReportingEndpoint, url, violation);
 }
 
 void ConnectionAllowlists::Allowlist::ToEntryArgs(

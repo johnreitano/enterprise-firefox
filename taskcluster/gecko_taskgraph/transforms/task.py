@@ -2726,6 +2726,14 @@ def build_task(config, tasks):
                     "MOZ_SOURCE_CHANGESET": get_branch_rev(config),
                     "MOZ_SOURCE_REPO": get_branch_repo(config),
                 })
+                prefix = config.graph_config["project-repo-param-prefix"]
+                git_repo = config.params.get(f"{prefix}head_git_repository")
+                git_rev = config.params.get(f"{prefix}head_git_rev")
+                if git_repo and git_rev:
+                    env.update({
+                        "MOZ_SOURCE_GIT_REPO": git_repo,
+                        "MOZ_SOURCE_GIT_CHANGESET": git_rev,
+                    })
 
         dependencies = task.get("dependencies", {})
         if_dependencies = task.get("if-dependencies", [])

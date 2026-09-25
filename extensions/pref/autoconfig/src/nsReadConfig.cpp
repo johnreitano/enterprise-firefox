@@ -161,12 +161,12 @@ NS_IMETHODIMP nsReadConfig::Observe(nsISupports* aSubject, const char* aTopic,
 static const char* gBlockedConfigs[] = {"dsengine.cfg"};
 
 /**
- * Prefs whose user values are cleared before the .cfg is evaluated, so that a
- * profile cannot fail the vendor check or redirect nsAutoConfig. prefs.js and
- * user.js are already parsed at this point (see the InitializeUserPrefs,
- * UpdateCurrentProfile, InitializeJSContext and FinishInitializingUserPrefs
- * call chain in XREMain::XRE_mainRun (nsAppRunner.cpp)). The .cfg can still
- * set them with pref().
+ * AutoConfig reads its inputs from the installation, not from the profile, so
+ * the user values of these prefs are cleared before the .cfg is evaluated.
+ * prefs.js and user.js have already been parsed at this point (see the
+ * InitializeUserPrefs, UpdateCurrentProfile, InitializeJSContext and
+ * FinishInitializingUserPrefs call chain in XREMain::XRE_mainRun). The .cfg
+ * can still set them with pref().
  */
 static const char* const gAutoConfigInputPrefs[] = {
     "general.config.filename",      "general.config.vendor",

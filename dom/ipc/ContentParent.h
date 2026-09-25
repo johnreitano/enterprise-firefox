@@ -1223,6 +1223,7 @@ class ContentParent final : public PContentParent,
       const nsACString& aTrackingOrigin, uint32_t aCookieBehavior,
       const ContentBlockingNotifier::StorageAccessPermissionGrantedReason&
           aReason,
+      const Maybe<bool>& aHadPriorUserInteraction,
       CompleteAllowAccessForResolver&& aResolver);
 
   mozilla::ipc::IPCResult RecvStoreUserInteractionAsPermission(

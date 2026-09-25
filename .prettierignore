@@ -60,6 +60,10 @@ toolkit/components/formautofill/shared/CreditCardRuleset.sys.mjs
 **/*.inc.xhtml
 **/*.inc.html
 
+# Verbatim upstream license notices rendered by about:license. Some are
+# fragments prettier cannot parse.
+toolkit/content/licenses/*.html
+
 # Ignore preprocessed xhtml/html files
 browser/base/content/aboutDialog.xhtml
 browser/base/content/browser.xhtml
@@ -83,7 +87,6 @@ security/manager/pki/resources/content/exceptionDialog.xhtml
 toolkit/components/pictureinpicture/content/player.xhtml
 toolkit/content/aboutSupport.xhtml
 toolkit/content/buildconfig.html
-toolkit/content/license.html
 toolkit/mozapps/downloads/content/unknownContentType.xhtml
 toolkit/mozapps/update/content/updateElevation.xhtml
 toolkit/profile/content/createProfileWizard.xhtml

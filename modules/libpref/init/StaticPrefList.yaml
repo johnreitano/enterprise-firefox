@@ -10493,6 +10493,11 @@
 #endif
   mirror: once
 
+- name: layers.gpu-process.allow-headless
+  type: bool
+  value: false
+  mirror: once
+
 # If true, when the process is in the background, we refuse to launch the GPU
 # process and instead fail with a temporary error that we can recover from when
 # we enter the foreground and the GPU process launches.
@@ -11078,7 +11083,7 @@
 # https://drafts.csswg.org/css-values-4/#calc-type-checking
 - name: layout.css.calc-typed-arithmetic.enabled
   type: RelaxedAtomicBool
-  value: @IS_NIGHTLY_BUILD@
+  value: true
   mirror: always
   rust: true
 
@@ -11125,6 +11130,12 @@
 
 # Is support for GeometryUtils.getBoxQuads enabled?
 - name: layout.css.getBoxQuads.enabled
+  type: bool
+  value: false
+  mirror: always
+
+# Whether grid intrinsic sizing measures bsize contributions.
+- name: layout.css.grid-intrinsic-sizing.measure-bsize
   type: bool
   value: false
   mirror: always
@@ -15767,6 +15778,15 @@
 #else
   value: 60
 #endif
+  mirror: always
+
+# Grace period (in seconds) for a negative DNS cache entry. During the grace
+# period the expired negative entry is still served (optimistic DNS); for
+# address records a background refresh is also kicked off. Applies to both
+# address and by-type (HTTPS/TXT) negative entries.
+- name: network.dnsNegativeCacheExpirationGracePeriod
+  type: RelaxedAtomicUint32
+  value: 60
   mirror: always
 
 # Get TTL; not supported on all platforms; nop on the unsupported ones.

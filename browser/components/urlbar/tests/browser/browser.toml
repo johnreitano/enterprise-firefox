@@ -163,8 +163,6 @@ skip-if = [
 ["browser_top_sites.js"]
 https_first_disabled = true
 
-["browser_top_sites_attribution.js"]
-
 ["browser_top_sites_private.js"]
 https_first_disabled = true
 

@@ -1378,15 +1378,22 @@ already_AddRefed<RemoteBrowser> ContentParent::CreateBrowser(
   aBrowsingContext->Canonical()->SetOwnerProcessId(
       constructorSender->ChildID());
 
-  RefPtr<BrowserParent> browserParent =
-      new BrowserParent(constructorSender.get(), tabId, aContext,
-                        aBrowsingContext->Canonical(), chromeFlags);
+  nsCOMPtr<nsIPrincipal> initialPrincipal =
+      NullPrincipal::Create(aBrowsingContext->OriginAttributesRef());
+  WindowGlobalInit windowInit = WindowGlobalActor::AboutBlankInitializer(
+      aBrowsingContext, initialPrincipal);
+
+  RefPtr<BrowserParent> browserParent = new BrowserParent(
+      constructorSender.get(), tabId, windowInit.context().mOuterWindowId,
+      aContext, aBrowsingContext->Canonical(), chromeFlags);
 
   ContentProcessManager* cpm = ContentProcessManager::GetSingleton();
   if (NS_WARN_IF(!cpm)) {
     return nullptr;
   }
-  cpm->RegisterRemoteFrame(browserParent);
+  if (NS_WARN_IF(!cpm->RegisterRemoteFrame(browserParent))) {
+    return nullptr;
+  }
 
   // Open a remote endpoint for our PBrowser actor.
   ManagedEndpoint<PBrowserChild> childEp =
@@ -1394,11 +1401,6 @@ already_AddRefed<RemoteBrowser> ContentParent::CreateBrowser(
   if (NS_WARN_IF(!childEp.IsValid())) {
     return nullptr;
   }
-
-  nsCOMPtr<nsIPrincipal> initialPrincipal =
-      NullPrincipal::Create(aBrowsingContext->OriginAttributesRef());
-  WindowGlobalInit windowInit = WindowGlobalActor::AboutBlankInitializer(
-      aBrowsingContext, initialPrincipal);
 
   RefPtr<WindowGlobalParent> windowParent =
       WindowGlobalParent::CreateDisconnected(windowInit,
@@ -4211,6 +4213,18 @@ mozilla::ipc::IPCResult ContentParent::RecvConstructPopupBrowser(
     const uint32_t& aChromeFlags) {
   MOZ_ASSERT(XRE_IsParentProcess());
 
+  if (!nsContentUtils::IsProcessSpecificIdFrom(aTabId, ChildID())) {
+    return IPC_FAIL(this, "Invalid tab ID from content process");
+  }
+  if (!nsContentUtils::IsProcessSpecificIdFrom(
+          aInitialWindowInit.context().mInnerWindowId, ChildID())) {
+    return IPC_FAIL(this, "Invalid inner window ID from content process");
+  }
+  if (!nsContentUtils::IsProcessSpecificIdFrom(
+          aInitialWindowInit.context().mOuterWindowId, ChildID())) {
+    return IPC_FAIL(this, "Invalid outer window ID from content process");
+  }
+
   if (!aBrowserEp.IsValidForManager(this)) {
     return IPC_FAIL(this, "Invalid PBrowserParent endpoint");
   }
@@ -4287,8 +4301,9 @@ mozilla::ipc::IPCResult ContentParent::RecvConstructPopupBrowser(
     return IPC_FAIL(this, "Failed to create WindowGlobalParent");
   }
 
-  auto parent = MakeRefPtr<BrowserParent>(this, aTabId, tc.GetTabContext(),
-                                          browsingContext, chromeFlags);
+  auto parent = MakeRefPtr<BrowserParent>(
+      this, aTabId, aInitialWindowInit.context().mOuterWindowId,
+      tc.GetTabContext(), browsingContext, chromeFlags);
 
   // The creation of PBrowser was triggered from content process through
   // window.open().
@@ -4300,6 +4315,7 @@ mozilla::ipc::IPCResult ContentParent::RecvConstructPopupBrowser(
 
   // Bind the created BrowserParent to IPC to actually link the actor.
   if (NS_WARN_IF(!BindPBrowserEndpoint(std::move(aBrowserEp), parent))) {
+    cpm->UnregisterRemoteFrame(parent);
     return IPC_FAIL(this, "BindPBrowserEndpoint failed");
   }
 
@@ -6668,6 +6684,7 @@ mozilla::ipc::IPCResult ContentParent::RecvCompleteAllowAccessFor(
     const nsACString& aTrackingOrigin, uint32_t aCookieBehavior,
     const ContentBlockingNotifier::StorageAccessPermissionGrantedReason&
         aReason,
+    const Maybe<bool>& aHadPriorUserInteraction,
     CompleteAllowAccessForResolver&& aResolver) {
   if (aParentContext.IsNullOrDiscarded()) {
     return IPC_OK();
@@ -6675,7 +6692,8 @@ mozilla::ipc::IPCResult ContentParent::RecvCompleteAllowAccessFor(
 
   StorageAccessAPIHelper::CompleteAllowAccessForOnParentProcess(
       aParentContext.get_canonical(), aTopLevelWindowId, aTrackingPrincipal,
-      aTrackingOrigin, aCookieBehavior, aReason, nullptr)
+      aTrackingOrigin, aCookieBehavior, aReason, nullptr,
+      aHadPriorUserInteraction)
       ->Then(GetCurrentSerialEventTarget(), __func__,
              [aResolver = std::move(aResolver)](
                  StorageAccessAPIHelper::StorageAccessPermissionGrantPromise::
@@ -6919,6 +6937,10 @@ mozilla::ipc::IPCResult ContentParent::RecvGetModulesTrust(
 
 mozilla::ipc::IPCResult ContentParent::RecvCreateBrowsingContext(
     uint64_t aGroupId, BrowsingContext::IPCInitializer&& aInit) {
+  if (!nsContentUtils::IsProcessSpecificIdFrom(aInit.mId, ChildID())) {
+    return IPC_FAIL(this, "Invalid ChildID for BrowsingContext");
+  }
+
   RefPtr<WindowGlobalParent> parent;
   if (aInit.mParentId != 0) {
     parent = WindowGlobalParent::GetByInnerWindowId(aInit.mParentId);
@@ -6971,8 +6993,17 @@ mozilla::ipc::IPCResult ContentParent::RecvCreateBrowsingContext(
     }
     return IPC_FAIL(this, "Opener has different group object");
   }
-  if (!parent && !opener && !group->Toplevels().IsEmpty()) {
-    return IPC_FAIL(this, "Unrelated context from child in stale group");
+  if (!parent && !opener) {
+    if (!nsContentUtils::IsProcessSpecificIdFrom(aGroupId, ChildID())) {
+      return IPC_FAIL(this, "Invalid new group ID from content process");
+    }
+    if (!group->Toplevels().IsEmpty()) {
+      return IPC_FAIL(this, "Unrelated context from child in stale group");
+    }
+  }
+  if (!parent && !nsContentUtils::IsProcessSpecificIdFrom(aInit.GetBrowserId(),
+                                                          ChildID())) {
+    return IPC_FAIL(this, "Invalid new BrowserID from content process");
   }
 
   return BrowsingContext::CreateFromIPC(std::move(aInit), group, this);
@@ -7284,6 +7315,10 @@ mozilla::ipc::IPCResult ContentParent::RecvFinalizeFocusOuter(
 
 mozilla::ipc::IPCResult ContentParent::RecvInsertNewFocusActionId(
     uint64_t aActionId) {
+  if (!nsContentUtils::IsProcessSpecificIdFrom(aActionId, ChildID())) {
+    return IPC_FAIL(this, "Invalid focus action ID from content process");
+  }
+
   LOGFOCUS(("ContentParent::RecvInsertNewFocusActionId actionid: %" PRIu64,
             aActionId));
   nsFocusManager* fm = nsFocusManager::GetFocusManager();

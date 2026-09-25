@@ -3294,6 +3294,10 @@ class Settings(
             default = { DefaultTabManagementFeatureHelper.tabGroupsStripEnabled },
         )
 
+    /** Whether the Tab Groups strip should be shown: its feature is enabled and the tab strip is not shown. */
+    val shouldShowTabGroupsStrip: Boolean
+        get() = tabGroupsStripEnabled && !isTabStripEnabled
+
     /** Whether the Tab Groups feature is visible in the browser menu. */
     var showTabGroupsInMenu by
         booleanPreference(
@@ -3449,5 +3453,11 @@ class Settings(
         booleanPreference(
             key = appContext.getPreferenceKey(R.string.pref_key_enable_pdf_tools),
             default = { FxNimbus.features.pdfViewer.value().androidUiTools },
+        )
+
+    var accountSettingsNewUi by
+        booleanPreference(
+            key = appContext.getPreferenceKey(R.string.pref_key_enable_account_settings_new_ui),
+            default = { FxNimbus.features.accountSyncDecoupleM1.value().enabled },
         )
 }

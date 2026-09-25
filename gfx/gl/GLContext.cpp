@@ -533,7 +533,7 @@ bool GLContext::InitImpl() {
   }
 
   const std::string versionStr = versionRawStr;
-  if (versionStr.find("OpenGL ES") == 0) {
+  if (versionStr.starts_with("OpenGL ES")) {
     mProfile = ContextProfile::OpenGLES;
   }
 

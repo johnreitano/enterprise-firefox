@@ -236,8 +236,14 @@
     @layer tokens-browser-theme-nova {
       @media not ((forced-colors) or (-moz-native-theme)) {
         /** button **/
-        --button-background-color-hover: light-dark(var(--color-violet-desaturated-20), var(--color-violet-desaturated-50));
-        --button-background-color-active: light-dark(var(--color-violet-desaturated-30), var(--color-violet-desaturated-40));
+        --button-background-color-hover: light-dark(
+          color-mix(in srgb, var(--color-accent-primary) 32%, transparent),
+          color-mix(in srgb, var(--color-accent-primary) 55%, transparent)
+        );
+        --button-background-color-active: light-dark(
+          color-mix(in srgb, var(--color-accent-primary) 50%, transparent),
+          color-mix(in srgb, var(--color-accent-primary) 75%, transparent)
+        );
         --button-background-color-ghost: var(--button-background-color);
         --button-border-color: var(--color-accent-primary);
         --button-text-color: light-dark(var(--color-violet-90), var(--color-gray-0));

@@ -26,6 +26,7 @@ const PROMPT_ON_SIGNOUT_PREF = "enterprise.prompt_on_signout";
 const WARN_ON_CLOSE_PREF = "browser.tabs.warnOnClose";
 const LOCK_ON_SHUTDOWN_PREF = "enterprise.locking.shutdown";
 const LOCK_ON_RESTART_PREF = "enterprise.locking.restart";
+const LOCK_ON_CRASH_PREF = "enterprise.locking.crash";
 
 export const EnterpriseHandler = {
   /**
@@ -107,6 +108,7 @@ export const EnterpriseHandler = {
       this._lockPrefObserver = () => this._syncLockIntents();
       Services.prefs.addObserver(LOCK_ON_SHUTDOWN_PREF, this._lockPrefObserver);
       Services.prefs.addObserver(LOCK_ON_RESTART_PREF, this._lockPrefObserver);
+      Services.prefs.addObserver(LOCK_ON_CRASH_PREF, this._lockPrefObserver);
     }
   },
 
@@ -383,6 +385,17 @@ export const EnterpriseHandler = {
   },
 
   /**
+   * Whether a crash that stops the browser from restarting will lock the
+   * session (persist it behind OS auth to resume later) rather than discard
+   * it, per the locking pref.
+   *
+   * @returns {boolean}
+   */
+  get willLockOnCrash() {
+    return Services.prefs.getBoolPref(LOCK_ON_CRASH_PREF, false);
+  },
+
+  /**
    * Push the current locking preferences to the browser's FELT IPC client,
    * which attaches them to the exit or restart event when one is observed.
    * The values are cached there rather than read at quit time so the intent
@@ -398,6 +411,11 @@ export const EnterpriseHandler = {
       Services.felt.setRestartLockIntent(this.willLockOnRestart);
     } catch (e) {
       lazy.log.error(`Unable to sync restart lock intent: ${e}`);
+    }
+    try {
+      Services.felt.setCrashLockIntent(this.willLockOnCrash);
+    } catch (e) {
+      lazy.log.error(`Unable to sync crash lock intent: ${e}`);
     }
   },
 
@@ -428,6 +446,7 @@ export const EnterpriseHandler = {
         LOCK_ON_RESTART_PREF,
         this._lockPrefObserver
       );
+      Services.prefs.removeObserver(LOCK_ON_CRASH_PREF, this._lockPrefObserver);
       this._lockPrefObserver = null;
     }
   },

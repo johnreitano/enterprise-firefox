@@ -693,6 +693,14 @@ class AdjustedTarget {
  public:
   using ContextState = CanvasRenderingContext2D::ContextState;
 
+  // When optimization is allowed, bounds are only needed if there is a filter.
+  // Otherwise, there if there is an optimized shadow, it does not needs bounds.
+  static inline bool NeedToCalculateBounds(CanvasRenderingContext2D* aCtx,
+                                           bool aAllowOptimization = false) {
+    return aAllowOptimization ? aCtx->NeedToApplyFilter()
+                              : aCtx->NeedToCalculateBounds();
+  }
+
   explicit AdjustedTarget(CanvasRenderingContext2D* aCtx,
                           const gfx::Rect* aBounds = nullptr,
                           bool aAllowOptimization = false)
@@ -3570,7 +3578,7 @@ void CanvasRenderingContext2D::FillImpl(const gfx::Path& aPath) {
     return;
   }
 
-  const bool needBounds = NeedToCalculateBounds();
+  const bool needBounds = AdjustedTarget::NeedToCalculateBounds(this, true);
   gfx::Rect bounds;
   if (needBounds) {
     bounds = aPath.GetBounds(mTarget->GetTransform());
@@ -3621,7 +3629,7 @@ void CanvasRenderingContext2D::StrokeImpl(const gfx::Path& aPath) {
     return;
   }
 
-  const bool needBounds = NeedToCalculateBounds();
+  const bool needBounds = AdjustedTarget::NeedToCalculateBounds(this, true);
   if (!IsTargetValid()) {
     return;
   }

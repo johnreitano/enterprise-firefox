@@ -85,6 +85,7 @@ if (AppConstants.MOZ_ENTERPRISE) {
   ChromeUtils.defineESModuleGetters(lazy, {
     EnterpriseHandler:
       "resource:///modules/enterprise/EnterpriseHandler.sys.mjs",
+    isTesting: "resource://gre/modules/enterprise/EnterpriseCommon.sys.mjs",
   });
 }
 
@@ -412,8 +413,7 @@ BrowserGlue.prototype = {
     if (
       Services.appinfo.inSafeMode &&
       (!AppConstants.MOZ_ENTERPRISE ||
-        (Services.felt?.isFeltBrowser() &&
-          !Services.prefs.getBoolPref("enterprise.is_testing", false)))
+        (Services.felt?.isFeltBrowser() && !lazy.isTesting()))
     ) {
       Services.ww.openWindow(
         null,

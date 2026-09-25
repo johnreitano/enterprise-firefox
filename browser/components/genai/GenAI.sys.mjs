@@ -482,14 +482,7 @@ export const GenAI = {
       panel.querySelector(id).iconSrc = src;
     }
 
-    const setAIButtonAriaLabel = (chatProviderName = "localhost") => {
-      document.l10n.setAttributes(aiActionButton, "genai-shortcut-button-2", {
-        provider: chatProviderName,
-      });
-    };
-
-    const initialChatProvider = this.chatProviders.get(lazy.chatProvider);
-    setAIButtonAriaLabel(initialChatProvider?.name);
+    document.l10n.setAttributes(aiActionButton, "genai-shortcut-button-3");
 
     const searchActionButton = panel.querySelector("#search-action-button");
 
@@ -598,10 +591,6 @@ export const GenAI = {
       );
       const showWarning = this.isContextTooLong(panel.selectionData.selection);
       const chatProvider = this.chatProviders.get(lazy.chatProvider);
-
-      if (initialChatProvider !== chatProvider?.name) {
-        setAIButtonAriaLabel(chatProvider?.name);
-      }
 
       // Show warning if selection is too long
       if (showWarning) {

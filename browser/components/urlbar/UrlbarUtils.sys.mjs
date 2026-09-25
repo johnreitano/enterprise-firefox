@@ -1596,9 +1596,6 @@ UrlbarUtils.RESULT_PAYLOAD_SCHEMA = {
       requestId: {
         type: "string",
       },
-      sendAttributionRequest: {
-        type: "boolean",
-      },
       shouldShowUrl: {
         type: "boolean",
       },

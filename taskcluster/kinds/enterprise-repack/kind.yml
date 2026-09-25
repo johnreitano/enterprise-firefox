@@ -30,17 +30,22 @@ task-defaults:
             in-tree: "partner-repack"
         chain-of-trust: true
         max-run-time: 7200
+        artifacts:
+            - name: project/enterprise/repacks
+              path: /builds/worker/artifacts/
+              type: directory
         env:
             XZ_OPT: "-T0 --block-size=16MiB"
+            SECRET_SCOPE: "enterprise"
+            LINUX_DEST_DIR: "firefox"
+            MAC_DEST_DIR: "Contents/Resources"
+            WINDOWS_DEST_DIR: "firefox"
     shipping-product: firefox-enterprise
     shipping-phase: build
     run:
-        using: mozharness
-        config:
-            - partner_repacks/enterprise.py
-        script: mozharness/scripts/desktop_partner_repacks.py
-        job-script: taskcluster/scripts/builder/repackage.sh
-        tooltool-downloads: false
+        using: run-task
+        cwd: '{checkout}'
+        command: $GECKO_PATH/taskcluster/scripts/release/partner-repack.sh
     extra:
         limit-locales:
             by-release-level:

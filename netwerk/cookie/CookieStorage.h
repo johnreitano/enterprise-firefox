@@ -17,7 +17,6 @@
 
 class nsIArray;
 class nsICookie;
-class nsICookieTransactionCallback;
 class nsIPrefBranch;
 
 namespace mozilla {
@@ -152,9 +151,6 @@ class CookieStorage : public nsIObserver, public nsSupportsWeakReference {
   virtual void Close() = 0;
 
   virtual void EnsureInitialized() = 0;
-
-  virtual nsresult RunInTransaction(
-      nsICookieTransactionCallback* aCallback) = 0;
 
  protected:
   // stores the CookieEntry entryclass and an index into the cookie array within

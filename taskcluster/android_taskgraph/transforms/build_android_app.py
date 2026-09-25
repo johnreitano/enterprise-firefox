@@ -168,6 +168,12 @@ def build_gradle_command(config, tasks):
         if task["run"].pop("track-apk-size", False):
             gradle_command.append(f"apkSize{variant_name}")
 
+        if task["run"].pop("track-build-times", False):
+            series = task["name"]
+            if package_command != "assemble":
+                series = f"{series}-{package_command}"
+            gradle_command.append(f"-PbuildMetricsPerfherderOptions={series}")
+
         task["run"]["gradlew"] = gradle_command
 
         yield task

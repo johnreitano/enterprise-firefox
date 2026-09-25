@@ -78,13 +78,16 @@ nsresult BrowserBridgeParent::InitWithProcess(
 
   // Construct the BrowserParent object for our subframe.
   auto browserParent = MakeRefPtr<BrowserParent>(
-      aContentParent, aTabId, *aParentBrowser, browsingContext, aChromeFlags);
+      aContentParent, aTabId, aWindowInit.context().mOuterWindowId,
+      *aParentBrowser, browsingContext, aChromeFlags);
 
   ContentProcessManager* cpm = ContentProcessManager::GetSingleton();
   if (!cpm) {
     return NS_ERROR_UNEXPECTED;
   }
-  cpm->RegisterRemoteFrame(browserParent);
+  if (NS_WARN_IF(!cpm->RegisterRemoteFrame(browserParent))) {
+    return NS_ERROR_UNEXPECTED;
+  }
 
   // Open a remote endpoint for our PBrowser actor.
   ManagedEndpoint<PBrowserChild> childEp =

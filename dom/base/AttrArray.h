@@ -115,8 +115,6 @@ class AttrArray {
   int32_t IndexOfAttr(const nsAtom* aLocalName) const;
   int32_t IndexOfAttr(const nsAtom* aLocalName, int32_t aNamespaceID) const;
 
-  void Compact();
-
   // Re-creates the NodeInfo of each namespaced attribute name in aManager.
   // Called when the owning element is adopted into another document.
   void NodeInfoChanged(nsNodeInfoManager* aManager);
@@ -214,15 +212,13 @@ class AttrArray {
   bool GrowTo(uint32_t aCapacity);
 
   void Clear() {
-    // If mImpl contains a tagged bloom filter, release it first to prevent
-    // unique_ptr from trying to delete it as a pointer
+    // If mImpl contains a tagged bloom filter there's nothing to really clear.
     if (HasTaggedBloom()) {
-      mImpl.release();
-    } else {
-      mImpl.reset();
+      return;
     }
-    // Reinitialize to default tagged bloom filter
-    SetTaggedBloom(0x1ULL);
+    auto bloom = mImpl->mSubtreeBloomFilter;
+    mImpl.reset();
+    SetTaggedBloom(bloom);
   }
 
   // For the HTML parser to call only after ensuring capacity.

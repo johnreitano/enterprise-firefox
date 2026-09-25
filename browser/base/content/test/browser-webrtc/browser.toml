@@ -63,6 +63,8 @@ skip-if = [
   "verify-standalone",
 ]
 
+["browser_devices_get_user_media_document_pip.js"]
+
 ["browser_devices_get_user_media_in_frame.js"]
 https_first_disabled = true
 skip-if = [

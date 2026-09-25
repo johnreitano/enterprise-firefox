@@ -222,7 +222,9 @@
     <!-- Label for using the new PDF viewer tools in secret settings. -->
     <string name="preferences_debug_settings_use_new_pdf_tools" translatable="false">Use New PDF Tools</string>
 
-    <!-- Label for the defaults section and reset action in secret settings. -->
+    <string name="preferences_debug_settings_use_account_settings_new_ui" translatable="false">Use new Account Settings UI</string>
+
+  <!-- Label for the defaults section and reset action in secret settings. -->
     <string name="preferences_debug_settings_reset_defaults" translatable="false">Reset switches to defaults</string>
     <string name="preferences_debug_settings_reset_defaults_message" translatable="false">This will reset all toggle switches to their defaults. Custom Glean Server and Remote Settings Server are not affected.</string>
     <string name="preferences_debug_settings_reset_defaults_confirm" translatable="false">Reset</string>

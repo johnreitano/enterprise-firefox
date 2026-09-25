@@ -14,6 +14,7 @@ import org.mozilla.fenix.customannotations.SmokeTest
 import org.mozilla.fenix.helpers.Constants
 import org.mozilla.fenix.helpers.Constants.PackageName.PRINT_SPOOLER
 import org.mozilla.fenix.helpers.MockBrowserDataHelper
+import org.mozilla.fenix.helpers.TestAssetHelper.articleSummaryAsset
 import org.mozilla.fenix.helpers.TestAssetHelper.firstForeignWebPageAsset
 import org.mozilla.fenix.helpers.TestAssetHelper.getGenericAsset
 import org.mozilla.fenix.helpers.TestAssetHelper.pdfFormAsset
@@ -504,12 +505,12 @@ class MainMenuTest : BaseTest() {
             .navigateToPage()
             .mozVerify(MainMenuSelectors.TRY_RECOMMENDED_EXTENSION_BUTTON)
             .mozClick(MainMenuSelectors.EXTENSIONS_BUTTON_UIAUTOMATOR)
-        val addonTitle = on.mainMenu.installFirstRecommendedExtension()
+        val extension = on.mainMenu.installFirstRecommendedExtension()
 
         // Remove it through Manage extensions -> the add-ons manager.
         on.browserPage.navigateToPage(genericURL.url.toString(), forceNavigation = true)
         on.mainMenu.navigateToPage()
-        on.settingsAddonsManager.navigateToPage().removeInstalledExtension(addonTitle)
+        on.settingsAddonsManager.navigateToPage().removeInstalledExtension(extension.name)
 
         // With no extensions installed, the "Try a recommended extension" entry point is shown again.
         on.browserPage.navigateToPage(genericURL.url.toString(), forceNavigation = true)
@@ -528,7 +529,7 @@ class MainMenuTest : BaseTest() {
             .navigateToPage()
             .mozVerify(MainMenuSelectors.TRY_RECOMMENDED_EXTENSION_BUTTON)
             .mozClick(MainMenuSelectors.EXTENSIONS_BUTTON_UIAUTOMATOR)
-        val addonTitle = on.mainMenu.installFirstRecommendedExtension()
+        val extension = on.mainMenu.installFirstRecommendedExtension()
 
         // Manage extensions opens the add-ons manager, where the extension is listed under Enabled.
         // Parity: legacy verifyAddonIsInstalled asserted the addon's install (+) button was invisible;
@@ -539,7 +540,7 @@ class MainMenuTest : BaseTest() {
             .navigateToPage()
             .mozVerify(SettingsAddonsManagerSelectors.ADD_ONS_LIST)
             .mozVerify(SettingsAddonsManagerSelectors.ENABLED_SECTION_TITLE)
-            .mozVerify(SettingsAddonsManagerSelectors.INSTALLED_ADDON_ITEM(addonTitle))
+            .mozVerify(SettingsAddonsManagerSelectors.INSTALLED_ADDON_ITEM(extension.name))
     }
 
     // TestRail link: https://mozilla.testrail.io/index.php?/cases/view/3080156
@@ -554,7 +555,7 @@ class MainMenuTest : BaseTest() {
             .navigateToPage()
             .mozVerify(MainMenuSelectors.TRY_RECOMMENDED_EXTENSION_BUTTON)
             .mozClick(MainMenuSelectors.EXTENSIONS_BUTTON_UIAUTOMATOR)
-        val addonTitle = on.mainMenu.installFirstRecommendedExtension()
+        val extension = on.mainMenu.installFirstRecommendedExtension()
 
         // Re-open the Extensions submenu: the collapsed Extensions row now advertises the installed
         // extension, the extension is listed in the submenu, and "Discover more" has been replaced by
@@ -563,10 +564,10 @@ class MainMenuTest : BaseTest() {
         on.mainMenu
             .navigateToPage()
             .mozClick(MainMenuSelectors.EXTENSIONS_BUTTON_UIAUTOMATOR)
-            .mozVerify(MainMenuSelectors.EXTENSIONS_BUTTON_WITH_INSTALLED_EXTENSION(addonTitle))
+            .mozVerify(MainMenuSelectors.EXTENSIONS_BUTTON_WITH_INSTALLED_EXTENSION(extension.menuLabel))
             .mozVerifyElementAbsent(MainMenuSelectors.DISCOVER_MORE_EXTENSIONS_BUTTON)
             .mozVerify(MainMenuSelectors.MANAGE_EXTENSIONS_BUTTON)
-            .mozVerify(MainMenuSelectors.INSTALLED_EXTENSION_ITEM(addonTitle))
+            .mozVerify(MainMenuSelectors.INSTALLED_EXTENSION_ITEM(extension.menuLabel))
     }
 
     // TestRail link: https://mozilla.testrail.io/index.php?/cases/view/3080162
@@ -581,12 +582,14 @@ class MainMenuTest : BaseTest() {
             .navigateToPage()
             .mozVerify(MainMenuSelectors.TRY_RECOMMENDED_EXTENSION_BUTTON)
             .mozClick(MainMenuSelectors.EXTENSIONS_BUTTON_UIAUTOMATOR)
-        val addonTitle = on.mainMenu.installFirstRecommendedExtension()
+        val extension = on.mainMenu.installFirstRecommendedExtension()
 
         // Open the installed extension's detail from Manage extensions and disable it.
         on.browserPage.navigateToPage(genericURL.url.toString(), forceNavigation = true)
-        on.mainMenu.navigateToPage().mozVerify(MainMenuSelectors.EXTENSIONS_BUTTON_WITH_INSTALLED_EXTENSION(addonTitle))
-        on.settingsAddonsManager.navigateToPage().disableInstalledExtension(addonTitle)
+        on.mainMenu
+            .navigateToPage()
+            .mozVerify(MainMenuSelectors.EXTENSIONS_BUTTON_WITH_INSTALLED_EXTENSION(extension.menuLabel))
+        on.settingsAddonsManager.navigateToPage().disableInstalledExtension(extension.name)
 
         // With the only extension disabled, the menu advertises the "no extensions enabled" entry point.
         on.browserPage.navigateToPage(genericURL.url.toString(), forceNavigation = true)
@@ -693,5 +696,22 @@ class MainMenuTest : BaseTest() {
             .mozVerifyElementAbsent(WebCompatReporterSelectors.DESCRIBE_PROBLEM_ERROR_MESSAGE)
             .mozClick(WebCompatReporterSelectors.SEND_REPORT_BUTTON)
             .mozVerify(WebCompatReporterSelectors.REPORT_SENT_SNACK_BAR_MESSAGE)
+    }
+
+    // TestRail link: https://mozilla.testrail.io/index.php?/cases/view/4036009
+    @SmokeTest
+    @Test
+    fun verifyTheMoreMainMenuSummarizePageButtonTest() {
+        composeRule.activityRule.applySettingsExceptions {
+            it.hasSeenShakeToSummarizeToolbarCfr = true
+        }
+
+        val articlePage = mockWebServer.articleSummaryAsset
+
+        on.browserPage.navigateToPage(articlePage.url.toString())
+        on.mainMenu
+            .navigateToPage()
+            .mozClick(MainMenuSelectors.MORE_BUTTON)
+            .mozVerify(MainMenuSelectors.SUMMARIZE_PAGE_BUTTON)
     }
 }

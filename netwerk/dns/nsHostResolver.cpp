@@ -1331,12 +1331,15 @@ void nsHostResolver::PrepareRecordExpirationAddrRecord(
   mQueue.mLock.AssertCurrentThreadOwns();
   if (!rec->addr_info) {
     // None of our implementations expose a TTL for negative responses, so we
-    // use a configurable constant lifetime.
+    // use a configurable constant lifetime. A grace period lets the expired
+    // negative entry be served optimistically while a background refresh runs.
     unsigned int negativeLifetime =
         StaticPrefs::network_dnsNegativeCacheExpiration();
-    rec->SetExpiration(TimeStamp::NowLoRes(), negativeLifetime, 0);
-    LOG(("Caching host [%s] negative record for %u seconds.\n", rec->host.get(),
-         negativeLifetime));
+    unsigned int negativeGrace =
+        StaticPrefs::network_dnsNegativeCacheExpirationGracePeriod();
+    rec->SetExpiration(TimeStamp::NowLoRes(), negativeLifetime, negativeGrace);
+    LOG(("Caching host [%s] negative record for %u seconds (grace %u).\n",
+         rec->host.get(), negativeLifetime, negativeGrace));
     return;
   }
 
@@ -1725,9 +1728,15 @@ nsHostResolver::LookupStatus nsHostResolver::CompleteLookupByTypeLocked(
     }
     LOG(("nsHostResolver::CompleteLookupByType record %p [%s] status %x\n",
          typeRec.get(), typeRec->host.get(), (unsigned int)status));
+    // A grace period lets the expired negative entry be served optimistically.
+    // Unlike address records, by-type records don't refresh a negative in the
+    // background (TypeHostRecord::RefreshForNegativeResponse() is false), so
+    // this only extends the serve-stale window; revalidation happens on the
+    // consumer side (e.g. Happy Eyeballs' cache-bypassing refresh query).
     typeRec->SetExpiration(
         TimeStamp::NowLoRes(),
-        StaticPrefs::network_dns_negative_ttl_for_type_record(), 0);
+        StaticPrefs::network_dns_negative_ttl_for_type_record(),
+        StaticPrefs::network_dnsNegativeCacheExpirationGracePeriod());
     MOZ_ASSERT(aResult.is<TypeRecordEmpty>());
     status = NS_ERROR_UNKNOWN_HOST;
     typeRec->negative = true;

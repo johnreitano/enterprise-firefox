@@ -657,14 +657,19 @@ export class SearchModeSwitcher {
    * Update the icon shown in the urlbar.
    *
    * @param {object} [options]
-   * @param [options.searchModeChanged]
+   * @param {boolean} [options.searchModeChanged]
    *        Optional flag to note whether the icon is being updated due
    *        the search mode being changed.
    */
-
   async updateSearchIcon(options = {}) {
+    let { source, engineName } = this.#input.searchMode ?? {};
     let { label, icon, wordmark } = await this.#getSearchIcon(options);
-    if (!icon) {
+    let searchMode = this.#input.searchMode;
+    if (
+      !icon ||
+      source != searchMode?.source ||
+      engineName != searchMode?.engineName
+    ) {
       return;
     }
     if (wordmark) {

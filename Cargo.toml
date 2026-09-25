@@ -20,6 +20,7 @@ members = [
   "third_party/application-services/tools/uniffi-bindgen-library-mode",
   "third_party/application-services/components/ads-client",
   "third_party/application-services/components/autofill",
+  "third_party/application-services/components/fxcontainers",
   "third_party/application-services/components/context_id",
   "third_party/application-services/components/crashtest",
   "third_party/application-services/components/example",
@@ -35,6 +36,7 @@ members = [
   "third_party/application-services/components/remote_settings",
   "third_party/application-services/components/search",
   "third_party/application-services/components/suggest",
+  "third_party/application-services/components/support/db-crypto",
   "third_party/application-services/components/support/error",
   "third_party/application-services/components/support/find-places-db",
   "third_party/application-services/components/support/firefox-versioning",
@@ -416,6 +418,8 @@ logins = { path = "third_party/application-services/components/logins" }
 autofill = { path = "third_party/application-services/components/autofill" }
 init_rust_components = { path = "third_party/application-services/components/init_rust_components" }
 breach-alerts = { path = "third_party/application-services/components/breach-alerts" }
+db-crypto = { path = "third_party/application-services/components/support/db-crypto" }
+fxcontainers = { path = "third_party/application-services/components/fxcontainers" }
 # temporary ohttp override enabling app-services build-related hacks while we wait for a new version.
 ohttp = { git = "https://github.com/martinthomson/ohttp", rev = "600931b5a1e947776cbaad931ed78f1e89005352" }
 

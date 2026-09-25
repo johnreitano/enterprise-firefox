@@ -17,7 +17,7 @@ export default {
   ],
   argTypes: {
     createdAt: { control: { type: "text" } },
-    heading: { control: { type: "text" } },
+    title: { control: { type: "text" } },
     subhead: { control: { type: "text" } },
     refreshing: { control: { type: "boolean" } },
   },
@@ -69,14 +69,14 @@ const REFERENCES = [
 
 const Template = ({
   createdAt,
-  heading,
+  title,
   subhead,
   references,
   refreshing,
 }) => html`
   <aitab-header
     .createdAt=${createdAt}
-    heading=${heading}
+    .title=${title}
     subhead=${subhead}
     .references=${references}
     ?refreshing=${refreshing}
@@ -86,7 +86,7 @@ const Template = ({
 export const Default = Template.bind({});
 Default.args = {
   createdAt: "Created today",
-  heading: "Three days in Kanazawa",
+  title: "Three days in Kanazawa",
   subhead:
     "Travel research: short names, tidy numbers, real photography. The comfortable case for all six blocks.",
   references: REFERENCES,
@@ -102,7 +102,7 @@ CreatedEarlier.args = { ...Default.args, createdAt: "Created Jul 31" };
 export const NoReferences = Template.bind({});
 NoReferences.args = {
   createdAt: "Created today",
-  heading: "Heat Pump for a 1940s House",
+  title: "Heat Pump for a 1940s House",
   subhead: "What nine sources agree on — and where they don't",
   references: [],
   refreshing: false,
@@ -111,7 +111,7 @@ NoReferences.args = {
 export const HeadingOnly = Template.bind({});
 HeadingOnly.args = {
   createdAt: "",
-  heading: "Places to Stay on Niijima",
+  title: "Places to Stay on Niijima",
   subhead: "",
   references: [],
   refreshing: false,

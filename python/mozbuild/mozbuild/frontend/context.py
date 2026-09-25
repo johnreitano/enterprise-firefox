@@ -1225,6 +1225,7 @@ LicensesList = StrictOrderingOnAppendListWithFlagsFactory({
     "spdx": str,
     "url": str,
     "paths": list,
+    "subcomponent": bool,
 })
 
 LicensedUnderList = StrictOrderingOnAppendListWithFlagsFactory({"paths": list})
@@ -1985,7 +1986,12 @@ VARIABLES = {
 
         ``text``
            Path, relative to the declaring ``moz.build``, of a file holding the
-           verbatim notice text. Required.
+           verbatim notice text.
+
+           Leave it unset for a vendored library whose ``moz.yaml`` names the
+           shipped license file in ``origin.license-file``: the notice is read
+           from there, so the two cannot come to name different files. One of
+           the two is required.
 
         ``notice``
            Optional prose rendered above the path list, for facts that cannot be
@@ -1995,6 +2001,20 @@ VARIABLES = {
            Optional SPDX license expression, used by the generated SBOM. The
            ``license-declarations`` linter validates it against the SPDX
            license list.
+
+           Leave it unset for a vendored library whose ``moz.yaml`` already
+           declares ``origin.license``: that field is where the SBOM reads the
+           component's license from, so repeating it here is a second copy to
+           keep in sync. The ``license-declarations`` linter reports the
+           duplicate.
+
+        ``subcomponent``
+           Set to ``True`` when the notice covers code whose license differs
+           from the license of the vendored library it sits inside -- the
+           MySpell files under ``extensions/spellcheck/hunspell``, say, whose
+           ``moz.yaml`` declares the MPL. Such a declaration keeps its own
+           ``spdx`` field, and this field is what tells the
+           ``license-declarations`` linter the two are not duplicates.
 
         ``url``
            Optional canonical URL for the license.

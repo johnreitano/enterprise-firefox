@@ -41,9 +41,8 @@
 
 namespace mozilla {
 
-using namespace mozilla::dom;
-using namespace mozilla::gfx;
-using namespace mozilla::gl;
+using namespace gfx;
+using namespace gl;
 
 //
 //  WebGL API
@@ -902,7 +901,7 @@ bool WebGLContext::DoReadPixelsAndConvert(
 }
 
 webgl::ReadPixelsResult WebGLContext::ReadPixelsInto(
-    const webgl::ReadPixelsDesc& desc, const Range<uint8_t>& dest) {
+    const webgl::ReadPixelsDesc& desc, const mozilla::Range<uint8_t>& dest) {
   const FuncScope funcScope(*this, "readPixels");
   if (IsContextLost()) return {};
 

@@ -296,7 +296,7 @@ class WebRenderAPI final {
 
   void Readback(const TimeStamp& aStartTime, gfx::IntSize aSize,
                 const gfx::SurfaceFormat& aFormat,
-                const Range<uint8_t>& aBuffer, bool* aNeedsYFlip);
+                const mozilla::Range<uint8_t>& aBuffer, bool* aNeedsYFlip);
 
   void ClearAllCaches();
   void SetBatchingLookback(uint32_t aCount);
@@ -770,7 +770,7 @@ class DisplayListBuilder final {
   void PushBorder(
       const wr::LayoutRect& aBounds, const wr::LayoutRect& aClip,
       bool aIsBackfaceVisible, const wr::LayoutSideOffsets& aWidths,
-      const Range<const wr::BorderSide>& aSides,
+      const mozilla::Range<const wr::BorderSide>& aSides,
       const wr::BorderRadius& aRadius,
       const wr::LayoutSideOffsets& aInset = EmptyLayoutSideOffsets(),
       wr::AntialiasBorder = wr::AntialiasBorder::Yes);
@@ -804,7 +804,7 @@ class DisplayListBuilder final {
   void PushText(const wr::LayoutRect& aBounds, const wr::LayoutRect& aClip,
                 bool aIsBackfaceVisible, const wr::ColorF& aColor,
                 wr::FontInstanceKey aFontKey,
-                Range<const wr::GlyphInstance> aGlyphBuffer,
+                mozilla::Range<const wr::GlyphInstance> aGlyphBuffer,
                 const wr::GlyphOptions* aGlyphOptions = nullptr);
 
   void PushLine(const wr::LayoutRect& aClip, bool aIsBackfaceVisible,

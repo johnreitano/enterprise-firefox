@@ -88,6 +88,7 @@ const kNotificationOptions = [
   ["dir", "auto", "rtl"],
   ["body", "", "Body text"],
   ["tag", "", "test-tag"],
+  ["data", null, {foo: ["test", 1, false, null]}],
 ];
 
 async function testDWP(t, pushData, actionToClick) {
@@ -103,8 +104,9 @@ async function testDWP(t, pushData, actionToClick) {
     if (expected === undefined || typeof expected !== typeof defaultValue) {
       expected = defaultValue;
     }
-    assert_equals(result.dwp[option], expected,
-                  `Notification ${option} should be set correctly.`);
+    (typeof expected === "object" && expected !== null
+        ? assert_object_equals : assert_equals)(
+      result.dwp[option], expected, `Notification ${option} should be set correctly.`);
   }
   let expectedActions = pushData.notification.actions;
   if (Array.isArray(expectedActions)) {
@@ -162,6 +164,10 @@ promise_test(async t => {
 promise_test(async t => {
   const pushData = structuredClone(SIMPLE_DWP);
   for (let [option, defaultValue] of kNotificationOptions) {
+    if (option === "data") {
+      // any JSON is valid for data.
+      continue;
+    }
     pushData.notification[option] = typeof defaultValue === "string" ? 3 : "hello";
   }
   pushData.notification.actions = 3;

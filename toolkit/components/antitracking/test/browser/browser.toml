@@ -121,6 +121,8 @@ support-files= [
 
 ["browser_onModifyRequestNotificationForTrackingResources.js"]
 
+["browser_openerAfterUserInteractionHeuristic.js"]
+
 ["browser_partitionKey_XSLT.js"]
 support-files= [
   "file_xslt.xml",

@@ -15,7 +15,7 @@ import mozilla.components.feature.ipprotection.store.IPProtectionStore
 import mozilla.components.feature.listentopage.ListenStore
 import mozilla.components.feature.tabgroups.storage.repository.TabGroupRepository
 import org.mozilla.fenix.R
-import org.mozilla.fenix.components.ClientUUID
+import org.mozilla.fenix.components.ClientUuid
 import org.mozilla.fenix.debugsettings.addons.ui.AddonsDebugToolsScreen
 import org.mozilla.fenix.debugsettings.addresses.AddressesDebugRegionRepository
 import org.mozilla.fenix.debugsettings.addresses.AddressesTools
@@ -144,7 +144,7 @@ enum class DebugDrawerRoute(
             loginsStorage: LoginsStorage,
             addressesDebugRegionRepository: AddressesDebugRegionRepository,
             creditCardsAddressesStorage: CreditCardsAddressesStorage,
-            clientUUID: ClientUUID,
+            clientUUID: ClientUuid,
             integrityClient: IntegrityClient,
             inactiveTabsEnabled: Boolean,
             tabGroupRepository: TabGroupRepository,
@@ -308,7 +308,7 @@ enum class DebugDrawerRoute(
                         debugDrawerStore.dispatch(DebugDrawerAction.NavigateTo.ListenToPageTools)
                     }
                     content = {
-                        ListenToPageTools(listenStore)
+                        ListenToPageTools(listenStore = listenStore, browserStore = browserStore)
                     }
                 }
             }

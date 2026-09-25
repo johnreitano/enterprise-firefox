@@ -1280,9 +1280,6 @@ class TestableCookieStorage final : public CookieStorage {
   void StaleCookies(const nsTArray<RefPtr<Cookie>>&, int64_t) override {}
   void Close() override {}
   void EnsureInitialized() override {}
-  nsresult RunInTransaction(nsICookieTransactionCallback*) override {
-    return NS_ERROR_NOT_IMPLEMENTED;
-  }
 
  protected:
   const char* NotificationTopic() const override { return "test-cookie"; }

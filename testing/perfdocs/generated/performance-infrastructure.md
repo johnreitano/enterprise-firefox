@@ -23,15 +23,11 @@ The HPE Moonshot System supports up to 45 servers in a single chassis, where eac
 * **Location**: MDC1
 * **Machines**: 45 cartridges per 4.3U chassis
 * **Worker pools, and their platforms**:
-  * `releng-hardware/gecko-t-linux-talos-1804`
-    * `test-linux1804-64-qr/opt`
-    * `test-linux1804-64-shippable-qr/opt`
   * `releng-hardware/gecko-t-linux-talos-2404`
     * `test-linux2404-64-clang-trunk/opt`
     * `test-linux2404-64-nightlyasrelease/opt`
     * `test-linux2404-64-shippable/opt`
     * `test-linux2404-64/opt`
-  * `releng-hardware/gecko-t-linux-netperf-1804`
   * `releng-hardware/gecko-t-linux-netperf-2404`
     * `test-linux2404-64-nightlyasrelease/opt`
     * `test-linux2404-64-shippable/opt`

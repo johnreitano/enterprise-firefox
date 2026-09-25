@@ -21,7 +21,6 @@ use xpcom::{xpcom_method, RefPtr};
 use log::{error, trace, warn};
 
 use crate::message::{FeltMessage, FELT_IPC_VERSION};
-#[cfg(target_os = "linux")]
 use crate::utils;
 use crate::utils::{Tokens, CONSOLE_URL, TOKENS, TOKEN_EXPIRY_SKEW};
 
@@ -345,6 +344,9 @@ impl FeltXPCOM {
             disposition,
             focus_hint
         );
+        // Not knowing the browser pid means the handshake is broken, so we
+        // don't send the URL.
+        utils::allow_browser_foreground()?;
         self.send(FeltMessage::OpenURL((url, disposition, focus_hint)))
             .to_result()
     }
@@ -397,8 +399,24 @@ impl FeltXPCOM {
         NS_OK
     }
 
-    xpcom_method!(ipc_channel => IpcChannel(pid: u32));
-    fn ipc_channel(&self, expected_pid: u32) -> Result<(), nserror::nsresult> {
+    fn SetCrashLockIntent(&self, lock_intent: bool) -> nserror::nsresult {
+        trace!("FeltXPCOM::SetCrashLockIntent({})", lock_intent);
+        let guard = crate::FELT_CLIENT.lock().expect("Could not get lock");
+        match &*guard {
+            Some(client) => client.notify_crash_lock_intent(lock_intent),
+            None => {
+                trace!("setCrashLockIntent(): missing client");
+                NS_ERROR_FAILURE
+            }
+        }
+    }
+
+    xpcom_method!(ipc_channel => IpcChannel(pid: u32, browser_generation: u32));
+    fn ipc_channel(
+        &self,
+        expected_pid: u32,
+        browser_generation: u32,
+    ) -> Result<(), nserror::nsresult> {
         let felt_server = match self.one_shot_server.take() {
             Some(f) => f,
             None => {
@@ -503,6 +521,7 @@ impl FeltXPCOM {
                         match rx.recv() {
                             Ok(FeltMessage::Restarting(lock_intent)) => {
                                 trace!("FeltServerThread::felt_server::ipc_loop(): Restarting (lock_intent={})", lock_intent);
+                                crate::utils::BROWSER_PID.store(0, Ordering::Relaxed);
                                 crate::utils::notify_observers_with_payload(
                                     "felt-firefox-restarting".to_string(),
                                     Some(lock_intent.to_string()),
@@ -510,18 +529,29 @@ impl FeltXPCOM {
                             },
                             Ok(FeltMessage::Exiting(lock_intent)) => {
                                 trace!("FeltServerThread::felt_server::ipc_loop(): Exiting, lock_intent={}", lock_intent);
+                                crate::utils::BROWSER_PID.store(0, Ordering::Relaxed);
                                 crate::utils::notify_observers_with_payload(
                                     "felt-firefox-exiting".to_string(),
                                     Some(lock_intent.to_string()),
                                 );
                             },
-                            Ok(FeltMessage::FeltReady) => {
-                                trace!("FeltServerThread::felt_server::ipc_loop(): FeltReady");
+                            Ok(FeltMessage::FeltReady(browser_pid)) => {
+                                trace!("FeltServerThread::felt_server::ipc_loop(): FeltReady pid={}", browser_pid);
+                                crate::utils::BROWSER_PID.store(browser_pid, Ordering::Relaxed);
                                 crate::utils::notify_observers("felt-ready".to_string());
                             },
                             Ok(FeltMessage::LogoutShutdown) => {
                                 trace!("FeltServerThread::felt_server::ipc_loop(): Shutdown for logout");
+                                crate::utils::BROWSER_PID.store(0, Ordering::Relaxed);
                                 crate::utils::notify_observers("felt-firefox-logout".to_string());
+                            }
+                            Ok(FeltMessage::CrashLockIntent(lock_intent)) => {
+                                trace!("FeltServerThread::felt_server::ipc_loop(): Crash lock intent {}", lock_intent);
+                                let payload = serde_json::json!({
+                                    "generation": browser_generation,
+                                    "lock_intent": lock_intent,
+                                }).to_string();
+                                crate::utils::notify_observers_with_payload("felt-firefox-crash-lock-intent".to_string(), Some(payload));
                             }
                             Ok(FeltMessage::AccessToken((access_token, expires_at))) => {
                                 trace!("FeltServerThread::felt_server::ipc_loop(): Update tokens from browser");
@@ -540,6 +570,7 @@ impl FeltXPCOM {
                             },
                             Err(ipc_channel::IpcError::Disconnected) => {
                                 trace!("FeltServerThread::felt_server::ipc_loop(): DISCONNECTED");
+                                crate::utils::BROWSER_PID.store(0, Ordering::Relaxed);
                                 break;
                             },
                             Err(ipc_channel::IpcError::SerializationError(deserializeErr)) => {

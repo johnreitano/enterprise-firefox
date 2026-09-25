@@ -87,6 +87,7 @@ class nsEditingSession final : public nsIEditingSession,
 
   nsresult PrepareForEditing(nsPIDOMWindowOuter* aWindow);
 
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY
   static void TimerCallback(nsITimer* aTimer, void* aClosure);
   nsCOMPtr<nsITimer> mLoadBlankDocTimer;
 

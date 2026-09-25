@@ -1120,7 +1120,7 @@ var AddonManagerInternal = {
     switch (aTopic) {
       case INTL_LOCALES_CHANGED: {
         // Asynchronously fetch and update the addons cache.
-        lazy.AddonRepository.backgroundUpdateCheck();
+        lazy.AddonRepository.updateIfLocaleChanged();
         return;
       }
 

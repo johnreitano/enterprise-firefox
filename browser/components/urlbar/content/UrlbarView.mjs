@@ -971,14 +971,22 @@ export class UrlbarView {
       return;
     }
 
-    // Search mode is active.  If the one-offs should be shown, make sure they
-    // are enabled and show the view.
+    // Search mode is active. Without results the view has nothing to show but
+    // the one-offs, so open it only when they will show.
+    let oneOffs = this.oneOffSearchButtons;
     let openPanelInstance = (this.#openPanelInstance = {});
-    this.oneOffSearchButtons?.willHide().then(willHide => {
-      if (!willHide && openPanelInstance == this.#openPanelInstance) {
-        this.oneOffSearchButtons.enable(true);
-        this.#openPanel();
+    (oneOffs?.willHide() ?? Promise.resolve(true)).then(willHide => {
+      if (openPanelInstance != this.#openPanelInstance) {
+        return;
       }
+      if (willHide) {
+        if (this.isOpen) {
+          this.close();
+        }
+        return;
+      }
+      oneOffs.enable(true);
+      this.#openPanel();
     });
   }
 

@@ -46,6 +46,11 @@ skip-if = [
 
 ["test_autoconfig_profile_prefs.js"]
 run-sequentially = ["true"] # shares GreD/autoconfig.cfg with the other tests
+skip-if = [
+  # resetPrefs() does not restore the defaults that GeckoView ships in the APK,
+  # which trips the debug-only `once` mirror check in InitOncePrefs.
+  "os == 'android'",
+]
 
 ["test_autoconfig_sysconfd.js"]
 run-if = [

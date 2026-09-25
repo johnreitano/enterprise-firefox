@@ -25,6 +25,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   ScreenshotsUtils:
     "moz-src:///browser/components/screenshots/ScreenshotsUtils.sys.mjs",
+  SELECTION_MODES:
+    "moz-src:///browser/components/screenshots/ScreenshotsSelectionModes.sys.mjs",
   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
   SearchUIUtils: "moz-src:///browser/components/search/SearchUIUtils.sys.mjs",
   SearchUtils: "moz-src:///toolkit/components/search/SearchUtils.sys.mjs",
@@ -1431,6 +1433,12 @@ export class nsContextMenu {
 
     this.showItem("context-sep-screenshots", shouldShow);
     this.showItem("context-take-screenshot", shouldShow);
+    this.showItem(
+      "context-use-mini-window",
+      shouldShow &&
+        Services.prefs.getBoolPref("browser.mini-window.enabled", false) &&
+        !this.document.documentElement.hasAttribute("mini-window")
+    );
   }
 
   initPasswordControlItems() {
@@ -1675,6 +1683,12 @@ export class nsContextMenu {
       "menuitem-screenshot",
       "ContextMenu"
     );
+  }
+
+  useMiniWindow() {
+    lazy.ScreenshotsUtils.toggle(this.browser, "MiniWindowContextMenu", {
+      mode: lazy.SELECTION_MODES.MINI_WINDOW,
+    });
   }
 
   // View Partial Source

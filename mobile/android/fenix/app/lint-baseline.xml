@@ -2,50 +2,6 @@
 <issues format="6" by="lint 9.4.0" type="baseline" client="gradle" dependencies="false" name="AGP (9.4.0)" variant="all" version="9.4.0">
 
     <issue
-        id="ComposeIconButtonUsage"
-        message="Use mozilla.components.compose.base.button.IconButton instead of androidx.compose.material3.IconButton"
-        errorLine1="import androidx.compose.material3.IconButton"
-        errorLine2="~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/org/mozilla/fenix/translations/preferences/downloadlanguages/DownloadLanguagesPreference.kt"
-            line="23"
-            column="1"/>
-    </issue>
-
-    <issue
-        id="ComposeIconButtonUsage"
-        message="Use mozilla.components.compose.base.button.IconButton instead of androidx.compose.material3.IconButton"
-        errorLine1="import androidx.compose.material3.IconButton"
-        errorLine2="~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/org/mozilla/fenix/compose/list/ListItem.kt"
-            line="30"
-            column="1"/>
-    </issue>
-
-    <issue
-        id="ComposeIconButtonUsage"
-        message="Use mozilla.components.compose.base.button.IconButton instead of androidx.compose.material3.IconButton"
-        errorLine1="import androidx.compose.material3.IconButton"
-        errorLine2="~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/org/mozilla/fenix/browser/tabstrip/TabStrip.kt"
-            line="33"
-            column="1"/>
-    </issue>
-
-    <issue
-        id="DataExtractionRules"
-        message="The attribute `android:allowBackup` is deprecated from Android 12 and higher and may be removed in future versions. Consider adding the attribute `android:dataExtractionRules` specifying an `@xml` resource which configures cloud backups and device transfers on Android 12 and higher."
-        errorLine1="        android:allowBackup=&quot;false&quot;"
-        errorLine2="                             ~~~~~">
-        <location
-            file="src/main/AndroidManifest.xml"
-            line="70"
-            column="30"/>
-    </issue>
-
-    <issue
         id="IconDensities"
         message="Missing the following drawables in `drawable-mdpi`: fenix_search_widget.webp (found in drawable-hdpi)">
         <location

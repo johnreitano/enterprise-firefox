@@ -43,6 +43,7 @@ BROWSER_CHROME_MANIFESTS += [
     "tests/browser/forceEnabled/browser.toml",
     "tests/browser/general/browser.toml",
     "tests/browser/hittest/browser.toml",
+    "tests/browser/lateServiceEnable/browser.toml",
     "tests/browser/mac/browser.toml",
     "tests/browser/mac/zoom/browser.toml",
     "tests/browser/name_and_description/browser.toml",

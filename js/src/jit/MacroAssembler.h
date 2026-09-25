@@ -1384,13 +1384,21 @@ class MacroAssembler : public MacroAssemblerSpecific {
 
   inline void minFloat32(FloatRegister other, FloatRegister srcDest,
                          bool handleNaN) PER_SHARED_ARCH;
+  inline void minFloat32(FloatRegister other, FloatRegister srcDest,
+                         bool handleNaN, bool handleZero) DEFINED_ON(loong64);
   inline void minDouble(FloatRegister other, FloatRegister srcDest,
                         bool handleNaN) PER_SHARED_ARCH;
+  inline void minDouble(FloatRegister other, FloatRegister srcDest,
+                        bool handleNaN, bool handleZero) DEFINED_ON(loong64);
 
   inline void maxFloat32(FloatRegister other, FloatRegister srcDest,
                          bool handleNaN) PER_SHARED_ARCH;
+  inline void maxFloat32(FloatRegister other, FloatRegister srcDest,
+                         bool handleNaN, bool handleZero) DEFINED_ON(loong64);
   inline void maxDouble(FloatRegister other, FloatRegister srcDest,
                         bool handleNaN) PER_SHARED_ARCH;
+  inline void maxDouble(FloatRegister other, FloatRegister srcDest,
+                        bool handleNaN, bool handleZero) DEFINED_ON(loong64);
 
   void minMaxArrayInt32(Register array, Register result, Register temp1,
                         Register temp2, Register temp3, bool isMax,

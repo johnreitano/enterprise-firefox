@@ -57,6 +57,7 @@ pub struct DeclarativePushData {
     body: nsString,
     icon: nsString,
     tag: nsString,
+    data: nsString,
     actions: ThinVec<DeclarativePushAction>,
     dir: DeclarativePushDir,
     silent: bool,
@@ -86,6 +87,7 @@ impl ActionJSON {
 struct NotificationJSON {
     title: String,
     navigate: String,
+    data: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "forgiving_deserialize")]
     dir: DeclarativePushDir,
     #[serde(default, deserialize_with = "forgiving_deserialize")]
@@ -122,9 +124,18 @@ fn parse_declarative_push_option(data: &[u8]) -> Option<DeclarativePushData> {
         return None;
     }
     let notification = data.notification;
+    let data = match notification.data {
+        None => nsString::new(),
+        Some(data) => {
+            let string = serde_json::to_string(&data)
+                .expect("Serializing serde_json::Value as JSON should never fail");
+            nsString::from(&string)
+        }
+    };
     Some(DeclarativePushData {
         title: nsString::from(&notification.title),
         navigate: nsString::from(&notification.navigate),
+        data,
         dir: notification.dir,
         lang: nsString::from(&notification.lang),
         body: nsString::from(&notification.body),

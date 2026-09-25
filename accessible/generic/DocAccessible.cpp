@@ -3253,13 +3253,8 @@ void DocAccessible::ARIAActiveDescendantIDMaybeMoved(
 }
 
 bool DocAccessible::IsRootContent(nsINode* aNode) const {
-  // The root element can be replaced or removed while the document is live.
-  // This means until mContent is re-synced by UpdateRootElement, it can
-  // still be the detached, former root.
-  MOZ_ASSERT(!mContent || !mContent->IsInComposedDoc() ||
-                 mDocumentNode->GetRootElement() == mContent,
-             "The doc acc should be bound to the root element");
-  return mContent == aNode;
+  return mContent && mDocumentNode->GetRootElement() == mContent &&
+         mContent == aNode;
 }
 
 bool DocAccessible::IsBodyElement(const nsINode* aNode) const {

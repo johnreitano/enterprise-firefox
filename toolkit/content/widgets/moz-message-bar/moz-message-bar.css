@@ -37,6 +37,8 @@
   gap: var(--message-bar-content-gap);
   padding-inline: var(--message-bar-content-padding-inline);
   padding-block: var(--message-bar-content-padding-block);
+  /* Lets content shrink past its own size instead of overflowing the container in narrow contexts. */
+  min-width: 0;
 }
 
 .text-container {

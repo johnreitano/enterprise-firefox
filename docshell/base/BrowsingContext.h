@@ -476,12 +476,13 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
   void PrepareForProcessChange();
 
   // Triggers a load in the process which currently owns this BrowsingContext.
+  MOZ_CAN_RUN_SCRIPT
   nsresult LoadURI(nsDocShellLoadState* aLoadState,
                    bool aSetNavigating = false);
 
   nsresult InternalLoad(nsDocShellLoadState* aLoadState);
 
-  void Navigate(
+  MOZ_CAN_RUN_SCRIPT void Navigate(
       nsIURI* aURI, Document* aSourceDocument, nsIPrincipal& aSubjectPrincipal,
       ErrorResult& aRv,
       NavigationHistoryBehavior aHistoryHandling =
@@ -927,6 +928,7 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
     already_AddRefed<BrowsingContext> GetOpener();
 
     uint64_t GetOpenerId() const { return mFields.Get<IDX_OpenerId>(); }
+    uint64_t GetBrowserId() const { return mFields.Get<IDX_BrowserId>(); }
 
     bool mWindowless = false;
     bool mUseRemoteTabs = false;

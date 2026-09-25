@@ -209,6 +209,7 @@ clippy:
         - rs
     support-files:
         - 'tools/lint/clippy/**'
+        - 'build/cargo/cargo-clippy.yaml'
     # the version of cargo-clippy is:
     # clippy 0.1.92 (ded5c06cf2 2025-12-08)
     # we use the date instead to facilitate the check

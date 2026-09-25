@@ -36,6 +36,9 @@ pref("app.update.background.enabled", true);
 pref("enterprise.locking.shutdown", false, locked);
 // Lock the session instead of signing out on an update-driven full restart.
 pref("enterprise.locking.restart", false, locked);
+// Lock the session instead of discarding it when repeated crashes stop the
+// browser from restarting.
+pref("enterprise.locking.crash", false, locked);
 #endif
 
 // Set add-ons abuse report related prefs specific to Firefox Desktop.
@@ -2006,15 +2009,6 @@ pref("browser.topsites.contile.enabled", true);
 pref("browser.topsites.contile.endpoint", "https://contile.services.mozilla.com/v1/tiles");
 #endif
 
-// The base URL for the Quick Suggest anonymizing proxy. To make a request to
-// the proxy, include a campaign ID in the path.
-#ifdef MOZ_ENTERPRISE
-pref("browser.partnerlink.attributionURL", "");
-#else
-pref("browser.partnerlink.attributionURL", "https://topsites.services.mozilla.com/cid/");
-#endif
-pref("browser.partnerlink.campaign.topsites", "amzn_2020_a1");
-
 // Activates preloading of the new tab url.
 pref("browser.newtab.preload", true);
 
@@ -2505,7 +2499,7 @@ pref("browser.smartwindow.autoTabGrouping.enabled", true);
 pref("browser.smartwindow.autoTabGrouping.preloadModels", true);
 pref("browser.smartwindow.autoTabGrouping.maxGroups", 3);
 pref("browser.smartwindow.autoTabGrouping.minTabsPerGroup", 2);
-pref("browser.smartwindow.autoTabGrouping.minCandidateTabs", 4);
+pref("browser.smartwindow.autoTabGrouping.minCandidateTabs", 2);
 pref("browser.smartwindow.autoTabGrouping.minCohesion", "0.15");
 pref("browser.smartwindow.autoTabGrouping.timeoutMs", 8000);
 pref("browser.smartwindow.autoTabGrouping.loglevel", "Warn");
@@ -3172,6 +3166,10 @@ pref("screenshots.browser.component.preventContentEvents", true);
 // Options 2 and 3 will fallback to the system downloads folder if their specified folder is not found.
 pref("browser.screenshots.folderList", 4);
 pref("browser.screenshots.dir", "");
+
+// Enable/disable opening a tab into a mini window.
+pref("browser.mini-window.enabled", false);
+pref("browser.mini-window.log", false);
 
 // DoH Rollout: whether to clear the mode value at shutdown.
 pref("doh-rollout.clearModeOnShutdown", false);
