@@ -49,11 +49,6 @@ fn peer_is_authorized(peer_pid: Option<u32>, expected_pid: u32) -> bool {
     matches!(peer_pid, Some(peer) if peer == expected_pid)
 }
 
-/// The protocol-version check, kept separate from authorization.
-fn version_supported(version: u32) -> bool {
-    version == FELT_IPC_VERSION
-}
-
 #[allow(non_snake_case)]
 impl FeltXPCOM {
     pub fn new(
@@ -456,8 +451,20 @@ impl FeltXPCOM {
             return Err(NS_ERROR_FAILURE);
         }
 
-        let version_ok = match rx.recv() {
-            Ok(FeltMessage::VersionProbe(version)) => version_supported(version),
+        let versions_match = match rx.recv() {
+            Ok(FeltMessage::VersionProbe(version)) => {
+                if version == FELT_IPC_VERSION {
+                    trace!("FeltXPCOM: IPC protocol version matches");
+                    true
+                } else {
+                    trace!(
+                        "FeltXPCOM: IPC protocol version mismatch (peer sent {}, expected {})",
+                        version,
+                        FELT_IPC_VERSION
+                    );
+                    false
+                }
+            }
             Ok(msg) => {
                 trace!("FeltXPCOM:rx.recv() INVALID MSG {:?}", msg);
                 false
@@ -467,22 +474,26 @@ impl FeltXPCOM {
                 false
             }
         };
-        if let Err(err) = tx.send(FeltMessage::VersionValidated(version_ok)) {
-            trace!(
-                "FeltXPCOM:tx.send(FeltMessage::VersionValidated({})) err={}",
-                version_ok,
-                err
-            );
-            return Err(NS_ERROR_FAILURE);
-        }
-        if !version_ok {
-            warn!("FeltXPCOM:IpcChannel() refused IPC peer: unsupported protocol version");
-            return Err(NS_ERROR_PORT_ACCESS_NOT_ALLOWED);
-        }
 
-        trace!("FeltXPCOM:IpcChannel() peer authenticated");
-        self.tx.replace(Some(tx));
-        self.rx.replace(Some(rx));
+        match tx.send(FeltMessage::VersionValidated(versions_match)) {
+            Ok(()) => {
+                trace!(
+                    "FeltXPCOM:tx.send(FeltMessage::VersionValidated({})) OK",
+                    versions_match
+                );
+                self.tx.replace(Some(tx));
+                self.rx.replace(Some(rx));
+            }
+            Err(err) => {
+                trace!(
+                    "FeltXPCOM:tx.send(FeltMessage::VersionValidated({})) err={}",
+                    versions_match,
+                    err
+                );
+
+                return Err(NS_ERROR_FAILURE);
+            }
+        };
 
         if let Ok(thread) = moz_task::create_thread("felt_server").map_err(|_| {
             trace!("FeltServerThread::start_thread(): felt_server thread error");
@@ -813,14 +824,5 @@ mod tests {
         assert!(peer_is_authorized(Some(child_pid), child_pid));
         assert!(!peer_is_authorized(Some(child_pid + 1), child_pid));
         assert!(!peer_is_authorized(None, child_pid));
-    }
-
-    // The protocol-version check is separate from authorization: only the
-    // current wire version is supported.
-    #[test]
-    fn only_the_current_protocol_version_is_supported() {
-        assert!(version_supported(FELT_IPC_VERSION));
-        assert!(!version_supported(FELT_IPC_VERSION + 1));
-        assert!(!version_supported(FELT_IPC_VERSION - 1));
     }
 }

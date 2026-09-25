@@ -54,23 +54,17 @@ const PROCESS_START_REASON = {
   CRASH: "crash",
 };
 
-// On Windows the process felt spawns is not always the one that runs as the
-// browser and connects to felt's IPC endpoint: with the launcher process
-// interposed, that is the browser child the launcher creates. The launcher
-// (browser/app/winlauncher/LauncherProcessWin.cpp) therefore announces the
-// browser's pid as one line of this form on the spawned process's stdout, a
-// pipe only felt's own process tree can write to. Keep the format in sync.
-const FELT_BROWSER_PID_LINE = /^FELT_BROWSER_PID=(\d{1,10})$/;
-
 /**
  * Reads the browser pid the Windows launcher process announced, if `line` is
- * such an announcement.
+ * such an announcement. The launcher
+ * (browser/app/winlauncher/LauncherProcessWin.cpp) writes it on the spawned
+ * process's stdout; keep the format in sync.
  *
  * @param {string} line - One line of the spawned process's stdout.
  * @returns {number|null} The announced pid, or null for any other line.
  */
 export function parseAnnouncedBrowserPid(line) {
-  const match = FELT_BROWSER_PID_LINE.exec(line.trim());
+  const match = /^FELT_BROWSER_PID=(\d{1,10})$/.exec(line.trim());
   if (!match) {
     return null;
   }

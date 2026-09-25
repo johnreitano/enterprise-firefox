@@ -449,9 +449,6 @@ static bool IsPackagedAppAutostarted() {
   return false;
 }
 
-// The body of LauncherMain. Returns Nothing whenever this process is to go on
-// and run as the browser itself; LauncherMain announces it to felt in that
-// case.
 static Maybe<int> RunLauncherMain(int& argc, wchar_t* argv[]) {
   EnsureBrowserCommandlineSafe(argc, argv);
 
