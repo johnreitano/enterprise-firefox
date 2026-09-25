@@ -290,6 +290,7 @@ static void MaybeBreakForBrowserDebugging() {
   ::Sleep(pauseLenMs);
 }
 
+#if defined(MOZ_ENTERPRISE)
 // felt, the enterprise launcher UI, hands the browser it spawns an IPC endpoint
 // via -felt and admits only the peer whose pid it expects. That peer is
 // whichever process ends up running as the browser, which with a launcher
@@ -309,6 +310,7 @@ static bool IsFeltSpawned(int& argc, wchar_t** argv) {
   return mozilla::CheckArg(argc, argv, "felt", nullptr,
                            mozilla::CheckArgFlag::None) == mozilla::ARG_FOUND;
 }
+#endif
 
 static bool DoLauncherProcessChecks(int& argc, wchar_t** argv) {
   // NB: We run all tests in this function instead of returning early in order
@@ -683,12 +685,14 @@ static Maybe<int> RunLauncherMain(int& argc, wchar_t* argv[]) {
     return Nothing();
   }
 
+#if defined(MOZ_ENTERPRISE)
   // Only now is the child certain to be the process that runs as the browser:
   // each failure above falls back to running it in this process, which
   // LauncherMain then announces instead.
   if (IsFeltSpawned(argc, argv)) {
     AnnounceFeltBrowserPid(pi.dwProcessId);
   }
+#endif
 
   if (flags & LauncherFlags::eWaitForBrowser) {
     DWORD exitCode;
@@ -712,6 +716,7 @@ static Maybe<int> RunLauncherMain(int& argc, wchar_t* argv[]) {
 
 Maybe<int> LauncherMain(int& argc, wchar_t* argv[]) {
   Maybe<int> result = RunLauncherMain(argc, argv);
+#if defined(MOZ_ENTERPRISE)
   // Nothing means this process goes on to run as the browser, either because
   // no launcher process was interposed or because interposing one failed and
   // we fell back. A launcher that did interpose has announced this process
@@ -720,6 +725,7 @@ Maybe<int> LauncherMain(int& argc, wchar_t* argv[]) {
       gDeelevationStatus == DeelevationStatus::DefaultStaticValue) {
     AnnounceFeltBrowserPid(::GetCurrentProcessId());
   }
+#endif
   return result;
 }
 
