@@ -72,6 +72,24 @@ export function parseAnnouncedBrowserPid(line) {
   return pid > 0 && pid <= 0xffffffff ? pid : null;
 }
 
+/**
+ * Opens felt's IPC channel to the spawned browser, terminating the spawned
+ * process if that fails. A refused peer has already consumed the one-shot
+ * server, so the browser must not keep starting with its released endpoint
+ * name on its command line.
+ *
+ * @param {object} proc - The spawned process, from Subprocess.call().
+ * @param {Function} openChannel - Opens the channel; throws on failure.
+ */
+export async function openIpcChannelOrTerminate(proc, openChannel) {
+  try {
+    openChannel();
+  } catch (e) {
+    await proc.kill(0);
+    throw e;
+  }
+}
+
 export function queueURL(payload) {
   // If Firefox AND Felt are both ready, forward immediately
   if (
@@ -1068,7 +1086,9 @@ export class FeltProcessParent extends JSProcessActorParent {
     const browserPid = useLauncherProcess
       ? await this._awaitAnnouncedBrowserPid(browserPidAnnounced)
       : this.proc.pid;
-    Services.felt.ipcChannel(browserPid, browserGeneration);
+    await openIpcChannelOrTerminate(this.proc, () =>
+      Services.felt.ipcChannel(browserPid, browserGeneration)
+    );
   }
 
   /**
