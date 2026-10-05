@@ -4,6 +4,9 @@
 
 "use strict";
 
+const { AppConstants } = ChromeUtils.importESModule(
+  "resource://gre/modules/AppConstants.sys.mjs"
+);
 const { HttpServer } = ChromeUtils.importESModule(
   "resource://testing-common/httpd.sys.mjs"
 );
@@ -73,6 +76,11 @@ add_setup(async function () {
 });
 
 add_task(async function testTelemetryToggle() {
+  if (AppConstants.MOZ_ENTERPRISE) {
+    info("Skipping: enterprise builds lock the data upload pref on");
+    return;
+  }
+
   server_requests = [];
   await lazy.DAPTelemetrySender.sendDAPMeasurement(task, 3, { timeout: 5000 });
   Assert.deepEqual(

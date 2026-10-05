@@ -819,6 +819,11 @@ if (AppConstants.MOZ_BUILD_APP === "browser") {
   });
 
   add_task(async function test_telemetry_can_upload_disabled() {
+    if (AppConstants.MOZ_ENTERPRISE) {
+      info("Skipping: enterprise builds lock the data upload pref on");
+      return;
+    }
+
     Services.prefs.setBoolPref(
       TelemetryUtils.Preferences.FhrUploadEnabled,
       false

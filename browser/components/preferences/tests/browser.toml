@@ -26,6 +26,9 @@ run-if = ["updater"]
 ["browser_backup_visibility.js"]
 
 ["browser_backup_warning_banner.js"]
+# Every task toggles datareporting.healthreport.uploadEnabled, which
+# enterprise builds lock on.
+skip-if = ["enterprise"]
 
 ["browser_bug731866.js"]
 

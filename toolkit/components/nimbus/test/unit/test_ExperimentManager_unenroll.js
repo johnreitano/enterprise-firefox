@@ -178,6 +178,11 @@ add_task(async function testUnenrollAllOptOut() {
 });
 
 add_task(async function test_unenroll_uploadPref() {
+  if (AppConstants.MOZ_ENTERPRISE) {
+    info("Skipping: enterprise builds lock the data upload pref on");
+    return;
+  }
+
   const { manager, cleanup } = await setupTest();
   const recipe = NimbusTestUtils.factories.recipe("foo");
 

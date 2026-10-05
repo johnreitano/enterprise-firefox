@@ -228,6 +228,11 @@ add_task(async function test_optIn_debug_disabled() {
 });
 
 add_task(async function test_optIn_studies_disabled() {
+  if (AppConstants.MOZ_ENTERPRISE) {
+    info("Skipping: enterprise builds lock the data upload pref on");
+    return;
+  }
+
   info(
     "Testing users cannot opt-in when telemetry is disabled or studies are disabled."
   );

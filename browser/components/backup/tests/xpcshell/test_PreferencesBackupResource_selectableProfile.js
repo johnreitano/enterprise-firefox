@@ -246,6 +246,13 @@ add_task(async function test_recover_overwrites_stale_selectable_prefs() {
  * data collection settings between the backup and the profile group.
  */
 add_task(async function test_recover_data_collection_prefs_most_restrictive() {
+  if (AppConstants.MOZ_ENTERPRISE) {
+    info(
+      "Skipping: enterprise builds lock datareporting.healthreport.uploadEnabled on"
+    );
+    return;
+  }
+
   let sandbox = sinon.createSandbox();
   let preferencesBackupResource = new PreferencesBackupResource();
 

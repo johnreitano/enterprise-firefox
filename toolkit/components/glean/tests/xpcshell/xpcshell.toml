@@ -18,6 +18,7 @@ run-if = [
 run-if = [
   "os != 'android'", # FOG isn't responsible for monitoring prefs and controlling upload on Android
 ]
+skip-if = ["enterprise"] # Enterprise builds lock datareporting.healthreport.uploadEnabled on
 
 ["test_FOGStoredSubmittedPings.js"]
 run-if = [

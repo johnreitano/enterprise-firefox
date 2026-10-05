@@ -33,6 +33,9 @@ skip-if = [
 ]
 
 ["browser_about_preferences.js"]
+# Enterprise builds hide the studies checkbox this test targets and lock
+# datareporting.healthreport.uploadEnabled on.
+skip-if = ["enterprise"]
 
 ["browser_about_studies.js"]
 https_first_disabled = true

@@ -30,6 +30,9 @@ tags = "os_integration"
 ["browser_backup_visibility.js"]
 
 ["browser_backup_warning_banner.js"]
+# Every task toggles datareporting.healthreport.uploadEnabled, which
+# enterprise builds lock on.
+skip-if = ["enterprise"]
 
 ["browser_browserIcon.js"]
 run-if = [

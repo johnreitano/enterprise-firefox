@@ -1,4 +1,6 @@
 [DEFAULT]
 firefox-appdir = "browser"
 
+["test_telemetry_upload_locked.js"]
+
 ["test_theme_migration.js"]

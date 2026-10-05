@@ -773,6 +773,11 @@ add_task(async function test_glean_crash_ping() {
 const TELEMETRY_ENABLE_PREF = "datareporting.healthreport.uploadEnabled";
 
 add_task(async function test_glean_crash_ping_disabled_by_telemetry_pref() {
+  if (AppConstants.MOZ_ENTERPRISE) {
+    info("Skipping: enterprise builds lock the data upload pref on");
+    return;
+  }
+
   let m = await getManager();
   m._disableGleanPing = false;
 

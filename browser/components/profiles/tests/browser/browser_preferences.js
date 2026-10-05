@@ -329,6 +329,10 @@ add_task(async function testReactivateProfileGroupID() {
     ok(true, "Skipping test because telemetry reporting is disabled");
     return;
   }
+  if (AppConstants.MOZ_ENTERPRISE) {
+    ok(true, "Skipping test because enterprise builds lock data reporting on");
+    return;
+  }
 
   await initGroupDatabase();
 
