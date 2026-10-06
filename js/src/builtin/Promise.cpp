@@ -3142,7 +3142,7 @@ static bool PromiseResolveBuiltinThenableJob(JSContext* cx,
  * resolving functions directly and enqueue the deferred-resolve job here.
  */
 bool js::SafeResolvePromise(JSContext* cx, Handle<PromiseObject*> promise,
-                            HandleValue resolution) {
+                            HandleValue resolution, bool* deferred) {
   cx->check(promise, resolution);
   MOZ_ASSERT(!PromiseHasAnyFlag(*promise, PROMISE_FLAG_ASYNC));
 
@@ -3176,7 +3176,13 @@ bool js::SafeResolvePromise(JSContext* cx, Handle<PromiseObject*> promise,
     SetAlreadyResolvedResolutionFunction(resolveFun);
   }
 
-  return EnqueueDeferredResolveJob(cx, promise, resolution);
+  if (!EnqueueDeferredResolveJob(cx, promise, resolution)) {
+    return false;
+  }
+  if (deferred) {
+    *deferred = true;
+  }
+  return true;
 }
 
 [[nodiscard]] static bool AddDummyPromiseReactionForDebugger(

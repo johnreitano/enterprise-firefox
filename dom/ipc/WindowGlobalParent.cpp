@@ -2274,7 +2274,7 @@ mozilla::ipc::IPCResult WindowGlobalParent::RecvPDocAccessibleConstructor(
 
   RefPtr<WindowGlobalParent> embedderWgp =
       GetBrowsingContext()->GetEmbedderWindowGlobal();
-  if (NS_WARN_IF(!IsTop() && !embedderWgp)) {
+  if (NS_WARN_IF(!IsTop() && (!embedderWgp || embedderWgp->IsDiscarded()))) {
     // This is an iframe, but it doesn't have a valid embedder WindowGlobal.
     // This can happen if the parent BrowsingContext navigated somewhere else
     // while the embedded document was loading. This isn't an error, but it does

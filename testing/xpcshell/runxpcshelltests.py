@@ -102,6 +102,7 @@ from mozprofile import Profile
 from mozprofile.cli import parse_key_value, parse_preferences
 from mozrunner.utils import get_stack_fixer_function
 from moztest.assertions import AssertionFailureParser
+from moztest.ubsan import UBSanErrorParser
 
 # --------------------------------------------------------------
 
@@ -206,6 +207,7 @@ class XPCShellTestThread(Thread):
         self.keep_going = kwargs.get("keep_going")
         self.log = kwargs.get("log")
         self.assertion_parser = AssertionFailureParser(self.log)
+        self.ubsan_parser = UBSanErrorParser(self.log)
         self.app_dir_key = kwargs.get("app_dir_key")
         self.interactive = kwargs.get("interactive")
         self.rootPrefsFile = kwargs.get("rootPrefsFile")
@@ -662,6 +664,17 @@ class XPCShellTestThread(Thread):
         self.env["XPCSHELL_TEST_TEMP_DIR"] = tempDir
         if self.interactive:
             self.log.info("temp dir is %s" % tempDir)
+
+        if "MOZ_APP_DATA" not in os.environ:
+            appdata_dir = os.path.join(tempDir, "moz-appdata")
+            os.makedirs(appdata_dir, exist_ok=True)
+            self.env["MOZ_APP_DATA"] = os.path.normpath(
+                os.path.join(appdata_dir, "AppData", "Roaming")
+            )
+            self.env["MOZ_LOCAL_APP_DATA"] = os.path.normpath(
+                os.path.join(appdata_dir, "Local")
+            )
+
         return tempDir
 
     def setupProfileDir(self):
@@ -821,6 +834,7 @@ class XPCShellTestThread(Thread):
         for line_string in output.splitlines():
             self.process_line(line_string)
         self.assertion_parser.flush()
+        self.ubsan_parser.flush()
 
         if self.saw_proc_start and not self.saw_proc_end:
             self.has_failure_output = True
@@ -843,6 +857,9 @@ class XPCShellTestThread(Thread):
             if time is not None:
                 kwargs["time"] = time
             self.assertion_parser.log(
+                line, pid=self.proc_ident, test=self.test_object["id"], time=time
+            )
+            self.ubsan_parser.log(
                 line, pid=self.proc_ident, test=self.test_object["id"], time=time
             )
             self.log.process_output(self.proc_ident, line, **kwargs)
@@ -904,6 +921,7 @@ class XPCShellTestThread(Thread):
         self.log.info(f"<<<<<<< End of {log_message}")
         self.log.group_end("replaying " + log_message)
         self.assertion_parser.flush()
+        self.ubsan_parser.flush()
         self.output_lines = []
 
     def report_message(self, message):

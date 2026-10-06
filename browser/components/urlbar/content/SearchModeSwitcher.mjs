@@ -139,6 +139,12 @@ export class SearchModeSwitcher {
       this.#panelList.replaceWith(panel);
       panel.appendChild(this.#panelList);
     }
+
+    if (!UrlbarShared.keywordEnabled(this.#input.sapName)) {
+      // Show the keyword disabled icon immediately. For keyword enabled,
+      // the icon is updated by the input once the engine store is initialized.
+      this.updateSearchIcon();
+    }
   }
 
   /**
@@ -737,12 +743,6 @@ export class SearchModeSwitcher {
   async #getSearchIcon({ searchModeChanged = false }) {
     let searchMode = this.#input.searchMode;
 
-    try {
-      await this.#input.controller.engineStore.init();
-    } catch {
-      // Search service failed but we continue anyways.
-    }
-
     if (!UrlbarShared.keywordEnabled(this.#input.sapName) && !searchMode) {
       return { icon: SearchModeSwitcher.ICON_GLOBE };
     }
@@ -808,6 +808,12 @@ export class SearchModeSwitcher {
 
   async #getDisplayedEngineDetails(searchMode = null) {
     if (!searchMode || searchMode.engineName) {
+      try {
+        await this.#input.controller.engineStore.init();
+      } catch {
+        return { label: null, icon: SearchModeSwitcher.ICON_GLASS };
+      }
+
       let engine = searchMode
         ? this.#input.controller.engineStore.getEngineByName(
             searchMode.engineName

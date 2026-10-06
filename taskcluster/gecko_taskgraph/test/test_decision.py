@@ -78,8 +78,15 @@ def test_write_artifact_yml():
         decision.ARTIFACTS_DIR = "artifacts"
 
 
-@patch("gecko_taskgraph.decision.get_hg_revision_info")
-@patch("gecko_taskgraph.decision.get_hg_revision_branch")
+def _hg_metadata(desc):
+    return {
+        "desc": desc,
+        "branch": "default",
+        "extras": {"branch": "default", "git_commit": "bcde"},
+    }
+
+
+@patch("gecko_taskgraph.decision.get_hg_revision_metadata")
 @patch("gecko_taskgraph.decision.get_repository")
 @patch("gecko_taskgraph.decision.get_changed_files")
 @pytest.mark.parametrize(
@@ -140,20 +147,19 @@ def test_write_artifact_yml():
 def test_get_decision_parameters(
     mock_get_changed_files,
     mock_get_repository,
-    mock_get_hg_revision_branch,
-    mock_get_hg_revision_info,
+    mock_get_hg_revision_metadata,
     options,
     extra_options,
     commit_msg,
     ttc,
     expected,
 ):
-    mock_get_hg_revision_info.return_value = "bcde"
-    mock_get_hg_revision_branch.return_value = "default"
+    mock_get_hg_revision_metadata.return_value = _hg_metadata(
+        commit_msg or "commit message"
+    )
 
     mock_repo = MagicMock()
     mock_repo.default_branch = "baseref"
-    mock_repo.get_commit_message.return_value = commit_msg or "commit message"
     mock_get_repository.return_value = mock_repo
     mock_get_changed_files.return_value = ["foo.txt", "bar/baz.md"]
 
@@ -168,35 +174,28 @@ def test_get_decision_parameters(
         assert params[key] == expected[key], f"key {key} does not match!"
 
 
-def _note_mock_repo(
-    mock_get_repository, mock_get_hg_revision_info, mock_get_hg_revision_branch, note
-):
-    mock_get_hg_revision_info.return_value = "bcde"
-    mock_get_hg_revision_branch.return_value = "default"
+def _note_mock_repo(mock_get_repository, mock_get_hg_revision_metadata, note):
+    mock_get_hg_revision_metadata.return_value = _hg_metadata("commit message")
     mock_repo = MagicMock()
     mock_repo.default_branch = "baseref"
-    mock_repo.get_commit_message.return_value = "commit message"
     mock_repo.get_note.return_value = note
     mock_get_repository.return_value = mock_repo
     return mock_repo
 
 
-@patch("gecko_taskgraph.decision.get_hg_revision_info")
-@patch("gecko_taskgraph.decision.get_hg_revision_branch")
+@patch("gecko_taskgraph.decision.get_hg_revision_metadata")
 @patch("gecko_taskgraph.decision.get_repository")
 @patch("gecko_taskgraph.decision.get_changed_files")
 def test_decision_parameters_note(
     mock_get_changed_files,
     mock_get_repository,
-    mock_get_hg_revision_branch,
-    mock_get_hg_revision_info,
+    mock_get_hg_revision_metadata,
     options,
 ):
     mock_get_changed_files.return_value = []
     mock_repo = _note_mock_repo(
         mock_get_repository,
-        mock_get_hg_revision_info,
-        mock_get_hg_revision_branch,
+        mock_get_hg_revision_metadata,
         note=json.dumps({"build_number": 99}),
     )
     opts = {**options, "allow_parameter_override": True}
@@ -208,22 +207,19 @@ def test_decision_parameters_note(
     assert params["build_number"] == 99
 
 
-@patch("gecko_taskgraph.decision.get_hg_revision_info")
-@patch("gecko_taskgraph.decision.get_hg_revision_branch")
+@patch("gecko_taskgraph.decision.get_hg_revision_metadata")
 @patch("gecko_taskgraph.decision.get_repository")
 @patch("gecko_taskgraph.decision.get_changed_files")
 def test_decision_parameters_note_disallow_override(
     mock_get_changed_files,
     mock_get_repository,
-    mock_get_hg_revision_branch,
-    mock_get_hg_revision_info,
+    mock_get_hg_revision_metadata,
     options,
 ):
     mock_get_changed_files.return_value = []
     mock_repo = _note_mock_repo(
         mock_get_repository,
-        mock_get_hg_revision_info,
-        mock_get_hg_revision_branch,
+        mock_get_hg_revision_metadata,
         note=json.dumps({"build_number": 99}),
     )
     opts = {**options, "allow_parameter_override": False}
@@ -233,22 +229,19 @@ def test_decision_parameters_note_disallow_override(
     assert params["build_number"] == 1
 
 
-@patch("gecko_taskgraph.decision.get_hg_revision_info")
-@patch("gecko_taskgraph.decision.get_hg_revision_branch")
+@patch("gecko_taskgraph.decision.get_hg_revision_metadata")
 @patch("gecko_taskgraph.decision.get_repository")
 @patch("gecko_taskgraph.decision.get_changed_files")
 def test_decision_parameters_note_invalid_json(
     mock_get_changed_files,
     mock_get_repository,
-    mock_get_hg_revision_branch,
-    mock_get_hg_revision_info,
+    mock_get_hg_revision_metadata,
     options,
 ):
     mock_get_changed_files.return_value = []
     _note_mock_repo(
         mock_get_repository,
-        mock_get_hg_revision_info,
-        mock_get_hg_revision_branch,
+        mock_get_hg_revision_metadata,
         note="not valid json {",
     )
     opts = {**options, "allow_parameter_override": True}

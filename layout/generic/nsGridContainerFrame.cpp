@@ -8894,7 +8894,6 @@ nscoord nsGridContainerFrame::MasonryLayout(GridReflowInput& aGridRI,
                                         : aGridRI.mGridStyle->mColumnGap,
       masonryTracks.mContentBoxSize);
   masonryTracks.mGridGap = gap;
-  uint32_t cursor = 0;
   const auto containerToMasonryBoxOffset =
       fragStartPos - aContentArea.Start(masonryAxis, wm);
   bool didAlignStartAlignedFirstItems = false;
@@ -9155,11 +9154,6 @@ nscoord nsGridContainerFrame::MasonryLayout(GridReflowInput& aGridRI,
       for (uint32_t i : gridRange.Range()) {
         lastItems[i] = item;
       }
-      cursor = gridRange.mEnd;
-      if (cursor >= gridAxisTrackCount) {
-        cursor = 0;
-      }
-
       nscoord pos;
       if (aConstraint == SizingConstraint::NoConstraint) {
         const auto* disp = child->StyleDisplay();

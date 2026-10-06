@@ -157,7 +157,6 @@ export class SmartwindowResumeCard extends MozLitElement {
             @click=${this.#stopPropagation}
           ></moz-button>
           <panel-list id=${MORE_MENU_ID} @click=${this.#stopPropagation}>
-            <!-- TODO Bug 2067868: wire up "open-tabs" in ai-window.mjs. -->
             <panel-item
               @click=${() => this.#onMenuItemClick("open-tabs")}
               data-l10n-id="aiwindow-resume-card-open-tabs"

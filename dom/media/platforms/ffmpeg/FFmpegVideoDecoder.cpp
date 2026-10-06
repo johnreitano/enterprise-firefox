@@ -1656,8 +1656,8 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::DoDecode(
       FFMPEG_LOG("avcodec_send_packet error: {} (code={})", errStr, res);
       nsresult rv;
       if (res == int(AVERROR_EOF)) {
-        rv = MaybeQueueDrain(aResults) ? NS_ERROR_DOM_MEDIA_END_OF_STREAM
-                                       : NS_ERROR_NOT_AVAILABLE;
+        rv = MaybeQueueDrain(aResults) ? NS_ERROR_NOT_AVAILABLE
+                                       : NS_ERROR_DOM_MEDIA_END_OF_STREAM;
       } else {
         rv = NS_ERROR_DOM_MEDIA_DECODE_ERR;
       }
@@ -1706,6 +1706,12 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::DoDecode(
       return NS_ERROR_DOM_MEDIA_END_OF_STREAM;
     }
     if (res == AVERROR(EAGAIN)) {
+      // MediaCodec produces no frame while it has no free output buffer. When
+      // draining, giving up here loses the frames it is still holding.
+      if (!aData && MaybeQueueDrain(aResults)) {
+        FFMPEG_LOG("  Output buffer shortage while draining.");
+        return NS_ERROR_NOT_AVAILABLE;
+      }
       return NS_OK;
     }
     if (res < 0) {
@@ -1891,15 +1897,8 @@ void FFmpegVideoDecoder<LIBAV_VER>::RecordFrame(const MediaRawData* aSample,
 #ifdef MOZ_WIDGET_ANDROID
 void FFmpegVideoDecoder<LIBAV_VER>::ResumeDrain() {
   MOZ_ASSERT(mTaskQueue->IsOnCurrentThread());
-
-  if (mDrainPromise.IsEmpty()) {
-    FFMPEG_LOGV("Resume drain but promise already fulfilled");
-    return;
-  }
-
-  FFMPEG_LOGV("Resume drain");
   mShouldResumeDrain = true;
-  ProcessDrain();
+  FFmpegDataDecoder::ResumeDrain();
 }
 
 void FFmpegVideoDecoder<LIBAV_VER>::QueueResumeDrain() {
@@ -1917,8 +1916,12 @@ void FFmpegVideoDecoder<LIBAV_VER>::QueueResumeDrain() {
 bool FFmpegVideoDecoder<LIBAV_VER>::MaybeQueueDrain(
     const MediaDataDecoder::DecodedData& aData) {
 #if defined(MOZ_WIDGET_ANDROID) && defined(USING_MOZFFVPX)
-  if (aData.IsEmpty() && mMediaCodecDeviceContext &&
-      !mLib->moz_avcodec_mediacodec_is_eos(mCodecContext)) {
+  // MediaCodec may still hold frames even if we hold none, such as when it
+  // reports an output format change before the first frame, or when it is
+  // waiting for frames held by the compositor.
+  if (mMediaCodecDeviceContext &&
+      !mLib->moz_avcodec_mediacodec_is_eos(mCodecContext) &&
+      MaybeDeferDrain(aData)) {
     FFMPEG_LOGV("Schedule drain");
     return true;
   }

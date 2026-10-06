@@ -48,8 +48,6 @@ const TEST_URI = `data:text/html,<meta charset=utf8>
   </aside>`;
 
 add_task(async function () {
-  await pushPref("layout.css.attr.enabled", true);
-
   await addTab(TEST_URI);
   const { inspector, view } = await openRuleView();
 

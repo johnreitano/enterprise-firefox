@@ -97,44 +97,6 @@ export const tokensTable = {
     },
     {
       value: {
-        light: "color-mix(in srgb, currentColor 12%, transparent)",
-        dark: "color-mix(in srgb, currentColor 17%, transparent)",
-        nativeTheme: "color-mix(in srgb, currentColor 17%, transparent)",
-        default:
-          "light-dark(color-mix(in srgb, currentColor 12%, transparent), color-mix(in srgb, currentColor 17%, transparent))",
-        platform: {
-          default: "color-mix(in srgb, currentColor 17%, transparent)",
-          browserTheme: {
-            light: "color-mix(in srgb, currentColor 12%, transparent)",
-            dark: "color-mix(in srgb, currentColor 17%, transparent)",
-            default:
-              "light-dark(color-mix(in srgb, currentColor 12%, transparent), color-mix(in srgb, currentColor 17%, transparent))",
-          },
-        },
-      },
-      name: "--background-color-dimmed",
-    },
-    {
-      value: {
-        light: "color-mix(in srgb, currentColor 20%, transparent)",
-        dark: "color-mix(in srgb, currentColor 14%, transparent)",
-        nativeTheme: "color-mix(in srgb, currentColor 30%, transparent)",
-        default:
-          "light-dark(color-mix(in srgb, currentColor 20%, transparent), color-mix(in srgb, currentColor 14%, transparent))",
-        platform: {
-          default: "color-mix(in srgb, currentColor 30%, transparent)",
-          browserTheme: {
-            light: "color-mix(in srgb, currentColor 20%, transparent)",
-            dark: "color-mix(in srgb, currentColor 14%, transparent)",
-            default:
-              "light-dark(color-mix(in srgb, currentColor 20%, transparent), color-mix(in srgb, currentColor 14%, transparent))",
-          },
-        },
-      },
-      name: "--background-color-dimmed-further",
-    },
-    {
-      value: {
         forcedColors: "ButtonFace",
         brand: { default: "color-mix(in srgb, currentColor 7%, transparent)" },
         nativeTheme: "color-mix(in srgb, currentColor 13%, transparent)",
@@ -426,12 +388,23 @@ export const tokensTable = {
       name: "--panel-background-color",
     },
     {
-      value: "var(--background-color-dimmed)",
-      name: "--panel-background-color-dimmed",
-    },
-    {
-      value: "var(--background-color-dimmed-further)",
-      name: "--panel-background-color-dimmed-further",
+      value: {
+        light: "color-mix(in srgb, currentColor 12%, transparent)",
+        dark: "color-mix(in srgb, currentColor 17%, transparent)",
+        nativeTheme: "color-mix(in srgb, currentColor 17%, transparent)",
+        default:
+          "light-dark(color-mix(in srgb, currentColor 12%, transparent), color-mix(in srgb, currentColor 17%, transparent))",
+        platform: {
+          default: "color-mix(in srgb, currentColor 17%, transparent)",
+          browserTheme: {
+            light: "color-mix(in srgb, currentColor 12%, transparent)",
+            dark: "color-mix(in srgb, currentColor 17%, transparent)",
+            default:
+              "light-dark(color-mix(in srgb, currentColor 12%, transparent), color-mix(in srgb, currentColor 17%, transparent))",
+          },
+        },
+      },
+      name: "--panel-footer-background-color",
     },
     { value: "var(--background-color-box)", name: "--popup-background-color" },
     {
@@ -2666,6 +2639,7 @@ export const tokensTable = {
       value: { forcedColors: "VisitedText", default: "var(--link-color)" },
       name: "--link-color-visited",
     },
+    { value: "inherit", name: "--panel-footer-text-color" },
     {
       value: {
         light: "var(--color-black)",
@@ -2683,11 +2657,6 @@ export const tokensTable = {
         },
       },
       name: "--panel-text-color",
-    },
-    { value: "var(--panel-text-color)", name: "--panel-text-color-dimmed" },
-    {
-      value: "var(--panel-text-color)",
-      name: "--panel-text-color-dimmed-further",
     },
     {
       value: {
@@ -3674,38 +3643,6 @@ export const variableLookupTable = {
     },
     platform: { default: "color-mix(in srgb, currentColor 20%, transparent)" },
     prefersContrast: "SelectedItem",
-  },
-  "background-color-dimmed": {
-    light: "color-mix(in srgb, currentColor 12%, transparent)",
-    dark: "color-mix(in srgb, currentColor 17%, transparent)",
-    nativeTheme: "color-mix(in srgb, currentColor 17%, transparent)",
-    default:
-      "light-dark(color-mix(in srgb, currentColor 12%, transparent), color-mix(in srgb, currentColor 17%, transparent))",
-    platform: {
-      default: "color-mix(in srgb, currentColor 17%, transparent)",
-      browserTheme: {
-        light: "color-mix(in srgb, currentColor 12%, transparent)",
-        dark: "color-mix(in srgb, currentColor 17%, transparent)",
-        default:
-          "light-dark(color-mix(in srgb, currentColor 12%, transparent), color-mix(in srgb, currentColor 17%, transparent))",
-      },
-    },
-  },
-  "background-color-dimmed-further": {
-    light: "color-mix(in srgb, currentColor 20%, transparent)",
-    dark: "color-mix(in srgb, currentColor 14%, transparent)",
-    nativeTheme: "color-mix(in srgb, currentColor 30%, transparent)",
-    default:
-      "light-dark(color-mix(in srgb, currentColor 20%, transparent), color-mix(in srgb, currentColor 14%, transparent))",
-    platform: {
-      default: "color-mix(in srgb, currentColor 30%, transparent)",
-      browserTheme: {
-        light: "color-mix(in srgb, currentColor 20%, transparent)",
-        dark: "color-mix(in srgb, currentColor 14%, transparent)",
-        default:
-          "light-dark(color-mix(in srgb, currentColor 20%, transparent), color-mix(in srgb, currentColor 14%, transparent))",
-      },
-    },
   },
   "border-color": {
     brand: {
@@ -4703,9 +4640,6 @@ export const variableLookupTable = {
       },
     },
   },
-  "panel-background-color-dimmed": "var(--background-color-dimmed)",
-  "panel-background-color-dimmed-further":
-    "var(--background-color-dimmed-further)",
   "panel-border-color": {
     light: "rgb(240, 240, 244)",
     dark: "rgb(82, 82, 94)",
@@ -4723,6 +4657,23 @@ export const variableLookupTable = {
   "panel-border-radius": "var(--border-radius-medium)",
   "panel-box-shadow": "0 0 var(--panel-box-shadow-margin) hsla(0, 0%, 0%, 0.2)",
   "panel-box-shadow-margin": "4px",
+  "panel-footer-background-color": {
+    light: "color-mix(in srgb, currentColor 12%, transparent)",
+    dark: "color-mix(in srgb, currentColor 17%, transparent)",
+    nativeTheme: "color-mix(in srgb, currentColor 17%, transparent)",
+    default:
+      "light-dark(color-mix(in srgb, currentColor 12%, transparent), color-mix(in srgb, currentColor 17%, transparent))",
+    platform: {
+      default: "color-mix(in srgb, currentColor 17%, transparent)",
+      browserTheme: {
+        light: "color-mix(in srgb, currentColor 12%, transparent)",
+        dark: "color-mix(in srgb, currentColor 17%, transparent)",
+        default:
+          "light-dark(color-mix(in srgb, currentColor 12%, transparent), color-mix(in srgb, currentColor 17%, transparent))",
+      },
+    },
+  },
+  "panel-footer-text-color": "inherit",
   "panel-padding": "16px",
   "panel-padding-block": "4px",
   "panel-separator-color": {
@@ -4749,8 +4700,6 @@ export const variableLookupTable = {
       },
     },
   },
-  "panel-text-color-dimmed": "var(--panel-text-color)",
-  "panel-text-color-dimmed-further": "var(--panel-text-color)",
   "panel-width": "initial",
   "popup-background-color": "var(--background-color-box)",
   "popup-border-color": {

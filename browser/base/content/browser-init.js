@@ -355,7 +355,7 @@ var gBrowserInit = {
     if (
       !window.toolbar.visible ||
       window.document.documentElement.hasAttribute("taskbartab") ||
-      window.document.documentElement.hasAttribute("mini-window")
+      window.document.documentElement.hasAttribute("cropped-mini-window")
     ) {
       // adjust browser UI for popups
       gURLBar.readOnly = true;
@@ -572,13 +572,13 @@ var gBrowserInit = {
 
     initBackForwardButtonTooltip(
       "back-button-tooltip-description",
-      "navbar-tooltip-back-2",
+      "navbar-tooltip-back-3",
       "goBackKb"
     );
 
     initBackForwardButtonTooltip(
       "forward-button-tooltip-description",
-      "navbar-tooltip-forward-2",
+      "navbar-tooltip-forward-3",
       "goForwardKb"
     );
 

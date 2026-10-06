@@ -99,11 +99,10 @@ add_task(async function test_concurrent_open_counts_every_mini_window() {
   }
 
   let popups = [];
-  let miniWins = [];
   for (let tab of tabs) {
     let opened = BrowserTestUtils.domWindowOpenedAndLoaded(null);
     let popPromise = MiniWindowManager.popTab(tab, "tab_context_menu");
-    miniWins.push(await opened);
+    await opened;
     popups.push(await popPromise);
   }
 
@@ -115,9 +114,8 @@ add_task(async function test_concurrent_open_counts_every_mini_window() {
   for (let popup of popups) {
     popup.close();
   }
-  // Wait for the popup windows to close.
-  await Promise.all(miniWins.map(win => BrowserTestUtils.domWindowClosed(win)));
-  assertNoMiniWindowsOpen();
+
+  await waitForNoMiniWindowsOpen();
   removeTestTabs();
 });
 

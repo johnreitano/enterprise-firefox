@@ -76,6 +76,9 @@
  *   Values set through `SessionStore.setCustomWindowValue`.
  * @property {boolean} [busy]
  *   Whether the window is still restoring tabs.
+ * @property {boolean} [_restoring]
+ *   Whether the window's state is still waiting to be restored into it,
+ *   which leaves the window out of session saves.
  * @property {WindowID} [__lastSessionWindowID]
  *   ID the window had in the session being restored, used to map that
  *   session's windows onto the windows they are restored into.
@@ -125,6 +128,32 @@
  * @typedef {Window|ClosedDataSourceOptions} ClosedDataSource
  *   The window a closed tab or tab group was closed in: the window itself, or
  *   a `ClosedDataSourceOptions` object identifying it.
+ */
+
+/**
+ * @typedef {object} RestoreOptions
+ *   Options for restoring session state into windows.
+ * @property {boolean} [overwriteTabs]
+ *   Whether to overwrite existing tabs with the restored ones.
+ * @property {boolean} [firstWindow]
+ *   Whether this is the first non-private window restored in this session,
+ *   which might open an external link as well.
+ * @property {string} [restoreSource]
+ *   What started the restore, recorded as the `entry_point` of the
+ *   `windowFeaturesMismatchIgnored` telemetry event.
+ * @property {string} [trigger]
+ *   The reason recorded when the restore opens a Smart Window.
+ */
+
+/**
+ * @typedef {object} RestoreHistoryOptions
+ *   What a tab's history restore needs, kept until its content restore.
+ * @property {TabStateData} tabData
+ *   The tab state to restore.
+ * @property {number} epoch
+ *   The browser's restore epoch, which discards updates from earlier ones.
+ * @property {object} [loadArguments]
+ *   Arguments for loading a URI after the history restore.
  */
 
 /**
@@ -389,6 +418,7 @@ class _SessionStore {
   #tabStateRestorePromises = new WeakMap();
 
   // The history data needed to be restored in the parent.
+  /** @type {WeakMap<object, RestoreHistoryOptions>} */
   #tabStateToRestore = new WeakMap();
 
   // For each <browser> element, records the current epoch.
@@ -606,7 +636,7 @@ class _SessionStore {
   /**
    * The session store's logger, or null before initialization.
    *
-   * @type {Log.Logger|null}
+   * @type {SessionStoreLogger|null}
    */
   get logger() {
     return this.#log;
@@ -722,9 +752,9 @@ class _SessionStore {
     Glean.sessionRestore.startupTimeline.sessionRestoreInitialized.set(
       Services.telemetry.msSinceProcessStart()
     );
-    OBSERVING.forEach(function (aTopic) {
-      Services.obs.addObserver(this, aTopic, true);
-    }, this);
+    for (let topic of OBSERVING) {
+      Services.obs.addObserver(this, topic, true);
+    }
 
     this.#initPrefs();
     this.#initialized = true;
@@ -1462,7 +1492,7 @@ class _SessionStore {
    *        which case a non-web-controlled page that is still loading is
    *        collected as well.
    */
-  updateSessionStoreFromTablistener(
+  updateSessionStoreFromChild(
     browser,
     browsingContext,
     permanentKey,
@@ -1731,9 +1761,9 @@ class _SessionStore {
       this.#onTabBrowserInserted(aWindow, tabbrowser.tabs[i]);
     }
     // notification of tab add/remove/selection/show/hide
-    TAB_EVENTS.forEach(function (aEvent) {
-      tabbrowser.tabContainer.addEventListener(aEvent, this, true);
-    }, this);
+    for (let event of TAB_EVENTS) {
+      tabbrowser.tabContainer.addEventListener(event, this, true);
+    }
 
     // Keep track of a browser's latest frameLoader.
     aWindow.gBrowser.addEventListener("XULFrameLoaderCreated", this);
@@ -2107,9 +2137,9 @@ class _SessionStore {
 
     let browsers = Array.from(tabbrowser.browsers);
 
-    TAB_EVENTS.forEach(function (aEvent) {
-      tabbrowser.tabContainer.removeEventListener(aEvent, this, true);
-    }, this);
+    for (let event of TAB_EVENTS) {
+      tabbrowser.tabContainer.removeEventListener(event, this, true);
+    }
 
     aWindow.gBrowser.removeEventListener("XULFrameLoaderCreated", this);
 
@@ -2836,7 +2866,7 @@ class _SessionStore {
       if (host && Services.eTLD.hasRootDomain(host, aDomain)) {
         return true;
       }
-      return aEntry.children && aEntry.children.some(containsDomain, this);
+      return aEntry.children && aEntry.children.some(containsDomain);
     }
     // remove all closed tabs containing a reference to the given domain
     for (let ix in this.#windows) {
@@ -3000,7 +3030,7 @@ class _SessionStore {
    *        Window reference
    * @param {MozTabbrowserTab} aTab
    *        Tab reference
-   * @param {boolean} aNoNotification
+   * @param {boolean} [aNoNotification]
    *        Do not save state if we're updating an existing tab
    */
   #onTabRemove(aWindow, aTab, aNoNotification) {
@@ -5702,9 +5732,9 @@ class _SessionStore {
   #updateWindowFeatures(aWindow) {
     var winData = this.#windows[aWindow.__SSi];
 
-    WINDOW_ATTRIBUTES.forEach(function (aAttr) {
-      winData[aAttr] = this.#getWindowDimension(aWindow, aAttr);
-    }, this);
+    for (let attr of WINDOW_ATTRIBUTES) {
+      winData[attr] = this.#getWindowDimension(aWindow, attr);
+    }
 
     if (winData.sizemode != "minimized") {
       winData.sizemodeBeforeMinimized = winData.sizemode;
@@ -5726,7 +5756,7 @@ class _SessionStore {
   /**
    * gather session data as object
    *
-   * @param {boolean} aUpdateAll
+   * @param {boolean} [aUpdateAll]
    *        Update all windows
    * @returns {object}
    *          The current session state
@@ -6102,14 +6132,8 @@ class _SessionStore {
    *        Window reference to the window to use for restoration
    * @param {WindowStateData} winData
    *        JS object
-   * @param {object} [aOptions]
+   * @param {RestoreOptions} [aOptions]
    *        Options for the restoration
-   * @param {boolean} [aOptions.overwriteTabs]
-   *        to overwrite existing tabs w/ new ones
-   * @param {boolean} [aOptions.firstWindow]
-   *        if this is the first non-private window we're
-   *        restoring in this session, that might open an
-   *        external link as well
    */
   #restoreWindow(aWindow, winData, aOptions = {}) {
     let overwriteTabs = aOptions && aOptions.overwriteTabs;
@@ -6445,14 +6469,8 @@ class _SessionStore {
    *        Additionally required windows will be opened.
    * @param {object|string} aState
    *        JS object or JSON string
-   * @param {object} [aOptions]
+   * @param {RestoreOptions} [aOptions]
    *        Options for the restoration
-   * @param {boolean} [aOptions.overwriteTabs]
-   *        to overwrite existing tabs w/ new ones
-   * @param {boolean} [aOptions.firstWindow]
-   *        if this is the first non-private window we're
-   *        restoring in this session, that might open an
-   *        external link as well
    */
   #restoreWindows(aWindow, aState, aOptions = {}) {
     // initialize window if necessary
@@ -6934,7 +6952,7 @@ class _SessionStore {
    *        Window reference
    * @param {WindowStateData} aWinData
    *        Object containing session data for the window
-   * @param {object} [aOptions]
+   * @param {RestoreOptions} [aOptions]
    *        Options for the restoration
    */
   #restoreWindowFeatures(aWindow, aWinData, aOptions = {}) {
@@ -7480,7 +7498,7 @@ class _SessionStore {
    * for debugging purposes.
    *
    * @param {nsIPropertyBag} bag
-   * @returns {{[string]: any}}
+   * @returns {Record<string, any>}
    */
   #serializePropertyBag(bag) {
     const obj = {};
@@ -7747,7 +7765,7 @@ class _SessionStore {
     // If the tab has one of the following transient about: history entry, no
     // userTypedValue, and no customizemode attribute, then we don't actually
     // want to write this tab's data to disk.
-    return (
+    return !!(
       aTabState.userTypedValue ||
       (aTabState.attributes && aTabState.attributes.customizemode == "true") ||
       (aTabState.entries.length &&
@@ -8427,7 +8445,7 @@ class _SessionStore {
    *
    * @param {object} permanentKey
    *        The permanent key of the browser.
-   * @param {nsIFrameLoader} [frameLoader]
+   * @param {FrameLoader} [frameLoader]
    *        The browser's frame loader, whose epoch is reset as well.
    */
   #resetEpoch(permanentKey, frameLoader = null) {
@@ -8585,7 +8603,7 @@ class _SessionStore {
    *
    * @param {MozBrowser} browser
    *        The browser to restore the history for.
-   * @param {TabStateData} data
+   * @param {RestoreHistoryOptions} data
    *        The tab data to restore.
    */
   #restoreHistory(browser, data) {
@@ -8851,7 +8869,7 @@ class _SessionStore {
    *
    * @param {MozBrowser} browser
    *        The browser to transmit the permissions for.
-   * @param {object} options
+   * @param {RestoreHistoryOptions} options
    *        The options data to send to content.
    */
   #sendRestoreHistory(browser, options) {

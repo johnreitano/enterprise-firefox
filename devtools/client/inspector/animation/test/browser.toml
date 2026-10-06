@@ -16,6 +16,7 @@ support-files = [
   "doc_negative_playback_rate.html",
   "doc_overflowed_delay_end_delay.html",
   "doc_pseudo.html",
+  "doc_scroll_animation.html",
   "doc_short_duration.html",
   "doc_simple_animation.html",
   "doc_special_colors.html",
@@ -244,6 +245,8 @@ fail-if = [
 fail-if = [
   "a11y_checks", # Bug 1849028 clicked element may not be focusable and/or labeled
 ]
+
+["browser_animation_scroll-animation.js"]
 
 ["browser_animation_short-duration.js"]
 

@@ -335,6 +335,10 @@ class TestComponentsForUnmatched(unittest.TestCase):
         self.assertEqual(extra[0]["properties"]["moz:license.notice-ids"], "mit")
         self.assertIsNone(extra[0]["bugzilla"])
 
+    def test_notice_without_spdx_is_licensed_by_its_title(self):
+        extra = components_for_unmatched([], [self.notice("jpnic", ["netwerk/dns"])])
+        self.assertEqual(extra[0]["licenses"], ["jpnic License"])
+
     def test_no_purl_is_invented(self):
         extra = components_for_unmatched([], [self.notice("mit", ["a/one.js"])])
         self.assertIsNone(extra[0]["purl"])

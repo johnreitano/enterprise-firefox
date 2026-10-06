@@ -842,36 +842,70 @@ RefPtr<PKCS11ModuleDB::TokenInfoPromise> PKCS11ModuleDB::ChangeTokenPassword(
       });
 }
 
-RefPtr<PKCS11ModuleDB::FindCertificatesPromise>
-PKCS11ModuleDB::FindCertificatesGivenParent(
-    const RefPtr<PKCS11ModuleParent>& parent) {
-  return parent->SendFindCertificates()->Then(
-      GetCurrentSerialEventTarget(), __func__,
-      [](nsTArray<Certificate>&& certificates) {
-        return FindCertificatesPromise::CreateAndResolve(
-            std::move(certificates), __func__);
-      },
-      [](ipc::ResponseRejectReason reason) {
-        return FindCertificatesPromise::CreateAndReject(NS_ERROR_FAILURE,
+RefPtr<PKCS11ModuleDB::FindObjectsPromise>
+PKCS11ModuleDB::FindObjectsGivenParent(
+    SearchingFor searchingFor, const RefPtr<PKCS11ModuleParent>& parent) {
+  return parent->SendFindObjects(searchingFor)
+      ->Then(
+          GetCurrentSerialEventTarget(), __func__,
+          [](nsTArray<IPCClientCertObject>&& objects) {
+            return FindObjectsPromise::CreateAndResolve(std::move(objects),
                                                         __func__);
-      });
+          },
+          [](ipc::ResponseRejectReason reason) {
+            return FindObjectsPromise::CreateAndReject(NS_ERROR_FAILURE,
+                                                       __func__);
+          });
 }
 
-RefPtr<PKCS11ModuleDB::FindCertificatesPromise>
-PKCS11ModuleDB::FindCertificates() {
+RefPtr<PKCS11ModuleDB::FindObjectsPromise> PKCS11ModuleDB::FindObjects(
+    SearchingFor searchingFor) {
   if (!mPKCS11ModuleProcessPromise) {
-    return FindCertificatesPromise::CreateAndReject(NS_ERROR_NOT_AVAILABLE,
-                                                    __func__);
+    return FindObjectsPromise::CreateAndReject(NS_ERROR_NOT_AVAILABLE,
+                                               __func__);
   }
   return mPKCS11ModuleProcessPromise->Then(
       GetCurrentSerialEventTarget(), __func__,
-      [](const RefPtr<PKCS11ModuleParent>& parent) {
+      [searchingFor](const RefPtr<PKCS11ModuleParent>& parent) {
         MOZ_RELEASE_ASSERT(parent);
-        return FindCertificatesGivenParent(parent);
+        return FindObjectsGivenParent(searchingFor, parent);
       },
       [](nsresult rv) {
-        return FindCertificatesPromise::CreateAndReject(rv, __func__);
+        return FindObjectsPromise::CreateAndReject(rv, __func__);
       });
+}
+
+RefPtr<PKCS11ModuleDB::SignPromise> PKCS11ModuleDB::SignGivenParent(
+    Span<uint8_t> certificate, Span<uint8_t> data, Span<uint8_t> params,
+    const RefPtr<PKCS11ModuleParent>& parent) {
+  return parent->SendSign(certificate, data, params)
+      ->Then(
+          GetCurrentSerialEventTarget(), __func__,
+          [](nsTArray<uint8_t>&& signature) {
+            return SignPromise::CreateAndResolve(std::move(signature),
+                                                 __func__);
+          },
+          [](ipc::ResponseRejectReason reason) {
+            return SignPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
+          });
+}
+
+RefPtr<PKCS11ModuleDB::SignPromise> PKCS11ModuleDB::Sign(
+    nsTArray<uint8_t> certificate, nsTArray<uint8_t> data,
+    nsTArray<uint8_t> params) {
+  if (!mPKCS11ModuleProcessPromise) {
+    return SignPromise::CreateAndReject(NS_ERROR_NOT_AVAILABLE, __func__);
+  }
+  return mPKCS11ModuleProcessPromise->Then(
+      GetCurrentSerialEventTarget(), __func__,
+      [certificate(std::move(certificate)), data(std::move(data)),
+       params(std::move(params))](
+          const RefPtr<PKCS11ModuleParent>& parent) mutable {
+        MOZ_RELEASE_ASSERT(parent);
+        return SignGivenParent(Span(certificate), Span(data), Span(params),
+                               parent);
+      },
+      [](nsresult rv) { return SignPromise::CreateAndReject(rv, __func__); });
 }
 #endif  // NIGHTLY_BUILD && !MOZ_NO_SMART_CARDS
 

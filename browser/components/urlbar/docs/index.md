@@ -42,6 +42,7 @@ firefox-suggest-telemetry
 debugging
 ranking
 dynamic-result-types
+adding-a-search-bar
 preferences
 testing
 contact
@@ -50,8 +51,13 @@ contact
 ## API Reference
 
 ```{toctree}
+ProvidersManager
 UrlbarChildController
-UrlbarInput
+UrlbarInputBase
+UrlbarMuxer
 UrlbarParentController
+UrlbarProvider
+UrlbarQueryContext
+UrlbarResult
 UrlbarView
 ```

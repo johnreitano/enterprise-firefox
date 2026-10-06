@@ -130,7 +130,8 @@ function parseMarkupToFragment(markup) {
 }
 
 /**
- * Implements the text input part of the address bar UI.
+ * Implements the text input part of search access points. Each access point
+ * extends this class (e.g. `UrlbarInput`, `SearchbarInput`).
  */
 export class UrlbarInputBase extends HTMLElement {
   static get #markup() {
@@ -495,7 +496,7 @@ ${
   }
 
   /**
-   * Hook for subclass-specific initialization work, called during {@link #init}.
+   * Hook for subclass-specific initialization work, called during `#init`.
    * Default no-op.
    */
   sapInit() {}
@@ -747,7 +748,8 @@ ${
   /**
    * Whether this is a bar dedicated to search.
    *
-   * @see {UrlbarShared.isSearchbarSAP}
+   * See `UrlbarShared.isSearchbarSAP`.
+   *
    * @type {boolean}
    */
   get isSearchbarSAP() {

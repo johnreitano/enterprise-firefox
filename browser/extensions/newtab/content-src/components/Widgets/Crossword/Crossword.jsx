@@ -376,7 +376,9 @@ function Crossword({
               data-l10n-id="newtab-widget-lists-label-new"
             ></moz-badge>
           )}
-          <h3 className="newtab-crossword-title">Daily crossword</h3>
+          <h3 className="newtab-widget-title newtab-crossword-title">
+            Daily crossword
+          </h3>
         </div>
         <div className="crossword-context-menu-wrapper">
           <moz-button

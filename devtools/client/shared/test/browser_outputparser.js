@@ -8,7 +8,6 @@ add_task(async function () {
     set: [
       ["dom.security.html_serialization_escape_lt_gt", true],
       ["layout.css.alpha-color-function.enabled", true],
-      ["layout.css.attr.enabled", true],
       ["layout.css.backdrop-filter.enabled", true],
       ["layout.css.color-mix-multi-color.enabled", true],
       ["security.allow_unsafe_parent_loads", true],

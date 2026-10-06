@@ -66,6 +66,14 @@ class MainMenuPage(composeRule: AndroidComposeTestRule<HomeActivityIntentTestRul
                 ),
         )
 
+        // "Customize homepage" is only present in the home main menu and jumps straight to the homepage settings
+        // screen, one level shallower than the Settings -> Homepage route.
+        builder.register(
+            from = pageName,
+            to = "SettingsHomepagePage",
+            steps = listOf(NavigationStep.Click(MainMenuSelectors.CUSTOMIZE_HOMEPAGE_BUTTON)),
+        )
+
         builder.register(
             from = pageName,
             to = "DownloadsPage",

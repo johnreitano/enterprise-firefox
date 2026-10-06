@@ -10,6 +10,10 @@ import {
   CHAT_WRAPPER_ELEMENTS,
 } from "chrome://browser/content/aiwindow/modules/ChatMarkdownParser.mjs";
 import { dispatchClientError } from "chrome://browser/content/aiwindow/modules/ClientErrorTelemetry.mjs";
+import {
+  isSettingsURL,
+  isSmartPageURL,
+} from "chrome://browser/content/aiwindow/modules/TrustedInternalURLs.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/ai-chat-card.mjs";
 // eslint-disable-next-line import/no-unassigned-import
@@ -278,27 +282,6 @@ export class AIChatMessage extends MozLitElement {
     }
   }
 
-  static #SETTINGS_URL = new URL("about:preferences");
-  static #SETTINGS_ALIAS_URL = new URL("about:settings");
-
-  /**
-   * Returns true if the parsed URL points to the browser settings page.
-   * Matches both about:preferences and its about:settings alias,
-   *
-   * @param {URL} parsed - A parsed URL object
-   * @returns {boolean}
-   */
-  #isSettingsURL(parsed) {
-    if (!parsed) {
-      return false;
-    }
-    return (
-      parsed.protocol === AIChatMessage.#SETTINGS_URL.protocol &&
-      (parsed.pathname === AIChatMessage.#SETTINGS_URL.pathname ||
-        parsed.pathname === AIChatMessage.#SETTINGS_ALIAS_URL.pathname)
-    );
-  }
-
   /**
    * This functions handles unfurling links that have not been seen by the conversation.
    * Language models can hallucinate URLs and can be forced by untrusted content to
@@ -320,8 +303,12 @@ export class AIChatMessage extends MozLitElement {
     for (const anchor of root.querySelectorAll("a[href]")) {
       const parsed = URL.parse(anchor.href);
 
-      // Settings pages are always trusted
-      if (this.#isSettingsURL(parsed)) {
+      // Settings pages are always trusted; a generated page only when this
+      // conversation produced it.
+      if (
+        isSettingsURL(parsed) ||
+        (isSmartPageURL(parsed) && this.seenUrls.has(anchor.href))
+      ) {
         continue;
       }
 

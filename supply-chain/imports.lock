@@ -543,13 +543,6 @@ user-id = 2915
 user-login = "Amanieu"
 user-name = "Amanieu d'Antras"
 
-[[publisher.paste]]
-version = "1.0.11"
-when = "2022-12-17"
-user-id = 3618
-user-login = "dtolnay"
-user-name = "David Tolnay"
-
 [[publisher.pe-unwind-info]]
 version = "0.6.0"
 when = "2025-08-05"
@@ -1571,6 +1564,12 @@ notes = """
 No `unsafe` code in this update. Lots of changes but all
 object-file-format-related, everything looks good.
 """
+
+[[audits.bytecode-alliance.audits.pastey]]
+who = "Chris Fallin <chris@cfallin.org>"
+criteria = "safe-to-deploy"
+version = "0.2.1"
+notes = "No unsafe code."
 
 [[audits.bytecode-alliance.audits.percent-encoding]]
 who = "Alex Crichton <alex@alexcrichton.com>"

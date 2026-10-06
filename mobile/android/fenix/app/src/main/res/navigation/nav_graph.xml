@@ -1857,6 +1857,10 @@
       <action
         android:id="@+id/action_menuFragment_to_createShortcutFragment"
         app:destination="@id/createShortcutFragment" />
+
+      <action
+        android:id="@+id/action_menuFragment_to_loginsListFragment"
+        app:destination="@id/savedLogins" />
     </dialog>
   </navigation>
 

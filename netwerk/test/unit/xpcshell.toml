@@ -135,6 +135,8 @@ firefox-appdir = "browser"
 
 ["test_blob_channelname.js"]
 
+["test_blocked_local_ports.js"]
+
 ["test_brotli_decoding.js"]
 
 ["test_brotli_http.js"]
@@ -521,9 +523,9 @@ prefs = ["browser.cache.disk.encryption.enabled=true"]
 
 ["test_cache2-44-no-rewrite-unchanged-metadata.js"]
 
-["test_cache2-45-clear-base-domain-context-evictor.js"]
-
 ["test_cache2-44-no_cache_revalidating_hang.js"]
+
+["test_cache2-45-clear-base-domain-context-evictor.js"]
 
 ["test_cache2_clear_with_principal.js"]
 run-sequentially = ["true"] # httpd server

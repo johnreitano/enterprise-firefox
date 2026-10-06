@@ -3269,8 +3269,7 @@ delta = "0.15.0 -> 0.15.1"
 [[audits.gleam]]
 who = "Jamie Nicol <jnicol@mozilla.com>"
 criteria = "safe-to-deploy"
-delta = "0.15.1 -> 0.15.1@git:68ca4e5cc31135b843af07ff213a94b9ddce64cf"
-importable = false
+delta = "0.15.1 -> 0.16.0"
 
 [[audits.glob]]
 who = "Mike Hommey <mh+mozilla@glandium.org>"
@@ -4493,10 +4492,20 @@ who = "Andy Leiserson <aleiserson@mozilla.com>"
 criteria = "safe-to-deploy"
 version = "0.2.2"
 
+[[audits.macro_rules_attribute]]
+who = "Lars Eggert <lars@eggert.org>"
+criteria = "safe-to-deploy"
+delta = "0.2.2 -> 0.2.3"
+
 [[audits.macro_rules_attribute-proc_macro]]
 who = "Andy Leiserson <aleiserson@mozilla.com>"
 criteria = "safe-to-deploy"
 version = "0.2.2"
+
+[[audits.macro_rules_attribute-proc_macro]]
+who = "Lars Eggert <lars@eggert.org>"
+criteria = "safe-to-deploy"
+delta = "0.2.2 -> 0.2.3"
 
 [[audits.malloc_buf]]
 who = "Bobby Holley <bobbyholley@gmail.com>"
@@ -5632,6 +5641,11 @@ delta = "1.0.7 -> 1.0.8"
 who = "Mike Hommey <mh+mozilla@glandium.org>"
 criteria = "safe-to-deploy"
 delta = "1.0.8 -> 1.0.11"
+
+[[audits.pastey]]
+who = "Lars Eggert <lars@eggert.org>"
+criteria = "safe-to-deploy"
+delta = "0.2.1 -> 0.2.3"
 
 [[audits.peeking_take_while]]
 who = "Bobby Holley <bobbyholley@gmail.com>"

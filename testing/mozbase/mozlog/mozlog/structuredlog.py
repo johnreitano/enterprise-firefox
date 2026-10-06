@@ -134,6 +134,22 @@ Allowed actions, and subfields:
       test - ID of the test that was running (optional)
       subsuite - Name of the subsuite for the tests that ran (optional)
 
+  ubsan_error
+      kind - UndefinedBehaviorSanitizer check kind from the SUMMARY line
+             ("undefined-behavior" unless the runtime reports error types)
+      message - The "runtime error:" message (e.g. "applying non-zero offset
+                96 to null pointer")
+      file - Source file of the offending operation (optional)
+      lineno - Source line of the offending operation (optional)
+      column - Source column of the offending operation (optional)
+      stack - Stack printed after the report (list of profiler-format frame
+              dicts with function/file/line/column or module/module_offset)
+              (optional)
+      scope - An identifier for the set of tests run during the browser session
+              (e.g. a directory name) (optional)
+      test - ID of the test that was running (optional)
+      subsuite - Name of the subsuite for the tests that ran (optional)
+
   mozleak_object
      process - Process that leaked
      count - Number of instances that leaked
@@ -738,6 +754,20 @@ class StructuredLogger:
     )
     def assertion_failure(self, data):
         self._log_data("assertion_failure", data)
+
+    @log_action(
+        Unicode("kind"),
+        Unicode("message"),
+        Unicode("file", optional=True, default=None),
+        Int("lineno", optional=True, default=None),
+        Int("column", optional=True, default=None),
+        List(Dict(Any), "stack", optional=True, default=None),
+        Unicode("scope", optional=True, default=None),
+        TestId("test", default=None, optional=True),
+        Unicode("subsuite", default=None, optional=True),
+    )
+    def ubsan_error(self, data):
+        self._log_data("ubsan_error", data)
 
     @log_action(
         Unicode("process"),

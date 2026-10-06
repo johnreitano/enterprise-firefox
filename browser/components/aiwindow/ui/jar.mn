@@ -88,6 +88,7 @@ browser.jar:
   content/browser/aiwindow/modules/ChatMarkdownParser.mjs           (modules/ChatMarkdownParser.mjs)
   content/browser/aiwindow/modules/ClientErrorTelemetry.mjs         (modules/ClientErrorTelemetry.mjs)
   content/browser/aiwindow/modules/SmartFormFillConstants.mjs       (modules/SmartFormFillConstants.mjs)
+  content/browser/aiwindow/modules/TrustedInternalURLs.mjs          (modules/TrustedInternalURLs.mjs)
   content/browser/aiwindow/components/SmartwindowOverflowRow.mjs    (components/smartwindow-overflow-row/SmartwindowOverflowRow.mjs)
   content/browser/aiwindow/components/smartwindow-overflow-row.css  (components/smartwindow-overflow-row/smartwindow-overflow-row.css)
   content/browser/aiwindow/components/context-icon-button.mjs       (components/context-icon-button/context-icon-button.mjs)

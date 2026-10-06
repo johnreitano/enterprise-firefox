@@ -933,26 +933,54 @@ export class Tabbrowser {
   // Begin forwarded browser properties. If you add a property to the browser
   // element, consider adding it here as well.
 
+  /**
+   * Whether the selected tab has a history entry to go back to.
+   */
   get canGoBack() {
     return this.selectedBrowser.canGoBack;
   }
 
+  /**
+   * Whether the selected tab has a history entry to go back to, counting
+   * entries the user never interacted with.
+   */
   get canGoBackIgnoringUserInteraction() {
     return this.selectedBrowser.canGoBackIgnoringUserInteraction;
   }
 
+  /**
+   * Whether the selected tab has a history entry to go forward to.
+   */
   get canGoForward() {
     return this.selectedBrowser.canGoForward;
   }
 
+  /**
+   * Goes back one entry in the selected tab's session history.
+   *
+   * @param {boolean} [requireUserInteraction]
+   *   Skip the entries the user never interacted with. Defaults to the
+   *   `browser.navigation.requireUserInteraction` pref.
+   */
   goBack(requireUserInteraction) {
     return this.selectedBrowser.goBack(requireUserInteraction);
   }
 
+  /**
+   * Goes forward one entry in the selected tab's session history.
+   *
+   * @param {boolean} [requireUserInteraction]
+   *   Skip the entries the user never interacted with. Defaults to the
+   *   `browser.navigation.requireUserInteraction` pref.
+   */
   goForward(requireUserInteraction) {
     return this.selectedBrowser.goForward(requireUserInteraction);
   }
 
+  /**
+   * Reloads the selected tab. Unlike `reloadWithFlags`, this ignores the
+   * other multiselected tabs.
+   */
   reload() {
     return this.selectedBrowser.reload();
   }
@@ -1044,6 +1072,9 @@ export class Tabbrowser {
     }
   }
 
+  /**
+   * Stops loading the selected tab.
+   */
   stop() {
     return this.selectedBrowser.stop();
   }
@@ -1067,54 +1098,99 @@ export class Tabbrowser {
     return this.selectedBrowser.fixupAndLoadURIString(uriString, params);
   }
 
-  gotoIndex(aIndex) {
-    return this.selectedBrowser.gotoIndex(aIndex);
+  /**
+   * Navigates the selected tab to an entry in its session history.
+   *
+   * @param {number} index
+   *   The index of the entry to load.
+   */
+  gotoIndex(index) {
+    return this.selectedBrowser.gotoIndex(index);
   }
 
+  /**
+   * The URI of the page in the selected tab.
+   */
   get currentURI() {
     return this.selectedBrowser.currentURI;
   }
 
+  /**
+   * The object that runs find in page for the selected tab.
+   */
   get finder() {
     return this.selectedBrowser.finder;
   }
 
+  /**
+   * The docshell of the selected tab, or null if its content is in another
+   * process, which is the usual case.
+   */
   get docShell() {
     return this.selectedBrowser.docShell;
   }
 
+  /**
+   * The navigation interface of the selected tab.
+   */
   get webNavigation() {
     return this.selectedBrowser.webNavigation;
   }
 
+  /**
+   * The web progress of the selected tab's top-level browsing context.
+   */
   get webProgress() {
     return this.selectedBrowser.webProgress;
   }
 
+  /**
+   * The content window of the selected tab, or null if its content is in
+   * another process, which is the usual case.
+   */
   get contentWindow() {
     return this.selectedBrowser.contentWindow;
   }
 
+  /**
+   * The session history of the selected tab.
+   */
   get sessionHistory() {
     return this.selectedBrowser.sessionHistory;
   }
 
+  /**
+   * The document of the selected tab, or null if its content is in another
+   * process, which is the usual case.
+   */
   get contentDocument() {
     return this.selectedBrowser.contentDocument;
   }
 
+  /**
+   * The page title of the selected tab.
+   */
   get contentTitle() {
     return this.selectedBrowser.contentTitle;
   }
 
+  /**
+   * The principal of the page loaded in the selected tab.
+   */
   get contentPrincipal() {
     return this.selectedBrowser.contentPrincipal;
   }
 
+  /**
+   * The security state of the page loaded in the selected tab.
+   */
   get securityUI() {
     return this.selectedBrowser.securityUI;
   }
 
+  /**
+   * The full zoom level of the selected tab.
+   */
   set fullZoom(val) {
     this.selectedBrowser.fullZoom = val;
   }
@@ -1123,6 +1199,9 @@ export class Tabbrowser {
     return this.selectedBrowser.fullZoom;
   }
 
+  /**
+   * The text zoom level of the selected tab.
+   */
   set textZoom(val) {
     this.selectedBrowser.textZoom = val;
   }
@@ -1131,10 +1210,19 @@ export class Tabbrowser {
     return this.selectedBrowser.textZoom;
   }
 
+  /**
+   * Whether the selected tab shows a document Gecko created to show an image or
+   * media file.
+   */
   get isSyntheticDocument() {
     return this.selectedBrowser.isSyntheticDocument;
   }
 
+  /**
+   * What the user typed into the address bar for the selected tab and has not
+   * loaded yet, or null if there is none. A location change in the tab resets
+   * it to null once a load has started since the user last typed.
+   */
   set userTypedValue(val) {
     this.selectedBrowser.userTypedValue = val;
   }
@@ -1164,12 +1252,21 @@ export class Tabbrowser {
     }
   }
 
-  isFindBarInitialized(aTab) {
-    return Tabbrowser.#findBars.has(aTab || this.selectedTab);
+  /**
+   * Whether the tab's findbar has been created. Unlike `getFindBar`, this
+   * never creates one, so code that only acts on an existing findbar can check
+   * without paying for it.
+   *
+   * @param {MozTabbrowserTab} [aTab]
+   *   Defaults to the selected tab.
+   */
+  isFindBarInitialized(aTab = this.selectedTab) {
+    return Tabbrowser.#findBars.has(aTab);
   }
 
   /**
-   * Get the already constructed findbar
+   * Returns the tab's findbar if it has been created, or undefined. Unlike
+   * `getFindBar`, this never creates one and returns synchronously.
    *
    * @param {MozTabbrowserTab} [aTab]
    *   Defaults to the selected tab.

@@ -117,6 +117,7 @@ class MediaQueryList;
 class OwningExternalOrWindowProxy;
 class Promise;
 class PostMessageEvent;
+class PushManager;
 struct RequestInit;
 class RequestOrUTF8String;
 class SharedWorker;
@@ -677,6 +678,8 @@ class nsGlobalWindowInner final : public mozilla::dom::EventTarget,
   }
 
   mozilla::dom::DocumentPictureInPicture* DocumentPictureInPicture();
+  mozilla::dom::PushManager* GetPushManager(JSContext* aCx,
+                                            mozilla::ErrorResult& aRv);
 
   // https://w3c.github.io/webappsec-secure-contexts/#dom-window-issecurecontext
   bool IsSecureContext() const;
@@ -1419,6 +1422,7 @@ class nsGlobalWindowInner final : public mozilla::dom::EventTarget,
   RefPtr<mozilla::dom::DocumentPictureInPicture> mDocumentPiP;
   RefPtr<mozilla::dom::Worklet> mPaintWorklet;
   RefPtr<mozilla::dom::External> mExternal;
+  RefPtr<mozilla::dom::PushManager> mPushManager;
 
   RefPtr<mozilla::dom::Storage> mLocalStorage;
   RefPtr<mozilla::dom::Storage> mSessionStorage;

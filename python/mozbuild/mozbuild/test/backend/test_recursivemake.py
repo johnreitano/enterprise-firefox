@@ -866,6 +866,33 @@ class TestRecursiveMakeBackend(BackendTester):
 
         self.assertTrue(os.path.isfile(mozpath.join(p, "Makefile")))
 
+        with open(mozpath.join(env.topobjdir, "root.mk")) as fh:
+            export_dirs = [l for l in fh.readlines() if l.startswith("export_dirs")]
+        self.assertEqual(export_dirs, ["export_dirs := config/makefiles/xpidl\n"])
+
+        with open(mozpath.join(env.topobjdir, "backend.mk")) as fh:
+            lines = fh.readlines()
+        self.assertIn(
+            "NONRECURSIVE_TARGETS_export_xpidl_DIRECTORY = "
+            "$(DEPTH)/config/makefiles/xpidl\n",
+            lines,
+        )
+        self.assertIn("NONRECURSIVE_TARGETS_export_xpidl_TARGETS += xpidl\n", lines)
+
+    def test_xpidl_without_compile_environment(self):
+        env = self._get_environment("xpidl-no-compile", srcdir_name="xpidl")
+        self._consume("xpidl", RecursiveMakeBackend, env=env)
+
+        install_dir = mozpath.join(env.topobjdir, "_build_manifests", "install")
+        self.assertFalse(os.path.exists(mozpath.join(install_dir, "xpidl")))
+        self.assertFalse(
+            os.path.exists(mozpath.join(env.topobjdir, "config/makefiles/xpidl"))
+        )
+
+        with open(mozpath.join(env.topobjdir, "root.mk")) as fh:
+            export_dirs = [l for l in fh.readlines() if l.startswith("export_dirs")]
+        self.assertEqual(export_dirs, ["export_dirs := \n"])
+
     def test_webidl_build_writes_cppsrcs(self):
         """Ensure _handle_webidl_build writes the unified variable into
         webidlsrcs.mk and CPPSRCS lines into dom/bindings/backend.mk, so that

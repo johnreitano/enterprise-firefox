@@ -1043,8 +1043,14 @@ void SMRegExpMacroAssembler::ClearRegisters(int reg_from, int reg_to) {
 void SMRegExpMacroAssembler::Push(Register source) {
   MOZ_ASSERT(source != backtrack_stack_pointer_);
 
+#ifdef JS_CODEGEN_ARM64
+  masm_.Str(js::jit::ARMRegister(source, 32),
+            vixl::MemOperand(js::jit::ARMRegister(backtrack_stack_pointer_, 64),
+                             -int32_t(sizeof(int32_t)), vixl::PreIndex));
+#else
   masm_.subPtr(Imm32(sizeof(int32_t)), backtrack_stack_pointer_);
   masm_.store32(source, Address(backtrack_stack_pointer_, 0));
+#endif
 }
 
 void SMRegExpMacroAssembler::Pop(Register target) {

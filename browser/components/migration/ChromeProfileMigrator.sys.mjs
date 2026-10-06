@@ -74,48 +74,6 @@ function convertBookmarks(items, bookmarkURLAccumulator, errorAccumulator) {
 }
 
 /**
- * Merge the children of the same Chrome bookmark root coming from several
- * bookmark files (e.g. "Bookmarks" and "AccountBookmarks"). URL items are
- * concatenated in order; folders with the same name are merged recursively so
- * that a subfolder present in more than one file yields a single folder holding
- * the items from all of them.
- *
- * @param {Array<Array<object>|undefined>} childrenArrays
- *   The per-file children arrays for a given root, in import order.
- * @returns {Array<object>} The merged list of Chrome bookmark items.
- */
-function mergeChromeBookmarkChildren(childrenArrays) {
-  let merged = [];
-  let foldersByName = new Map();
-  for (let children of childrenArrays) {
-    if (!children) {
-      continue;
-    }
-    for (let item of children) {
-      if (item.type == "folder") {
-        let existing = foldersByName.get(item.name);
-        if (existing) {
-          existing.children = mergeChromeBookmarkChildren([
-            existing.children,
-            item.children,
-          ]);
-          continue;
-        }
-        let folder = {
-          ...item,
-          children: mergeChromeBookmarkChildren([item.children]),
-        };
-        foldersByName.set(item.name, folder);
-        merged.push(folder);
-      } else {
-        merged.push(item);
-      }
-    }
-  }
-  return merged;
-}
-
-/**
  * Chrome profile migrator. This can also be used as a parent class for
  * migrators for browsers that are variants of Chrome.
  */
@@ -817,13 +775,13 @@ async function GetBookmarksResource(aProfileFolder, aBrowserKey) {
         // files becomes a single folder holding the items from both, rather
         // than a duplicate folder per file.
         let mergedRoots = {
-          bookmark_bar: mergeChromeBookmarkChildren(
+          bookmark_bar: lazy.ChromeMigrationUtils.mergeBookmarkChildren(
             bookmarkJSONs.map(json => json.roots.bookmark_bar?.children)
           ),
-          other: mergeChromeBookmarkChildren(
+          other: lazy.ChromeMigrationUtils.mergeBookmarkChildren(
             bookmarkJSONs.map(json => json.roots.other?.children)
           ),
-          synced: mergeChromeBookmarkChildren(
+          synced: lazy.ChromeMigrationUtils.mergeBookmarkChildren(
             bookmarkJSONs.map(json => json.roots.synced?.children)
           ),
         };

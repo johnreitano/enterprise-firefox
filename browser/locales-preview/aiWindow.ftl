@@ -6,8 +6,8 @@
 
 # Toolbar button that opens the panel where the user creates a monitor
 smartwindow-monitor-button =
-    .label = Monitors
-    .tooltiptext = Monitors
+    .label = Tasks
+    .tooltiptext = Tasks
 
 # Title of the panel opened by the toolbar button above
 smartwindow-monitor-panel-title = Tasks
@@ -38,8 +38,14 @@ smartwindow-monitor-panel-manage = Manage and view all tasks
 # a user-created task in Smart Window that watches a web page and alerts the
 # user when a condition they described is met.
 # The user-facing name is not final.
-ai-tasks-monitor-notification-title = { -smart-window-brand-name } monitor agent
-ai-tasks-monitor-notification-body = Found what you’re watching for.
+ai-tasks-monitor-notification-title = Match found
+# Variables:
+#   $pageCount (Number) - How many pages the monitor watches
+ai-tasks-monitor-notification-body =
+    { $pageCount ->
+        [one] { -smart-window-brand-name } found a match on a page you’re watching.
+       *[other] { -smart-window-brand-name } found a match on pages you’re watching.
+    }
 ai-tasks-monitor-notification-snooze = Snooze
 ai-tasks-monitor-notification-dismiss = Dismiss
 

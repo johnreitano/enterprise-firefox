@@ -759,6 +759,9 @@ linux64-reproduced/opt:
         max-run-time: 9000
         env:
             PERFHERDER_EXTRA_OPTIONS: repr
+            # Must match linux64-shippable/opt: configure options end up in
+            # buildconfig.html inside omni.ja, which diffoscope compares.
+            MOZ_GENERATE_SBOM: "1"
     run:
         using: mozharness
         actions: [get-secrets, build]

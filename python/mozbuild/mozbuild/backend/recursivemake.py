@@ -185,9 +185,10 @@ class BackendMakeFile:
             self.fh.write("NONRECURSIVE_TARGETS += export\n")
             self.fh.write("NONRECURSIVE_TARGETS_export += xpidl\n")
             self.fh.write(
-                "NONRECURSIVE_TARGETS_export_xpidl_DIRECTORY = $(DEPTH)/xpcom/xpidl\n"
+                "NONRECURSIVE_TARGETS_export_xpidl_DIRECTORY = "
+                "$(DEPTH)/config/makefiles/xpidl\n"
             )
-            self.fh.write("NONRECURSIVE_TARGETS_export_xpidl_TARGETS += export\n")
+            self.fh.write("NONRECURSIVE_TARGETS_export_xpidl_TARGETS += xpidl\n")
 
         return self.fh.close()
 
@@ -1303,6 +1304,11 @@ class RecursiveMakeBackend(MakeBackend):
         rules = StringIO()
         mk.dump(rules, removal_guard=False)
 
+        xpidl_dir = "config/makefiles/xpidl"
+        self._traversal.add("", dirs=[xpidl_dir])
+        self._traversal.add(xpidl_dir)
+        self._no_skip["export"].add(xpidl_dir)
+
         # Create dependency for output header so we force regeneration if the
         # header was deleted. This ideally should not be necessary. However,
         # some processes (such as PGO at the time this was implemented) wipe
@@ -1310,10 +1316,10 @@ class RecursiveMakeBackend(MakeBackend):
 
         obj = self.Substitution()
         obj.output_path = mozpath.join(
-            self.environment.topobjdir, "config", "makefiles", "xpidl", "Makefile"
+            self.environment.topobjdir, xpidl_dir, "Makefile"
         )
         obj.input_path = mozpath.join(
-            self.environment.topsrcdir, "config", "makefiles", "xpidl", "Makefile.in"
+            self.environment.topsrcdir, xpidl_dir, "Makefile.in"
         )
         obj.topsrcdir = self.environment.topsrcdir
         obj.topobjdir = self.environment.topobjdir

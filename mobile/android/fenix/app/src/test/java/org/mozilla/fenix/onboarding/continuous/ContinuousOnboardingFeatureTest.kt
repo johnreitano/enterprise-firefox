@@ -56,7 +56,7 @@ class ContinuousOnboardingFeatureTest {
     private lateinit var activity: Activity
     private lateinit var settings: Settings
     private lateinit var telemetryRecorder: OnboardingTelemetryRecorder
-    private lateinit var stageProvider: ContinuousOnboardingStageProvider
+    private lateinit var stageProvider: FakeContinuousOnboardingStageProvider
     private lateinit var dateTimeProvider: DateTimeProvider
     private lateinit var ipProtectionStore: IPProtectionStore
     private lateinit var ipProtectionPromptRepository: FakeIPProtectionPromptRepository
@@ -94,45 +94,36 @@ class ContinuousOnboardingFeatureTest {
             )
     }
 
-    // shouldShowContinuousOnboarding
+    // start() gating
 
     @Test
-    fun `WHEN feature disabled THEN shouldShowContinuousOnboarding returns false`() {
+    fun `WHEN feature disabled THEN start does not evaluate the stage`() {
         settings.continuousOnboardingFeatureEnabled = false
+        settings.seventhDayOnboardingCompletedTimestamp = -1
 
-        assertFalse(feature.shouldShowContinuousOnboarding())
+        feature.start()
+
+        assertEquals(0, stageProvider.callCount)
     }
 
     @Test
-    fun `WHEN feature enabled and seventh day completed THEN shouldShowContinuousOnboarding returns false`() {
+    fun `WHEN feature enabled and seventh day completed THEN start does not evaluate the stage`() {
         settings.continuousOnboardingFeatureEnabled = true
         settings.seventhDayOnboardingCompletedTimestamp = dateTimeProvider.currentTimeMillis()
 
-        assertFalse(feature.shouldShowContinuousOnboarding())
+        feature.start()
+
+        assertEquals(0, stageProvider.callCount)
     }
 
     @Test
-    fun `WHEN feature enabled and seventh day not completed THEN shouldShowContinuousOnboarding returns true`() {
+    fun `WHEN feature enabled and seventh day not completed THEN start evaluates the stage`() {
         settings.continuousOnboardingFeatureEnabled = true
         settings.seventhDayOnboardingCompletedTimestamp = -1
 
-        assertTrue(feature.shouldShowContinuousOnboarding())
-    }
+        feature.start()
 
-    @Test
-    fun `WHEN feature enabled and only second day completed THEN shouldShowContinuousOnboarding returns true`() {
-        settings.continuousOnboardingFeatureEnabled = true
-        settings.secondDayOnboardingCompletedTimestamp = dateTimeProvider.currentTimeMillis()
-
-        assertTrue(feature.shouldShowContinuousOnboarding())
-    }
-
-    @Test
-    fun `WHEN feature enabled and only third day completed THEN shouldShowContinuousOnboarding returns true`() {
-        settings.continuousOnboardingFeatureEnabled = true
-        settings.thirdDayOnboardingCompletedTimestamp = dateTimeProvider.currentTimeMillis()
-
-        assertTrue(feature.shouldShowContinuousOnboarding())
+        assertEquals(1, stageProvider.callCount)
     }
 
     // syncOnboardingPageState

@@ -90,6 +90,9 @@ class ResourceHandler(LogHandler):
     def assertion_failure(self, data):
         self.resources.assertion_failure(data)
 
+    def ubsan_error(self, data):
+        self.resources.ubsan_error(data)
+
     def mozleak_object(self, data):
         self.resources.mozleak_object(data)
 

@@ -28,6 +28,7 @@ const PREF_SYSTEM_USES_DARK_THEME = "ui.systemUsesDarkTheme";
 // affect the (chrome-only) theme preview color scheme.
 const PREF_CONTENT_COLOR_SCHEME_OVERRIDE =
   "layout.css.prefers-color-scheme.content-override";
+const PREF_LINK_PARAMETERS_ENABLED = "layout.css.link-parameters.enabled";
 
 const DEFAULT_THEME_ID = "default-theme@mozilla.org";
 const LIGHT_THEME_ID = "firefox-compact-light@mozilla.org";
@@ -433,10 +434,16 @@ add_task(async function test_default_and_extra_themes_preview_color_scheme() {
 add_task(async function test_themes_preview_rtl() {
   const TEST_THEME_ID = "rtl-test-theme@mochi.test";
 
+  // link-parameters is enabled in chrome on all channels, and so it applies to
+  // about:addons everywhere, but getComputedStyle only exposes properties that
+  // are enabled for all content (see nsComputedDOMStyle's Entry::IsEnabled).
+  // Enable the pref so that the computed link-parameters assertions below can
+  // also inspect the resolved param values on non-Nightly channels.
   await SpecialPowers.pushPrefEnv({
     set: [
       [PREF_NOVA_ENABLED, true],
       [PREF_NOVA_THEMES_PICKER, true],
+      [PREF_LINK_PARAMETERS_ENABLED, true],
     ],
   });
 
@@ -482,12 +489,19 @@ add_task(async function test_themes_preview_rtl() {
         expectedLinkParameters.join(", "),
         `"${themeId}" preview image has the expected link-parameters`
       );
+      const expectedRtlFlip = isRTL ? "scaleX(-1)" : "none";
+      Assert.equal(
+        win
+          .getComputedStyle(img)
+          .getPropertyValue("--theme-preview-rtl-flip")
+          .trim(),
+        expectedRtlFlip,
+        `"${themeId}" preview image inherits the expected --theme-preview-rtl-flip value (RTL: ${isRTL})`
+      );
       Assert.ok(
         win
           .getComputedStyle(img)
-          .linkParameters.includes(
-            `param(--rtl-flip, ${isRTL ? "scaleX(-1)" : "none"})`
-          ),
+          .linkParameters.includes(`param(--rtl-flip, ${expectedRtlFlip})`),
         `"${themeId}" preview image has the expected computed --rtl-flip link-parameter (RTL: ${isRTL})`
       );
       Assert.equal(

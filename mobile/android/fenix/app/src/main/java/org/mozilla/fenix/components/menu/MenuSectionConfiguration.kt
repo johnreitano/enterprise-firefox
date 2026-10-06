@@ -80,6 +80,18 @@ sealed interface FenixMenuItem {
     /** A menu item allowing to navigate back. */
     data object Back : FenixMenuItem
 
+    /** A menu item allowing to open the history screen. */
+    data object History : FenixMenuItem
+
+    /** A menu item allowing to open the bookmarks screen. */
+    data object Bookmarks : FenixMenuItem
+
+    /** A menu item allowing to open the downloads screen. */
+    data object Downloads : FenixMenuItem
+
+    /** A menu item allowing to open the passwords screen. */
+    data object Passwords : FenixMenuItem
+
     /** A menu item allowing to navigate forward. */
     data object Forward : FenixMenuItem
 

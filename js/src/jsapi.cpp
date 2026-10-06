@@ -435,6 +435,13 @@ JS::ContextOptions& JS::ContextOptions::setFuzzing(bool flag) {
   return *this;
 }
 
+JS::ContextOptions& JS::ContextOptions::setWasmDisablesDenormals() {
+#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
+  wasmDisablesDenormals_ = true;
+#endif
+  return *this;
+}
+
 JS_PUBLIC_API const char* JS_GetImplementationVersion(void) {
   return "JavaScript-C" MOZILLA_VERSION;
 }
@@ -3078,7 +3085,11 @@ JS_PUBLIC_API bool JS::RejectPromise(JSContext* cx, JS::HandleObject promiseObj,
 }
 
 JS_PUBLIC_API bool JS::SafeResolve(JSContext* cx, JS::HandleObject promiseObj,
-                                   JS::HandleValue resolutionValue) {
+                                   JS::HandleValue resolutionValue,
+                                   bool* deferred) {
+  if (deferred) {
+    *deferred = false;
+  }
   AssertHeapIsIdle();
   CHECK_THREAD(cx);
   cx->check(promiseObj, resolutionValue);
@@ -3102,7 +3113,7 @@ JS_PUBLIC_API bool JS::SafeResolve(JSContext* cx, JS::HandleObject promiseObj,
     promise = promiseObj.as<PromiseObject>();
   }
 
-  return js::SafeResolvePromise(cx, promise, resolution);
+  return js::SafeResolvePromise(cx, promise, resolution, deferred);
 }
 
 JS_PUBLIC_API JSObject* JS::CallOriginalPromiseThen(

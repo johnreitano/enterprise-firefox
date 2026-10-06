@@ -638,6 +638,8 @@ Did you run with --create-virtualenv? Is mozinstall in virtualenv_modules?"""
         self.mkdir_p(target_dir)
         if not installer_path:
             installer_path = self.installer_path
+        if installer_path.endswith(".dmg"):
+            cmd.append("--no-verify")
         cmd.extend([installer_path, "--destination", target_dir])
         # TODO we'll need some error checking here
         return self.get_output_from_command(

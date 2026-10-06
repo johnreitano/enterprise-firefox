@@ -1343,6 +1343,7 @@ browsertime-speculation-rules:
             - [prefetch-list-eager, pfl-eag]
             - [prefetch-list-moderate, pfl-mod]
             - [prefetch-list-conservative, pfl-con]
+            - [prefetch-list-inflight, pfl-inf]
     description: Raptor (browsertime) Speculation Rules prefetch pageload test
     limit-platforms:
         by-app:

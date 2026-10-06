@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
+import mozilla.appservices.places.BookmarkRoot
 import mozilla.components.ExperimentalAndroidComponentsApi
 import mozilla.components.browser.state.state.BrowserState
 import mozilla.components.browser.state.state.ContentState
@@ -964,6 +965,62 @@ class MenuMiddlewareTest {
         verify {
             navController.popBackStack(R.id.menuFragment, true)
             printContentUseCase(tabId = TAB_ID)
+        }
+    }
+
+    @Test
+    fun `WHEN handling history navigation THEN open the history screen and dismiss the menu`() {
+        val store = createStore()
+
+        store.dispatch(Navigate.History)
+
+        verify {
+            navController.navigate(
+                NavGraphDirections.actionGlobalHistoryFragment(),
+                optionsEq(NavOptions.Builder().setPopUpTo(R.id.browserFragment, false).build()),
+            )
+        }
+    }
+
+    @Test
+    fun `WHEN handling bookmarks navigation THEN open the bookmarks screen and dismiss the menu`() {
+        val store = createStore()
+
+        store.dispatch(Navigate.Bookmarks)
+
+        verify {
+            navController.navigate(
+                NavGraphDirections.actionGlobalBookmarkFragment(BookmarkRoot.Mobile.id),
+                optionsEq(NavOptions.Builder().setPopUpTo(R.id.browserFragment, false).build()),
+            )
+        }
+    }
+
+    @Test
+    fun `WHEN handling downloads navigation THEN open the downloads screen and dismiss the menu`() {
+        val store = createStore()
+
+        store.dispatch(Navigate.Downloads)
+
+        verify {
+            navController.navigate(
+                NavGraphDirections.actionGlobalDownloadsFragment(),
+                optionsEq(NavOptions.Builder().setPopUpTo(R.id.browserFragment, false).build()),
+            )
+        }
+    }
+
+    @Test
+    fun `WHEN handling passwords navigation THEN open the saved passwords list and dismiss the menu`() {
+        val store = createStore()
+
+        store.dispatch(Navigate.Passwords)
+
+        verify {
+            navController.navigate(
+                MenuFragmentDirections.actionMenuFragmentToLoginsListFragment(),
+                optionsEq(NavOptions.Builder().setPopUpTo(R.id.browserFragment, false).build()),
+            )
         }
     }
 

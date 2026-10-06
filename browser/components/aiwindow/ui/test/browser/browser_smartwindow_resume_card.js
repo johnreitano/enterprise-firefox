@@ -3,6 +3,10 @@
 
 "use strict";
 
+const { ToolUI } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/aiwindow/ui/modules/ToolUI.sys.mjs"
+);
+
 // Opening an AI Window records usage timestamps at runtime.
 registerCleanupFunction(() => {
   for (const pref of [
@@ -21,6 +25,12 @@ const SAMPLE_CONTENT = {
   status: "Reviewed venue quotes and the calendar poll for next week.",
   previewTabs: [{ url: "https://a.example/" }, { url: "https://b.example/" }],
 };
+
+const RESUME_ACTIVITY_PREFS = [
+  ["browser.smartwindow.memories.generateFromConversation", true],
+  ["browser.smartwindow.memories.generateFromHistory", true],
+  ["browser.smartwindow.resumeCards.enabled", true],
+];
 
 async function ensureCardDefined(doc) {
   if (doc.defaultView.customElements.get("smartwindow-resume-card")) {
@@ -42,6 +52,41 @@ async function createResumeCard(doc, { content, journeyId = "memory-1" }) {
   doc.body.appendChild(el);
   await el.updateComplete;
   return el;
+}
+
+/**
+ * Runs a test callback with a generated, rendered resume card.
+ *
+ * @param {Function} stub - Resume-activity generation stub
+ * @param {Function} run - Receives {win, aiWindow, section, card, memories}
+ */
+async function withRenderedResumeCard(stub, run) {
+  await SpecialPowers.pushPrefEnv({ set: RESUME_ACTIVITY_PREFS });
+
+  const { memories, cleanup } = await stub();
+  let win;
+  try {
+    win = await openAIWindow();
+    const browser = win.gBrowser.selectedBrowser;
+    const aiWindow = await TestUtils.waitForCondition(
+      () => browser.contentDocument?.querySelector("ai-window"),
+      "Wait for ai-window element"
+    );
+    const section = await TestUtils.waitForCondition(
+      () => aiWindow.shadowRoot.querySelector("smartwindow-resume-section"),
+      "Wait for smartwindow-resume-section element"
+    );
+    const card = await TestUtils.waitForCondition(
+      () => section.shadowRoot.querySelector("smartwindow-resume-card"),
+      "Wait for a resume card to render"
+    );
+    await run({ win, aiWindow, section, card, memories });
+  } finally {
+    if (win) {
+      await BrowserTestUtils.closeWindow(win);
+    }
+    await cleanup();
+  }
 }
 
 add_task(async function test_resume_card_rendering() {
@@ -286,6 +331,12 @@ add_task(async function test_resume_card_click_closing_menu_does_not_resume() {
       new MouseEvent("mousedown", { bubbles: true, composed: true })
     );
     title.dispatchEvent(
+      new PointerEvent("pointerup", { bubbles: true, composed: true })
+    );
+    title.dispatchEvent(
+      new MouseEvent("mouseup", { bubbles: true, composed: true })
+    );
+    title.dispatchEvent(
       new PointerEvent("click", { bubbles: true, composed: true, detail: 1 })
     );
     await hidden;
@@ -310,69 +361,138 @@ add_task(async function test_resume_card_click_closing_menu_does_not_resume() {
 });
 
 add_task(async function test_resume_card_snooze_dismisses_for_session() {
-  await SpecialPowers.pushPrefEnv({
-    set: [
-      ["browser.smartwindow.memories.generateFromConversation", true],
-      ["browser.smartwindow.memories.generateFromHistory", true],
-      ["browser.smartwindow.resumeCards.enabled", true],
-    ],
-  });
-
   const sb = sinon.createSandbox();
-  let win;
   try {
-    const { memories, cleanup } = await stubResumeActivityGeneration(sb);
-    try {
-      win = await openAIWindow();
-      const browser = win.gBrowser.selectedBrowser;
-      const aiWindow = await TestUtils.waitForCondition(
-        () => browser.contentDocument?.querySelector("ai-window"),
-        "Wait for ai-window element"
-      );
-      const section = await TestUtils.waitForCondition(
-        () => aiWindow.shadowRoot.querySelector("smartwindow-resume-section"),
-        "Wait for smartwindow-resume-section element"
-      );
-      const card = await TestUtils.waitForCondition(
-        () => section.shadowRoot.querySelector("smartwindow-resume-card"),
-        "Wait for a resume card to render"
-      );
+    await withRenderedResumeCard(
+      () => stubResumeActivityGeneration(sb),
+      async ({ aiWindow, section, card, memories }) => {
+        // stubResumeActivityGeneration only produces one valid journey.
+        const [{ id: journeyId }] = memories;
 
-      // stubResumeActivityGeneration only produces one valid journey.
-      const [{ id: journeyId }] = memories;
+        card.dispatchEvent(
+          new CustomEvent("smartwindow-resume-card:menu-item-selected", {
+            detail: { journeyId, itemId: "snooze" },
+            bubbles: true,
+            composed: true,
+          })
+        );
+        await aiWindow.updateComplete;
+        await section.updateComplete;
 
-      card.dispatchEvent(
-        new CustomEvent("smartwindow-resume-card:menu-item-selected", {
-          detail: { journeyId, itemId: "snooze" },
-          bubbles: true,
-          composed: true,
-        })
-      );
-      await aiWindow.updateComplete;
-      await section.updateComplete;
-
-      Assert.equal(
-        section.shadowRoot.querySelector("smartwindow-resume-card"),
-        null,
-        "Snoozing the only card should remove it"
-      );
-      Assert.equal(
-        section.shadowRoot.querySelector(".resume-section-empty-heading")
-          .dataset.l10nId,
-        "aiwindow-resume-section-empty-all-dismissed-heading",
-        "Snoozing the last card should show the all-dismissed empty state"
-      );
-      Assert.ok(
-        ResumeActivity.isMemoryDismissed(journeyId),
-        "Snoozing should record the dismissal so it doesn't reappear this session"
-      );
-    } finally {
-      await cleanup();
-    }
+        Assert.equal(
+          section.shadowRoot.querySelector("smartwindow-resume-card"),
+          null,
+          "Snoozing the only card should remove it"
+        );
+        Assert.equal(
+          section.shadowRoot.querySelector(".resume-section-empty-heading")
+            .dataset.l10nId,
+          "aiwindow-resume-section-empty-all-dismissed-heading",
+          "Snoozing the last card should show the all-dismissed empty state"
+        );
+        Assert.ok(
+          ResumeActivity.isMemoryDismissed(journeyId),
+          "Snoozing should record the dismissal so it doesn't reappear this session"
+        );
+      }
+    );
   } finally {
-    if (win) {
-      await BrowserTestUtils.closeWindow(win);
-    }
+    sb.restore();
+  }
+});
+
+add_task(async function test_resume_card_open_tabs_opens_tab_group() {
+  const sb = sinon.createSandbox();
+  try {
+    await withRenderedResumeCard(
+      () => stubResumeActivityGeneration(sb),
+      async ({ win, card, memories }) => {
+        // stubResumeActivityGeneration only produces one valid journey.
+        const [{ id: journeyId }] = memories;
+        const { previewTabs } = card.content;
+
+        const openAndGroupTabsStub = sb
+          .stub(ToolUI, "openAndGroupTabs")
+          .resolves({ success: true, group: { id: "group-1" } });
+
+        card.dispatchEvent(
+          new CustomEvent("smartwindow-resume-card:menu-item-selected", {
+            detail: { journeyId, itemId: "open-tabs" },
+            bubbles: true,
+            composed: true,
+          })
+        );
+
+        await TestUtils.waitForCondition(
+          () => openAndGroupTabsStub.called,
+          "Wait for ToolUI.openAndGroupTabs to be called"
+        );
+
+        const [{ tabs, window: openWindow }] =
+          openAndGroupTabsStub.firstCall.args;
+        Assert.deepEqual(
+          tabs,
+          previewTabs,
+          "Should open every preview tab, not just the visible favicons"
+        );
+        Assert.equal(
+          openWindow,
+          win,
+          "Should open the tabs in the ai-window's chrome window"
+        );
+      }
+    );
+  } finally {
+    sb.restore();
+  }
+});
+
+add_task(async function test_resume_card_open_tabs_switches_to_single_tab() {
+  const sb = sinon.createSandbox();
+  try {
+    await withRenderedResumeCard(
+      () => stubResumeActivityGenerationPool(sb, 1),
+      async ({ win, card, memories }) => {
+        const [{ id: journeyId }] = memories;
+        const { previewTabs } = card.content;
+
+        const openOrSwitchToTabStub = sb
+          .stub(ToolUI, "openOrSwitchToTab")
+          .resolves({ success: true, switched: false });
+        const openAndGroupTabsStub = sb.stub(ToolUI, "openAndGroupTabs");
+
+        card.dispatchEvent(
+          new CustomEvent("smartwindow-resume-card:menu-item-selected", {
+            detail: { journeyId, itemId: "open-tabs" },
+            bubbles: true,
+            composed: true,
+          })
+        );
+
+        await TestUtils.waitForCondition(
+          () => openOrSwitchToTabStub.called,
+          "Wait for ToolUI.openOrSwitchToTab to be called"
+        );
+
+        const [{ tab, window: openWindow }] =
+          openOrSwitchToTabStub.firstCall.args;
+        Assert.deepEqual(
+          tab,
+          previewTabs[0],
+          "Should switch to the card's single preview tab"
+        );
+        Assert.equal(
+          openWindow,
+          win,
+          "Should open the tab in the ai-window's chrome window"
+        );
+        Assert.ok(
+          !openAndGroupTabsStub.called,
+          "Should not group a single tab"
+        );
+      }
+    );
+  } finally {
     sb.restore();
   }
 });
@@ -460,13 +580,7 @@ add_task(
 );
 
 add_task(async function test_resume_section_hide_clears_once_cards_reappear() {
-  await SpecialPowers.pushPrefEnv({
-    set: [
-      ["browser.smartwindow.memories.generateFromConversation", true],
-      ["browser.smartwindow.memories.generateFromHistory", true],
-      ["browser.smartwindow.resumeCards.enabled", true],
-    ],
-  });
+  await SpecialPowers.pushPrefEnv({ set: RESUME_ACTIVITY_PREFS });
 
   // Hiding the section while it was empty should not carry over once real
   // cards are shown - a later empty state should be a fresh occurrence,
@@ -548,13 +662,7 @@ add_task(async function test_resume_card_click_shows_confirmation_card() {
     sb.stub(openAIEngine, "build").resolves({});
     const fetchWithHistoryStub = sb.stub(Chat, "fetchWithHistory").resolves();
 
-    await SpecialPowers.pushPrefEnv({
-      set: [
-        ["browser.smartwindow.memories.generateFromConversation", true],
-        ["browser.smartwindow.memories.generateFromHistory", true],
-        ["browser.smartwindow.resumeCards.enabled", true],
-      ],
-    });
+    await SpecialPowers.pushPrefEnv({ set: RESUME_ACTIVITY_PREFS });
 
     const resumeActivityStubs = await stubResumeActivityGeneration(sb);
     let win;

@@ -1086,6 +1086,10 @@ enum class MozOp {
 #ifdef ENABLE_WASM_JSPI
   // Check that there is a WebAssembly.promising function ready to suspend to.
   GuardSuspending,
+
+  // Reinterpret an externref as (ref null $T) where $T is a cont type. This is
+  // unchecked, and must only be used on values known to be continuations.
+  ExternToCont,
 #endif
 
   Limit

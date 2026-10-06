@@ -131,6 +131,7 @@
   "panel/border/radius": "{Primitives$border/radius/medium}",
   "panel/box/shadow": "0 0 {Primitives$panel/box/shadow/margin} hsla(0, 0%, 0%, 0.2)",
   "panel/box/shadow/margin": 4,
+  "panel/footer/text/color": "inherit",
   "panel/padding": 16,
   "panel/padding/block": 4,
   "panel/separator/padding": "{Primitives$panel/separator/padding/block} {Primitives$panel/separator/padding/inline}",

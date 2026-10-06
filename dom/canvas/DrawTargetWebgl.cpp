@@ -4601,7 +4601,7 @@ already_AddRefed<PathCacheEntry> PathCache::FindOrInsertEntry(
     float aSigma) {
   HashNumber hash =
       PathCacheEntry::HashPath(aPath, aPattern, aTransform, aBounds, aOrigin);
-  for (const RefPtr<PathCacheEntry>& entry : GetChain(hash)) {
+  for (PathCacheEntry* entry : GetChain(hash)) {
     if (entry->MatchesPath(aPath, aPattern, aStrokeOptions, aStrokeMode,
                            aTransform, aBounds, aOrigin, hash, aSigma)) {
       return do_AddRef(entry);
@@ -4637,7 +4637,7 @@ already_AddRefed<PathCacheEntry> PathCache::FindEntry(
     float aSigma, bool aHasSecondaryHandle) {
   HashNumber hash =
       PathCacheEntry::HashPath(aPath, aPattern, aTransform, aBounds, aOrigin);
-  for (const RefPtr<PathCacheEntry>& entry : GetChain(hash)) {
+  for (PathCacheEntry* entry : GetChain(hash)) {
     if (entry->MatchesPath(aPath, aPattern, aStrokeOptions, aStrokeMode,
                            aTransform, aBounds, aOrigin, hash, aSigma) &&
         (!aHasSecondaryHandle || (entry->GetSecondaryHandle() &&
@@ -6084,7 +6084,7 @@ already_AddRefed<GlyphCacheEntry> GlyphCache::FindEntry(
   IntPoint offset = QuantizeOffset(aTransform, aQuantizeScale, aBuffer);
   IntPoint boundsOffset(offset.x / aQuantizeScale.x,
                         offset.y / aQuantizeScale.y);
-  for (const RefPtr<GlyphCacheEntry>& entry : GetChain(aHash)) {
+  for (GlyphCacheEntry* entry : GetChain(aHash)) {
     if (entry->MatchesGlyphs(aBuffer, aColor, aTransform, offset, boundsOffset,
                              aClipRect, aHash, aStrokeOptions)) {
       return do_AddRef(entry);

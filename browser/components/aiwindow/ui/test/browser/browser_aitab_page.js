@@ -7,27 +7,11 @@ const AITAB_PREF = "browser.smartwindow.aitab.enabled";
 const PAGE_NAME = "hotels_san_francisco_1.html";
 const PAGE_URL = `about:smartpage?page=${PAGE_NAME}`;
 
-const PAGE_CONFIG = {
-  header: {
-    type: "header",
-    eyebrow: "From your open tabs",
-    title: "Hotels in Lisbon",
-    subhead: "4 options gathered from your open tabs",
-  },
-  blocks: [
-    { type: "text", layout: "summary", title: "What you are comparing" },
-    { type: "table", layout: "comparison", title: "Nightly rates" },
-    { layout: "summary", title: "A block with no type" },
-  ],
-  footer: {
-    type: "footer",
-    text: "Keep it going",
-    buttons: [
-      { text: "Open the booking site", href: "https://example.com/book" },
-      { text: "Add a block", href: "app://views/add" },
-    ],
-  },
-};
+/* import-globals-from head_aitab.js */
+Services.scriptloader.loadSubScript(
+  getRootDirectory(gTestPath) + "head_aitab.js",
+  this
+);
 
 add_task(async function test_actor_registered_when_enabled() {
   await SpecialPowers.pushPrefEnv({ set: [[AITAB_PREF, true]] });
@@ -195,31 +179,21 @@ add_task(async function test_renders_page_config() {
       await header.updateComplete;
       Assert.equal(
         header.shadowRoot.querySelector(".aitab-title").textContent,
-        config.header.title,
+        config.children[0].title,
         "The header title is rendered"
       );
       Assert.equal(
         content.document.title,
-        config.header.title,
+        config.children[0].title,
         "The document title follows the header title so history shows it"
       );
       Assert.deepEqual(
         [...shadowRoot.querySelectorAll(".aitab-block")].map(
           block => block.dataset.blockType
         ),
-        ["text", "table"],
+        ["textblock", "timeline"],
         "Every typed block gets a placeholder that keeps its type, and a block with no type is skipped"
       );
-
-      const chips = [...shadowRoot.querySelectorAll(".aitab-chip")];
-      Assert.equal(chips.length, 2, "Both footer buttons are rendered");
-      Assert.equal(chips[0].localName, "a", "An https href becomes a link");
-      Assert.equal(
-        chips[0].target,
-        "_blank",
-        "The link opens in a new tab, leaving the generated page up"
-      );
-      Assert.equal(chips[1].localName, "span", "A non-http href stays inert");
     });
   });
 

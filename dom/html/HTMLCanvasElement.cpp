@@ -24,9 +24,11 @@
 #include "mozilla/ProfilerMarkers.h"
 #include "mozilla/StaticPrefs_privacy.h"
 #include "mozilla/dom/BlobImpl.h"
+#include "mozilla/dom/BrowsingContext.h"
 #include "mozilla/dom/CanvasCaptureMediaStream.h"
 #include "mozilla/dom/CanvasRenderingContext2D.h"
 #include "mozilla/dom/Document.h"
+#include "mozilla/dom/ElementInlines.h"
 #include "mozilla/dom/Event.h"
 #include "mozilla/dom/File.h"
 #include "mozilla/dom/GeneratePlaceholderCanvasData.h"
@@ -510,6 +512,7 @@ HTMLCanvasElement::~HTMLCanvasElement() { Destroy(); }
 
 void HTMLCanvasElement::Destroy() {
   if (mOffscreenDisplay) {
+    UnregisterActivityObserver();
     mOffscreenDisplay->DestroyElement();
     mOffscreenDisplay = nullptr;
     mImageContainer = nullptr;
@@ -1168,6 +1171,8 @@ OffscreenCanvas* HTMLCanvasElement::TransferControlToOffscreen(
   CSSIntSize sz = GetWidthHeight();
   mOffscreenDisplay =
       MakeRefPtr<OffscreenCanvasDisplayHelper>(this, sz.width, sz.height);
+  RegisterActivityObserver();
+  NotifyOwnerDocumentActivityChanged();
   mOffscreenCanvas = new OffscreenCanvas(win->AsGlobal(), sz.width, sz.height,
                                          backend, do_AddRef(mOffscreenDisplay),
                                          FragmentOrElement::GetLang());
@@ -1291,6 +1296,22 @@ void HTMLCanvasElement::FlushOffscreenCanvas() {
   if (mOffscreenDisplay) {
     mOffscreenDisplay->FlushForDisplay();
   }
+}
+
+void HTMLCanvasElement::NotifyOwnerDocumentActivityChanged() {
+  if (!mOffscreenDisplay) {
+    return;
+  }
+
+  BrowsingContext* bc = OwnerDoc()->GetBrowsingContext();
+  mOffscreenDisplay->SetPresentationEnabled(bc && bc->IsActive());
+}
+
+void HTMLCanvasElement::NodeInfoChanged(Document* aOldDoc) {
+  nsGenericHTMLElement::NodeInfoChanged(aOldDoc);
+
+  // The activity observer registration itself is moved over by nsINode::Adopt.
+  NotifyOwnerDocumentActivityChanged();
 }
 
 void HTMLCanvasElement::InvalidateCanvasPlaceholder(uint32_t aWidth,

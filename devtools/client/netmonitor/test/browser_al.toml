@@ -133,9 +133,6 @@ support-files = [
 ["browser_net_block-context.js"]
 
 ["browser_net_block-csp.js"]
-fail-if = [
-  "a11y_checks", # Bug 1849028 clicked element may not be focusable and/or labeled
-]
 
 ["browser_net_block-draganddrop.js"]
 
@@ -268,9 +265,6 @@ skip-if = [
 ["browser_net_fission_switch_target.js"]
 
 ["browser_net_fonts.js"]
-fail-if = [
-  "a11y_checks", # Bug 1849028 clicked element may not be focusable and/or labeled
-]
 
 ["browser_net_footer-summary.js"]
 

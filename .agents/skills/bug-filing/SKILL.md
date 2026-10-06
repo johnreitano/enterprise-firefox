@@ -60,6 +60,10 @@ created under their own account with a chance to review and adjust.
    every later request in the session. If the user asked only for a summary and
    description, print those instead and stop.
 
+   A request to file a bug, in any wording, means opening this form. Never create
+   the bug yourself, even with a Bugzilla API key at hand: the form is the user's
+   only chance to review the text before it goes public under their name.
+
    Run the helper script with each Bugzilla
    `enter_bug.cgi` field as a `field=value` argument; it URL-encodes the values and
    opens the form in the browser (cross-platform, so Linux, macOS, and Windows all work):

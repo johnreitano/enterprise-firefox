@@ -64,6 +64,11 @@ fail-if = [
   "true",
 ]
 
+["browser_fail_mouse_left_down.js"]
+fail-if = ["true"]
+
+["browser_fail_mouse_left_down_next.js"]
+
 ["browser_fail_throw.js"]
 fail-if = [
   "true",

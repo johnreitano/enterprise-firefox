@@ -2,7 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { checkAccessKeys } from "./accesskey-check.mjs";
+import { checkAccessKeys } from "chrome://global/content/elements/accesskey-check.mjs";
+import { assignAutoAccessKeys } from "chrome://global/content/elements/auto-accesskey.mjs";
 
 export class PanelList extends HTMLElement {
   static get observedAttributes() {
@@ -666,6 +667,8 @@ export class PanelList extends HTMLElement {
       }
     }
     let letter = key.toLowerCase();
+    // TODO(bug 2076174): Match the first character in the label that a key
+    // press can type.
     let startsWithLetter = item =>
       !item.hasAttribute("accesskey") &&
       (item.label?.textContent ?? item.textContent)
@@ -804,6 +807,7 @@ export class PanelList extends HTMLElement {
 
   async onShow() {
     this.sendEvent("showing");
+    assignAutoAccessKeys(this);
 
     if (this.lastAnchorNode?.hasSubmenu) {
       await this.setSubmenuAlign();
@@ -881,9 +885,18 @@ export class PanelItem extends HTMLElement {
   #initialized = false;
   #defaultSlot;
   #badge;
+  #shortcut;
 
   static get observedAttributes() {
-    return ["accesskey", "type", "disabled", "badge-type", "aria-haspopup"];
+    return [
+      "accesskey",
+      "type",
+      "disabled",
+      "badge-type",
+      "shortcut",
+      "aria-haspopup",
+      "aria-keyshortcuts",
+    ];
   }
 
   constructor() {
@@ -906,6 +919,7 @@ export class PanelItem extends HTMLElement {
 
     this.button.appendChild(this.label);
     this.#updateBadge();
+    this.#updateShortcut();
 
     let supportLinkSlot = document.createElement("slot");
     supportLinkSlot.name = "support-link";
@@ -1032,11 +1046,14 @@ export class PanelItem extends HTMLElement {
     } else if (
       name === "type" ||
       name === "disabled" ||
-      name === "aria-haspopup"
+      name === "aria-haspopup" ||
+      name === "aria-keyshortcuts"
     ) {
       this.#setButtonAttributes();
     } else if (name === "badge-type") {
       this.#updateBadge();
+    } else if (name === "shortcut") {
+      this.#updateShortcut();
     }
   }
 
@@ -1057,6 +1074,14 @@ export class PanelItem extends HTMLElement {
     } else {
       this.button.removeAttribute("aria-haspopup");
     }
+    if (this.hasAttribute("aria-keyshortcuts")) {
+      this.button.setAttribute(
+        "aria-keyshortcuts",
+        this.getAttribute("aria-keyshortcuts")
+      );
+    } else {
+      this.button.removeAttribute("aria-keyshortcuts");
+    }
   }
 
   #updateBadge() {
@@ -1069,6 +1094,22 @@ export class PanelItem extends HTMLElement {
     } else if (this.#badge) {
       this.#badge.remove();
       this.#badge = null;
+    }
+  }
+
+  #updateShortcut() {
+    if (this.hasAttribute("shortcut")) {
+      if (!this.#shortcut) {
+        this.#shortcut = document.createElement("span");
+        this.#shortcut.className = "shortcut";
+        this.#shortcut.setAttribute("part", "shortcut");
+        this.#shortcut.setAttribute("aria-hidden", "true");
+        (this.#badge ?? this.label).after(this.#shortcut);
+      }
+      this.#shortcut.textContent = this.getAttribute("shortcut");
+    } else if (this.#shortcut) {
+      this.#shortcut.remove();
+      this.#shortcut = null;
     }
   }
 

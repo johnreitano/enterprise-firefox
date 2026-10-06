@@ -744,6 +744,7 @@ export class UrlbarView {
     let ns = "http://www.w3.org/1999/xhtml";
     let overlay = doc.createElementNS(ns, "div");
     overlay.className = "urlbarView-tail150-overlay";
+    overlay.setAttribute("popover", "manual");
 
     let closeBtn = doc.createElementNS(ns, "div");
     closeBtn.className = "close-button";
@@ -759,6 +760,7 @@ export class UrlbarView {
     overlay.append(closeBtn, canvas);
 
     this.input.appendChild(overlay);
+    overlay.showPopover();
     this.#tail150 = { overlay, keyHandler: null };
     this.#runTail150(canvas);
   }
@@ -919,6 +921,13 @@ export class UrlbarView {
   }
 
   // UrlbarChildController listener methods.
+
+  /**
+   * Called when a query starts.
+   *
+   * @param {UrlbarQueryContext} queryContext
+   *   The context of the query.
+   */
   onQueryStarted(queryContext) {
     this.#queryWasCancelled = false;
     this.#queryUpdatedResults = false;
@@ -936,11 +945,20 @@ export class UrlbarView {
     this.#cacheL10nStrings();
   }
 
+  /**
+   * Called when a query is canceled. `onQueryFinished` still follows.
+   */
   onQueryCancelled() {
     this.#queryWasCancelled = true;
     this.#cancelRemoveStaleRowsTimer();
   }
 
+  /**
+   * Called when a query is done, including when it was canceled.
+   *
+   * @param {UrlbarQueryContext} queryContext
+   *   The context of the query.
+   */
   onQueryFinished(queryContext) {
     this.#cancelRemoveStaleRowsTimer();
     if (this.#queryWasCancelled) {
@@ -991,6 +1009,12 @@ export class UrlbarView {
     });
   }
 
+  /**
+   * Called when a query has new results.
+   *
+   * @param {UrlbarQueryContext} queryContext
+   *   The context of the query, with all of its results so far in `results`.
+   */
   onQueryResults(queryContext) {
     this.queryContextCache.put(queryContext);
     this.#queryContext = queryContext;

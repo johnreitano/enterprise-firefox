@@ -618,6 +618,7 @@ class LoginsTest {
         bug = 2075586,
         since = "2026-09",
     )
+    @Critical
     @Test
     @SkipLeaks(reasons = ["https://bugzilla.mozilla.org/show_bug.cgi?id=1935209"])
     fun doNotSaveOptionWillNotUpdateALoginTest() {

@@ -1,5 +1,13 @@
 "use strict";
 
+add_setup(async function () {
+  // Right-clicking text selects the word under the cursor on macOS, which adds
+  // a selection to the context menu this test checks.
+  await SpecialPowers.pushPrefEnv({
+    set: [["ui.mouse.right_click.select_under_cursor", false]],
+  });
+});
+
 // Make sure that we won't trigger events for a private window.
 add_task(async function test_no_show_hide_for_private_window() {
   function background() {

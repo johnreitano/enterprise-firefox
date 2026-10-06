@@ -334,6 +334,9 @@ export class LoginDataSource extends DataSourceBase {
         },
         executeReveal: {
           value() {
+            if (!Services.policies.isAllowed("passwordReveal")) {
+              return;
+            }
             this.concealed = false;
             clearTimeout(this.concealPasswordTimeout);
             this.concealPasswordTimeout = setTimeout(

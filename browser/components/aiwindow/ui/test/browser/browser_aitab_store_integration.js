@@ -3,6 +3,12 @@
 
 "use strict";
 
+/* import-globals-from head_aitab.js */
+Services.scriptloader.loadSubScript(
+  getRootDirectory(gTestPath) + "head_aitab.js",
+  this
+);
+
 const AITAB_PREF = "browser.smartwindow.aitab.enabled";
 const UNKNOWN_SLUG = "unknown-slug";
 const STORED_SLUG = "stored-slug";
@@ -70,13 +76,12 @@ describe("about:smartpage store integration", () => {
         convId: "stored-conversation",
         slug: STORED_SLUG,
         title: "Stored AI Tab",
-        components: [
-          {
-            type: "text",
-            layout: "summary",
-            title: "Stored component",
+        components: {
+          surface: {
+            components: [],
+            dataModel: {},
           },
-        ],
+        },
       });
     });
 

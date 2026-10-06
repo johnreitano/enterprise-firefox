@@ -1500,6 +1500,10 @@ export var Policies = {
     onBeforeUIStartup(manager, param) {
       if (param) {
         manager.disallowFeature("passwordReveal");
+        lazy.PoliciesUtils.setAndLockPref(
+          "layout.forms.reveal-password-button.enabled",
+          false
+        );
       }
     },
   },

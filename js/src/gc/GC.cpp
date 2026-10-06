@@ -250,6 +250,7 @@
 #include "js/HeapAPI.h"  // JS::GCCellPtr
 #include "js/Printer.h"
 #include "js/SliceBudget.h"
+#include "util/Denormals.h"
 #include "util/DifferentialTesting.h"
 #include "vm/BigIntType.h"
 #include "vm/EnvironmentObject.h"
@@ -5046,6 +5047,9 @@ MOZ_NEVER_INLINE GCRuntime::IncrementalResult GCRuntime::gcCycle(
 
   // This reason is used internally. See below.
   MOZ_ASSERT(reason != JS::GCReason::RESET);
+
+  // We should be running with denormals enabled.
+  MOZ_ASSERT(!DenormalsDisabled());
 
   // Background finalization and decommit are finished by definition before we
   // can start a new major GC.  Background allocation may still be running, but

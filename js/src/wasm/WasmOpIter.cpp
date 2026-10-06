@@ -781,6 +781,8 @@ OpKind wasm::Classify(OpBytes op) {
 #  ifdef ENABLE_WASM_JSPI
         case MozOp::GuardSuspending:
           return OpKind::GuardSuspending;
+        case MozOp::ExternToCont:
+          return OpKind::ExternToCont;
 #  endif
       }
       break;

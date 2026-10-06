@@ -72,6 +72,11 @@ from mozlog.formatters import TestSummaryFormatter
             id="assertion_failure_dropped",
         ),
         pytest.param(
+            {"action": "ubsan_error", "kind": "undefined-behavior", "message": "m"},
+            True,
+            id="ubsan_error_kept",
+        ),
+        pytest.param(
             {"action": "group_start", "name": "manifestA"}, True, id="group_start_kept"
         ),
         pytest.param(
@@ -330,6 +335,28 @@ def test_testsummary_crash_keeps_stack():
     out = fmt(record)
     result = json.loads(out)
     assert result["stack"] == "frame1\nframe2"
+    assert "thread" not in result
+    assert "pid" not in result
+
+
+def test_testsummary_ubsan_error_keeps_stack():
+    fmt = TestSummaryFormatter()
+    stack = [{"function": "incr_ptr_aligned", "file": "ggml-c.c", "line": 7106}]
+    record = {
+        "action": "ubsan_error",
+        "kind": "undefined-behavior",
+        "message": "applying non-zero offset 96 to null pointer",
+        "file": "ggml-c.c",
+        "lineno": 7106,
+        "column": 33,
+        "stack": stack,
+        "thread": "main",
+        "pid": 1234,
+    }
+    result = json.loads(fmt(record))
+    assert result["stack"] == stack
+    assert result["message"] == "applying non-zero offset 96 to null pointer"
+    assert result["column"] == 33
     assert "thread" not in result
     assert "pid" not in result
 

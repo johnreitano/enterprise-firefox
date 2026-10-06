@@ -27,6 +27,9 @@ NSIS_STAGE_ARGS = --config-dir=$(CONFIG_DIR) \
 
 ifdef ZIP_IN
 installer:: $(CONFIG_DIR)/setup.exe $(ZIP_IN)
+# In automation, the installers are created by repackage tasks, from setup.exe
+# and the package, so don't spend time creating them in the build.
+ifndef MOZ_AUTOMATION
 	$(NSINSTALL) -D '$(ABS_DIST)/$(PKG_PATH)'
 	$(PYTHON3) $(MOZILLA_DIR)/mach repackage installer \
 	  -o '$(ABS_DIST)/$(PKG_PATH)$(PKG_INST_BASENAME).exe' \
@@ -43,6 +46,7 @@ ifdef MOZ_STUB_INSTALLER
 	  --setupexe $(CONFIG_DIR)/setup-stub.exe \
 	  --sfx-stub $(SFX_MODULE) \
 	  $(USE_UPX)
+endif
 endif
 else
 installer::

@@ -9,15 +9,20 @@ import mozilla.components.support.ktx.util.PromptAbuserDetector
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import org.mozilla.fenix.R
+import org.mozilla.fenix.customannotations.Critical
 import org.mozilla.fenix.customannotations.SmokeTest
 import org.mozilla.fenix.helpers.Constants
 import org.mozilla.fenix.helpers.Constants.PackageName.PRINT_SPOOLER
+import org.mozilla.fenix.helpers.DataGenerationHelper.getStringResource
+import org.mozilla.fenix.helpers.FeatureSettingsHelper.Companion.settings
 import org.mozilla.fenix.helpers.MockBrowserDataHelper
 import org.mozilla.fenix.helpers.TestAssetHelper.articleSummaryAsset
 import org.mozilla.fenix.helpers.TestAssetHelper.firstForeignWebPageAsset
 import org.mozilla.fenix.helpers.TestAssetHelper.getGenericAsset
 import org.mozilla.fenix.helpers.TestAssetHelper.pdfFormAsset
 import org.mozilla.fenix.ui.efficiency.helpers.BaseTest
+import org.mozilla.fenix.ui.efficiency.navigation.NavigationOptions
 import org.mozilla.fenix.ui.efficiency.selectors.AddToHomeScreenSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.BookmarksSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.BookmarksSelectors.DELETE_BOOKMARK_BUTTON
@@ -36,6 +41,7 @@ import org.mozilla.fenix.ui.efficiency.selectors.MainMenuSelectors.DESKTOP_SITE_
 import org.mozilla.fenix.ui.efficiency.selectors.MainMenuSelectors.EDIT_BOOKMARK_BUTTON
 import org.mozilla.fenix.ui.efficiency.selectors.MainMenuSelectors.FORWARD_BUTTON
 import org.mozilla.fenix.ui.efficiency.selectors.SettingsAddonsManagerSelectors
+import org.mozilla.fenix.ui.efficiency.selectors.SettingsHomepageSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.SettingsSavedPasswordsSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.SettingsSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.ShareOverlaySelectors
@@ -607,5 +613,51 @@ class MainMenuTest : BaseTest() {
             .navigateToPage()
             .mozClick(MainMenuSelectors.MORE_BUTTON)
             .mozVerify(MainMenuSelectors.SUMMARIZE_PAGE_BUTTON)
+    }
+
+    // TestRail link: https://mozilla.testrail.io/index.php?/cases/view/4105720
+    @Critical
+    @Test
+    fun verifyTheCustomizeHomepageMenuItemTest() {
+        // The test harness forces the Bookmarks and Recently visited homepage sections on (LaunchConfig defaults),
+        // but bug 2066206 made both default off in the product. Override them here so this test asserts the real
+        // shipped default state.
+        composeRule.activityRule.applySettingsExceptions {
+            it.isBookmarksHomeFeatureEnabled = false
+            it.isRecentlyVisitedFeatureEnabled = false
+        }
+
+        // The privacy report row's label follows the longfox flag exactly as HomeSettingsFragment sets it, so derive
+        // the
+        // expected text from the same setting to keep this locator valid on every channel (developer/debug shows
+        // "Help catch trackers"; nightly/beta/release show "Privacy report").
+        val privacyReportLabel =
+            if (settings.longfoxEnabled) {
+                getStringResource(R.string.help_catch_trackers)
+            } else {
+                getStringResource(R.string.customize_toggle_privacy_report)
+            }
+
+        on.settingsHomepage
+            .navigateToPage(
+                navigationOptions =
+                    NavigationOptions(via = listOf("MainMenuPage"), excludedPages = setOf("SettingsPage"))
+            )
+            .mozVerify(SettingsHomepageSelectors.WALLPAPERS_BUTTON)
+            .mozVerifyOptionSwitchIsChecked(SettingsHomepageSelectors.SHORTCUTS_SWITCH)
+            .mozVerifyOptionCheckBoxIsChecked(SettingsHomepageSelectors.SPONSORED_SHORTCUTS_CHECKBOX)
+            .mozVerifyOptionSwitchIsChecked(SettingsHomepageSelectors.PRIVACY_REPORT_SWITCH(privacyReportLabel))
+            .mozVerifyOptionSwitchIsChecked(SettingsHomepageSelectors.CONTINUE_SWITCH)
+            .mozVerifyOptionSwitchIsNotChecked(SettingsHomepageSelectors.BOOKMARKS_SWITCH)
+            .mozVerifyOptionSwitchIsNotChecked(SettingsHomepageSelectors.RECENTLY_VISITED_SWITCH)
+            .mozVerifyOptionSwitchIsChecked(SettingsHomepageSelectors.STORIES_SWITCH)
+            .mozVerifyOptionCheckBoxIsChecked(SettingsHomepageSelectors.SPONSORED_STORIES_CHECKBOX)
+            .mozVerify(SettingsHomepageSelectors.OPENING_SCREEN_OPTION("Homepage"))
+            .mozVerify(SettingsHomepageSelectors.OPENING_SCREEN_OPTION("Last tab"))
+            .mozVerifyElementIsChecked(
+                SettingsHomepageSelectors.OPENING_SCREEN_OPTION("Homepage after four hours of inactivity")
+            )
+
+        on.home.navigateToPage().mozVerify(HomeSelectors.HOMEPAGE_VIEW)
     }
 }

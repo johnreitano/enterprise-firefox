@@ -3844,11 +3844,12 @@ class MToBigInt : public MUnaryInstruction, public ToBigIntPolicy::Data {
 class MToInt64 : public MUnaryInstruction, public ToInt64Policy::Data {
   explicit MToInt64(MDefinition* def) : MUnaryInstruction(classOpcode, def) {
     setResultType(MIRType::Int64);
-    setMovable();
 
-    // Guard unless the conversion is known to be non-effectful & non-throwing.
-    if (!def->typeIsOneOf(
-            {MIRType::Boolean, MIRType::BigInt, MIRType::Int64})) {
+    // Conversions that are known to be non-effectful & non-throwing can move.
+    // All other conversions are guards.
+    if (def->typeIsOneOf({MIRType::Boolean, MIRType::BigInt, MIRType::Int64})) {
+      setMovable();
+    } else {
       setGuard();
     }
   }
