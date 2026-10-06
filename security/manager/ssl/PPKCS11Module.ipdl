@@ -4,8 +4,9 @@
 
 include PSMIPCTypes;
 
-using SECMODModuleID from "secmodt.h";
 using CK_SLOT_ID from "pkcs11t.h";
+using SECMODModuleID from "secmodt.h";
+using mozilla::psm::SearchingFor from "mozilla/psm/PSMIPCUtils.h";
 
 namespace mozilla {
 
@@ -73,7 +74,10 @@ protocol PPKCS11Module
 
     async CancelProtectedAuth(uint64_t id);
 
-    async FindCertificates() returns (Certificate[] certificates);
+    async FindObjects(SearchingFor searchingFor) returns (IPCClientCertObject[] objects);
+
+    async Sign(uint8_t[] certificate, uint8_t[] data, uint8_t[] params)
+        returns (uint8_t[] signature);
 
   parent:
     async PromptPassword(nsCString aTokenName)

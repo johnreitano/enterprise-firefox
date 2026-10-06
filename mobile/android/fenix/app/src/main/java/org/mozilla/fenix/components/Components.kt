@@ -362,9 +362,8 @@ class Components(
                         SetupChecklistTelemetryMiddleware(),
                         ReviewPromptMiddleware(
                                 continuousOnboardingInProgress = {
-                                    val continuousOnboardingCompleted =
-                                        settings.seventhDayOnboardingCompletedTimestamp != -1L
-                                    settings.continuousOnboardingFeatureEnabled && !continuousOnboardingCompleted
+                                    settings.continuousOnboardingFeatureEnabled &&
+                                        !settings.continuousOnboardingCompleted
                                 },
                                 shouldShowCustomPrompt = {
                                     settings.customReviewPromptUiEnabled && settings.isTelemetryEnabled
@@ -385,16 +384,18 @@ class Components(
             }
     }
 
+    val lensImageUploader by lazyMonitored {
+        LensImageUploader(
+            context = context,
+            client = core.client,
+            userAgent = core.engine.settings.userAgentString ?: "",
+        )
+    }
+
     val lensImageSearch by lazyMonitored {
         LensImageSearch(
             appStore = appStore,
-            uploader = {
-                LensImageUploader(
-                    context = context,
-                    client = core.client,
-                    userAgent = core.engine.settings.userAgentString ?: "",
-                )
-            },
+            uploader = { lensImageUploader },
             browserUseCases = { useCases.fenixBrowserUseCases },
         )
     }

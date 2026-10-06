@@ -106,8 +106,8 @@ class ModuleRecord final {
 /**
  * The set of modules a child process wants trust information for. The child
  * asks about each distinct module once per batch, identifying it by a
- * read-only duplicate of the section handle it was mapped from, taken by the
- * DLL blocklist's NtMapViewOfSection hook.
+ * duplicate of the handle the loader opened the module's file with, taken by
+ * the DLL blocklist's NtCreateSection hook.
  */
 using ModuleIdentifiers = nsTArray<mozilla::ipc::FileDescriptor>;
 
@@ -192,8 +192,7 @@ class UntrustedModulesData final {
         mNumEvents(0),
         mSanitizationFailures(0),
         mTrustTestFailures(0),
-        mUnverifiableLoads(0),
-        mRejectedSections(0) {
+        mRejectedFiles(0) {
     MOZ_ASSERT(kMaxEvents == mStacks.GetMaxStacksCount());
   }
 
@@ -205,8 +204,7 @@ class UntrustedModulesData final {
 
   explicit operator bool() const {
     return !mEvents.isEmpty() || mSanitizationFailures || mTrustTestFailures ||
-           mUnverifiableLoads || mRejectedSections ||
-           mXULLoadDurationMS.isSome();
+           mRejectedFiles || mXULLoadDurationMS.isSome();
   }
 
   void AddNewLoads(const ModulesMap& aModulesMap,
@@ -229,16 +227,13 @@ class UntrustedModulesData final {
   Maybe<double> mXULLoadDurationMS;
   uint32_t mSanitizationFailures;
   uint32_t mTrustTestFailures;
-  // Counts cases where the child process couldn't duplicate the section
-  // handle.  See ModuleLoadInfo::mSectionHandleUnavailable.
-  uint32_t mUnverifiableLoads;
-  // Number of sections a child sent that the parent refused as invalid.
-  uint32_t mRejectedSections;
+  // Number of files a child sent that the parent refused as invalid.
+  uint32_t mRejectedFiles;
 };
 
 class ModulesMapResult final {
  public:
-  ModulesMapResult() : mTrustTestFailures(0), mRejectedSections(0) {}
+  ModulesMapResult() : mTrustTestFailures(0), mRejectedFiles(0) {}
 
   ModulesMapResult(const ModulesMapResult& aOther) = delete;
   ModulesMapResult(ModulesMapResult&& aOther) = default;
@@ -247,7 +242,7 @@ class ModulesMapResult final {
 
   ModulesMap mModules;
   uint32_t mTrustTestFailures;
-  uint32_t mRejectedSections;
+  uint32_t mRejectedFiles;
 };
 
 }  // namespace mozilla
@@ -403,8 +398,7 @@ struct ParamTraits<mozilla::UntrustedModulesData> {
     WriteParam(aWriter, aParam.mXULLoadDurationMS);
     aWriter->WriteUInt32(aParam.mSanitizationFailures);
     aWriter->WriteUInt32(aParam.mTrustTestFailures);
-    aWriter->WriteUInt32(aParam.mUnverifiableLoads);
-    aWriter->WriteUInt32(aParam.mRejectedSections);
+    aWriter->WriteUInt32(aParam.mRejectedFiles);
   }
 
   static bool Read(MessageReader* aReader, paramType* aResult) {
@@ -458,11 +452,7 @@ struct ParamTraits<mozilla::UntrustedModulesData> {
       return false;
     }
 
-    if (!aReader->ReadUInt32(&aResult->mUnverifiableLoads)) {
-      return false;
-    }
-
-    if (!aReader->ReadUInt32(&aResult->mRejectedSections)) {
+    if (!aReader->ReadUInt32(&aResult->mRejectedFiles)) {
       return false;
     }
 
@@ -554,7 +544,7 @@ struct ParamTraits<mozilla::ModulesMapResult> {
   static void Write(MessageWriter* aWriter, const paramType& aParam) {
     WriteParam(aWriter, aParam.mModules);
     aWriter->WriteUInt32(aParam.mTrustTestFailures);
-    aWriter->WriteUInt32(aParam.mRejectedSections);
+    aWriter->WriteUInt32(aParam.mRejectedFiles);
   }
 
   static bool Read(MessageReader* aReader, paramType* aResult) {
@@ -566,7 +556,7 @@ struct ParamTraits<mozilla::ModulesMapResult> {
       return false;
     }
 
-    if (!aReader->ReadUInt32(&aResult->mRejectedSections)) {
+    if (!aReader->ReadUInt32(&aResult->mRejectedFiles)) {
       return false;
     }
 

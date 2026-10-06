@@ -7,9 +7,10 @@ package org.mozilla.fenix.ui.efficiency.core
 import androidx.compose.ui.test.SemanticsNodeInteractionCollection
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.matcher.ViewMatchers.isRoot
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject
-import io.mockk.every
-import io.mockk.mockk
+import androidx.test.uiautomator.UiSelector
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
@@ -86,7 +87,9 @@ class VerbContractTest {
         // groupAbsent probes DISPLAYED on the resolved element, and Espresso's isDisplayed() needs a
         // running activity this unit test never launches. A UiObject reports DISPLAYED via exists(),
         // so a stub that exists is a present element without a UI in the loop.
-        val present = UiObjectUiElement(mockk<UiObject> { every { exists() } returns true })
+        // Constructing one needs the UiDevice singleton, which nothing else in this test touches.
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        val present = UiObjectUiElement(AlwaysPresentUiObject())
         val host = FakeVerbHost(TimedReporter(logger), ElementResolution.Found(present))
 
         val absent = host.groupAbsent(verb = "verify_group_absent", label = "Page_GROUP", selectors = listOf(selector))
@@ -282,6 +285,11 @@ class VerbContractTest {
         override fun dumpFailure(label: String) = Unit
 
         override fun stepId(prefix: String, description: String) = "$prefix-$description"
+    }
+
+    @Suppress("DEPRECATION")
+    private class AlwaysPresentUiObject : UiObject(UiSelector()) {
+        override fun exists() = true
     }
 
     private class RecordingStepLogger : StepLogger {

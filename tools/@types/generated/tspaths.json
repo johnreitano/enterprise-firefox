@@ -175,6 +175,9 @@
       "chrome://browser/content/aiwindow/modules/SmartFormFillConstants.mjs": [
         "../../../browser/components/aiwindow/ui/modules/SmartFormFillConstants.mjs"
       ],
+      "chrome://browser/content/aiwindow/modules/TrustedInternalURLs.mjs": [
+        "../../../browser/components/aiwindow/ui/modules/TrustedInternalURLs.mjs"
+      ],
       "chrome://browser/content/asrouter/components/menu-message.mjs": [
         "../../../browser/components/asrouter/content/components/menu-message/menu-message.mjs"
       ],
@@ -587,7 +590,10 @@
         "../../../toolkit/components/certviewer/content/components/utils.mjs"
       ],
       "chrome://global/content/elements/accesskey-check.mjs": [
-        "../../../toolkit/content/widgets/panel-list/accesskey-check.mjs"
+        "../../../toolkit/content/widgets/accesskey-check.mjs"
+      ],
+      "chrome://global/content/elements/auto-accesskey.mjs": [
+        "../../../toolkit/content/widgets/auto-accesskey.mjs"
       ],
       "chrome://global/content/elements/browser-custom-element.mjs": [
         "../../../toolkit/content/widgets/browser-custom-element.mjs"
@@ -1554,6 +1560,9 @@
       ],
       "resource:///modules/FirefoxBridgeExtensionUtils.sys.mjs": [
         "../../../browser/modules/FirefoxBridgeExtensionUtils.sys.mjs"
+      ],
+      "resource:///modules/GenAI.sys.mjs": [
+        "../../../browser/components/genai/GenAI.sys.mjs"
       ],
       "resource:///modules/HistoryController.sys.mjs": [
         "../../../browser/components/firefoxview/HistoryController.sys.mjs"

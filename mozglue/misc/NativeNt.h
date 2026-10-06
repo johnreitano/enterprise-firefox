@@ -58,6 +58,13 @@ NTSTATUS NTAPI NtMapViewOfSection(
     SECTION_INHERIT aInheritDisposition, ULONG aAllocationType,
     ULONG aProtectionFlags);
 
+NTSTATUS NTAPI NtCreateSection(PHANDLE aSectionHandle,
+                               ACCESS_MASK aDesiredAccess,
+                               POBJECT_ATTRIBUTES aObjectAttributes,
+                               PLARGE_INTEGER aMaximumSize,
+                               ULONG aSectionPageProtection,
+                               ULONG aAllocationAttributes, HANDLE aFileHandle);
+
 NTSTATUS NTAPI NtUnmapViewOfSection(HANDLE aProcess, PVOID aBaseAddress);
 
 enum MEMORY_INFORMATION_CLASS {

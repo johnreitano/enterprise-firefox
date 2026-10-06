@@ -209,6 +209,12 @@ const MAX_RESUME_CARDS_DISPLAYED = 4;
 // localization - see Bug 2066263.
 const RESUME_HEADLINE_PREFIX_RE = /^\s*pick\s+up\b[\s:;,.—-]*/iu;
 
+function formatResumeTabGroupLabel(headline) {
+  const stripped =
+    headline.replace(RESUME_HEADLINE_PREFIX_RE, "").trim() || headline.trim();
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+}
+
 // 1-6 are MLPA spec codes; 7 is set locally for Fastly-blocked 406s.
 const ERROR_TELEMETRY_NAME_BY_CODE = {
   1: "budgetExceeded",
@@ -1668,26 +1674,53 @@ export class AIWindow extends MozLitElement {
 
   /**
    * Handles a resume card's "More" menu selection. Snoozing dismisses the
-   * card for the rest of the session; the X button is left unwired until
-   * hard delete is available in the journey store.
+   * card for the rest of the session.
    *
    * @param {CustomEvent} event - The menu-item-selected event
    * @private
    */
   #handleResumeCardMenuItemSelected = event => {
     const { journeyId, itemId } = event.detail;
-    if (itemId !== "snooze") {
+    switch (itemId) {
+      case "open-tabs":
+        this.#handleResumeCardOpenTabs(journeyId).catch(e =>
+          lazy.log.error("[ResumeCard] Failed to open tabs:", e)
+        );
+        break;
+
+      case "snooze":
+        lazy.ResumeActivity.dismissMemory(journeyId);
+        this.resumeCards = this.resumeCards.filter(
+          ({ memory }) => memory.id !== journeyId
+        );
+        if (!this.resumeCards.length) {
+          this.resumeCardsEmptyReason =
+            RESUME_SECTION_EMPTY_REASON.ALL_DISMISSED;
+        }
+        break;
+    }
+  };
+
+  /**
+   * Opens a resume card's preview tabs as a group without the current
+   * Smart Window tab, or switches to the preview tab if there's only one.
+   *
+   * @param {string} journeyId - The resume card's journey/memory id
+   */
+  async #handleResumeCardOpenTabs(journeyId) {
+    const card = this.resumeCards.find(({ memory }) => memory.id === journeyId);
+    const previewTabs = card?.content.previewTabs;
+    const win = this.#topChromeWindow;
+    if (!previewTabs?.length || !win) {
       return;
     }
 
-    lazy.ResumeActivity.dismissMemory(journeyId);
-    this.resumeCards = this.resumeCards.filter(
-      ({ memory }) => memory.id !== journeyId
-    );
-    if (!this.resumeCards.length) {
-      this.resumeCardsEmptyReason = RESUME_SECTION_EMPTY_REASON.ALL_DISMISSED;
-    }
-  };
+    await lazy.ToolUI.openOrGroupTabs({
+      tabs: previewTabs,
+      window: win,
+      label: formatResumeTabGroupLabel(card.content.headline),
+    });
+  }
 
   /**
    * Helper method to get or create the smartbar element
@@ -2407,10 +2440,6 @@ export class AIWindow extends MozLitElement {
         checked: false,
       })
     );
-    const strippedHeadline =
-      resumePrompt.text.replace(RESUME_HEADLINE_PREFIX_RE, "").trim() ||
-      resumePrompt.text.trim();
-
     // The conversation was built with its user turn already appended, so the
     // request only needs real-time context injected before it goes out.
     const userMessage = conversation.messages.at(-1);
@@ -2427,9 +2456,7 @@ export class AIWindow extends MozLitElement {
         isResumeActivity: true,
         properties: {
           actionType: "open_tabs",
-          tabGroupLabel:
-            strippedHeadline.charAt(0).toUpperCase() +
-            strippedHeadline.slice(1),
+          tabGroupLabel: formatResumeTabGroupLabel(resumePrompt.text),
           tabs,
         },
       },

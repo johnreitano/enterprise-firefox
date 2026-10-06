@@ -109,6 +109,7 @@ urlbar:
           possible types are:
           `action`,
           `addon`,
+          `addons_shortcut_moved`,
           `ai_chat`,
           `ai_search_fallback`,
           `autofill_about`,
@@ -546,6 +547,7 @@ urlbar:
           not occur and indicates a bug. The possible types are:
           `action`,
           `addon`,
+          `addons_shortcut_moved`,
           `ai_chat`,
           `ai_search_fallback`,
           `autofill_about`,
@@ -702,6 +704,7 @@ urlbar:
           possible types are:
           `action`,
           `addon`,
+          `addons_shortcut_moved`,
           `ai_chat`,
           `ai_search_fallback`,
           `autofill_about`,

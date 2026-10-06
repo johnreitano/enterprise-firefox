@@ -33,9 +33,9 @@ smartwindow-document-title = New Tab
 
 ## Smart Window Toggle Button
 
-toolbar-switcher-customizable-label =
+toolbar-switcher-customizable-label-v2 =
     .label = { -smart-window-brand-name } switcher
-    .tooltiptext = Switch between Smart and Classic windows.
+    .tooltiptext = Switch between Smart and Classic Windows
 
 ai-window-toggleview-switch-classic =
     .label = Classic Window

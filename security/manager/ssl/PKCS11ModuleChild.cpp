@@ -14,6 +14,7 @@
 #include "ScopedNSSTypes.h"
 #include "certdb.h"
 #include "mozilla/ipc/Endpoint.h"
+#include "mozilla/psm/IPCClientCertsParent.h"
 #include "nsDebugImpl.h"
 
 namespace mozilla::psm {
@@ -389,13 +390,27 @@ Trust GetTrustForCert(CERTCertificate* cert) {
   return Trust::Unknown;
 }
 
-ipc::IPCResult PKCS11ModuleChild::RecvFindCertificates(
-    FindCertificatesResolver&& aResolver) {
+ipc::IPCResult PKCS11ModuleChild::RecvFindObjects(
+    SearchingFor aSearchingFor, FindObjectsResolver&& aResolver) {
   mAuthTaskQueue->Dispatch(NS_NewRunnableFunction(
-      __func__, [self = RefPtr{this}, resolver(std::move(aResolver))] {
-        nsTArray<Certificate> certificates;
+      __func__, [searchingFor(aSearchingFor), self = RefPtr{this},
+                 resolver(std::move(aResolver))] {
+        nsTArray<IPCClientCertObject> objects;
+        PK11CertListType certListType;
+        switch (searchingFor) {
+          case SearchingFor::ClientCertificates:
+            // Using `PK11CertListUserUnique` would make the most sense
+            // here, but that turns out to be too conservative in terms of
+            // what NSS considers a "client certificate" to be. Instead
+            // just search for all certificates.
+            certListType = PK11CertListUnique;
+            break;
+          case SearchingFor::CACertificates:
+            certListType = PK11CertListCAUnique;
+            break;
+        }
         UniqueCERTCertList nssCertificates(
-            PK11_ListCerts(PK11CertListUnique, self.get()));
+            PK11_ListCerts(certListType, self.get()));
         if (nssCertificates.get()) {
           for (CERTCertListNode* node = CERT_LIST_HEAD(nssCertificates.get());
                !CERT_LIST_END(node, nssCertificates.get());
@@ -409,13 +424,70 @@ ipc::IPCResult PKCS11ModuleChild::RecvFindCertificates(
             certificate.der().AppendElements(node->cert->derCert.data,
                                              node->cert->derCert.len);
             certificate.serverAuthTrustAnchor() = trust == Trust::Anchor;
-            certificates.AppendElement(std::move(certificate));
+            objects.AppendElement(std::move(certificate));
+
+            // If not searching for client certificates, don't look for a
+            // corresponding private key.
+            if (searchingFor != SearchingFor::ClientCertificates) {
+              continue;
+            }
+            // If a certificate has a corresponding private key, expose the
+            // corresponding public key.
+            UniqueSECKEYPrivateKey privateKey(
+                PK11_FindKeyByAnyCert(node->cert, self.get()));
+            if (!privateKey) {
+              continue;
+            }
+            UniqueSECKEYPublicKey publicKey(CERT_ExtractPublicKey(node->cert));
+            if (!publicKey) {
+              continue;
+            }
+            nsTArray<uint8_t> certDER(node->cert->derCert.data,
+                                      node->cert->derCert.len);
+            switch (SECKEY_GetPublicKeyType(publicKey.get())) {
+              case rsaKey:
+              case rsaPssKey: {
+                nsTArray<uint8_t> modulus(publicKey->u.rsa.modulus.data,
+                                          publicKey->u.rsa.modulus.len);
+                RSAKey rsakey(modulus, certDER);
+                objects.AppendElement(std::move(rsakey));
+                break;
+              }
+              case ecKey: {
+                nsTArray<uint8_t> params(publicKey->u.ec.DEREncodedParams.data,
+                                         publicKey->u.ec.DEREncodedParams.len);
+                ECKey eckey(params, certDER);
+                objects.AppendElement(std::move(eckey));
+                break;
+              }
+              default:
+                break;
+            }
           }
         }
         self->mTaskQueue->Dispatch(NS_NewRunnableFunction(
-            __func__, [certificates(std::move(certificates)),
-                       resolver(std::move(resolver))] {
-              resolver(std::move(certificates));
+            __func__,
+            [objects(std::move(objects)), resolver(std::move(resolver))] {
+              resolver(std::move(objects));
+            }));
+      }));
+  return IPC_OK();
+}
+
+ipc::IPCResult PKCS11ModuleChild::RecvSign(nsTArray<uint8_t> aCertificate,
+                                           nsTArray<uint8_t> aData,
+                                           nsTArray<uint8_t> aParams,
+                                           SignResolver&& aResolver) {
+  mAuthTaskQueue->Dispatch(NS_NewRunnableFunction(
+      __func__, [self = RefPtr{this}, certificate(std::move(aCertificate)),
+                 data(std::move(aData)), params(std::move(aParams)),
+                 resolver(std::move(aResolver))] {
+        nsTArray<uint8_t> signature;
+        SignDataGivenCertificate(certificate, data, params, signature, self);
+        self->mTaskQueue->Dispatch(NS_NewRunnableFunction(
+            __func__,
+            [signature(std::move(signature)), resolver(std::move(resolver))] {
+              resolver(std::move(signature));
             }));
       }));
   return IPC_OK();

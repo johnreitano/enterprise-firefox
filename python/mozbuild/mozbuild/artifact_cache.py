@@ -208,34 +208,34 @@ class ArtifactCache:
             )
             os.remove(path)
 
+        last_dl_update = -1
+
+        def download_progress(dl, _decoded_bytes, total_size):
+            nonlocal last_dl_update
+            if not total_size:
+                return
+            # Content-Length is the compressed size, but dlmanager counts decoded bytes.
+            bytes_so_far = self._response.current.raw.tell()
+            percent = (float(bytes_so_far) / total_size) * 100
+            now = int(percent / 5)
+            if now == last_dl_update:
+                return
+            last_dl_update = now
+            self.log(
+                logging.INFO,
+                "artifact",
+                {
+                    "fname": fname,
+                    "bytes_so_far": bytes_so_far,
+                    "total_size": total_size,
+                    "percent": percent,
+                },
+                "Downloading {fname}... {percent:02.1f} %",
+            )
+
         dl = None
         try:
-            dl = self._download_manager.download(url, fname)
-            last_dl_update = -1
-
-            def download_progress(dl, _decoded_bytes, total_size):
-                nonlocal last_dl_update
-                if not total_size:
-                    return
-                # Content-Length is the compressed size, but dlmanager counts decoded bytes.
-                bytes_so_far = self._response.current.raw.tell()
-                percent = (float(bytes_so_far) / total_size) * 100
-                now = int(percent / 5)
-                if now == last_dl_update:
-                    return
-                last_dl_update = now
-                self.log(
-                    logging.INFO,
-                    "artifact",
-                    {
-                        "fname": fname,
-                        "bytes_so_far": bytes_so_far,
-                        "total_size": total_size,
-                        "percent": percent,
-                    },
-                    "Downloading {fname}... {percent:02.1f} %",
-                )
-
+            dl = self._download_manager.download(url, fname, progress=download_progress)
             if dl:
                 self.log(
                     logging.INFO,
@@ -243,7 +243,6 @@ class ArtifactCache:
                     {"path": path},
                     "Downloading artifact to local cache: {path}",
                 )
-                dl.set_progress(download_progress)
                 with build_marker("ArtifactDownload", url, log=self.log):
                     dl.wait()
             else:

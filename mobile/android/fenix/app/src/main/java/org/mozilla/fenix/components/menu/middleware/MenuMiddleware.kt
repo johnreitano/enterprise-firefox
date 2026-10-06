@@ -11,6 +11,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import mozilla.appservices.places.BookmarkRoot
 import mozilla.components.browser.state.action.WebExtensionAction
 import mozilla.components.browser.state.selector.selectedTab
 import mozilla.components.browser.state.state.SessionState
@@ -254,6 +255,29 @@ class MenuMiddleware(
             is DeleteBrowsingDataAndQuit -> deleteBrowsingDataAndQuit()
 
             is Navigate.Back -> handleBackNavigation(action)
+
+            is Navigate.History -> {
+                val navOptions = NavOptions.Builder().setPopUpTo(R.id.browserFragment, false).build()
+                navigate(NavGraphDirections.actionGlobalHistoryFragment(), navOptions)
+            }
+
+            is Navigate.Bookmarks -> {
+                val navOptions = NavOptions.Builder().setPopUpTo(R.id.browserFragment, false).build()
+                navigate(
+                    NavGraphDirections.actionGlobalBookmarkFragment(BookmarkRoot.Mobile.id),
+                    navOptions,
+                )
+            }
+
+            is Navigate.Downloads -> {
+                val navOptions = NavOptions.Builder().setPopUpTo(R.id.browserFragment, false).build()
+                navigate(NavGraphDirections.actionGlobalDownloadsFragment(), navOptions)
+            }
+
+            is Navigate.Passwords -> {
+                val navOptions = NavOptions.Builder().setPopUpTo(R.id.browserFragment, false).build()
+                navigate(MenuFragmentDirections.actionMenuFragmentToLoginsListFragment(), navOptions)
+            }
 
             is Navigate.Forward -> handleForwardNavigation(action)
 

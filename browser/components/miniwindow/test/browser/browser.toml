@@ -21,6 +21,12 @@ prefs = [
 
 ["browser_origin_close.js"]
 
+["browser_overlap.js"]
+skip-if = [
+  "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland'", # Wayland doesn't let windows move themselves
+  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11'", # X11/XWayland report unreliable window positions
+]
+
 ["browser_placement.js"]
 
 ["browser_region_entry.js"]

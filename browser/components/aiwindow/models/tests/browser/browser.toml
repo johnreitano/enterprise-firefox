@@ -2,7 +2,6 @@
 support-files = [
   "aitab_attacker_page.html",
   "aitab_source_page.html",
-  "aitab_viewer_stub.html",
   "head.js",
 ]
 prefs = [

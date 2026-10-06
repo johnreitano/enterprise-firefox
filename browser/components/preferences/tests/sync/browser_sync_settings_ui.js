@@ -125,49 +125,76 @@ add_task(async function testSyncFxaLoginFailed() {
 });
 
 add_task(async function testSyncFxaSignedInSyncingOff() {
-  await runSyncPaneTest(
+  const testCases = [
     {
-      status: UIState.STATUS_SIGNED_IN,
-      email: "foo@bar.com",
-      syncEnabled: false,
+      isPerDeviceSyncEnabled: false,
+      dataL10nId: "prefs-syncing-off-2",
+      assertMessage: "Sync not configured text is displayed for legacy sync",
     },
-    async doc => {
-      let syncSettingGroup = doc.querySelector('setting-group[groupid="sync"]');
-      ok(
-        !BrowserTestUtils.isHidden(syncSettingGroup),
-        "Sync setting group is displayed."
-      );
+    {
+      isPerDeviceSyncEnabled: true,
+      dataL10nId: "prefs-syncing-off-3",
+      assertMessage:
+        "Sync not configured text is displayed for per-device sync",
+    },
+  ];
 
-      let fxaDeviceNameSection = syncSettingGroup.querySelector(
-        "#fxaDeviceNameSection"
-      );
-      ok(
-        !BrowserTestUtils.isHidden(fxaDeviceNameSection),
-        "Device name section is displayed when user is signed in."
-      );
+  for (const testCase of testCases) {
+    await runSyncPaneTest(
+      {
+        status: UIState.STATUS_SIGNED_IN,
+        email: "foo@bar.com",
+        syncEnabled: false,
+      },
+      async doc => {
+        let syncSettingGroup = doc.querySelector(
+          'setting-group[groupid="sync"]'
+        );
+        ok(
+          !BrowserTestUtils.isHidden(syncSettingGroup),
+          "Sync setting group is displayed."
+        );
 
-      let fxaDeviceName = fxaDeviceNameSection.querySelector("#fxaDeviceName");
-      ok(
-        !fxaDeviceName.disabled,
-        "Change device name is enabled when user is signed in."
-      );
+        let fxaDeviceNameSection = syncSettingGroup.querySelector(
+          "#fxaDeviceNameSection"
+        );
+        ok(
+          !BrowserTestUtils.isHidden(fxaDeviceNameSection),
+          "Device name section is displayed when user is signed in."
+        );
 
-      let syncNotConfigured =
-        syncSettingGroup.querySelector("#syncNotConfigured");
-      ok(
-        !BrowserTestUtils.isHidden(syncNotConfigured),
-        "Syncing is off section is displayed when user is signed in but sync is disabled."
-      );
+        let fxaDeviceName =
+          fxaDeviceNameSection.querySelector("#fxaDeviceName");
+        ok(
+          !fxaDeviceName.disabled,
+          "Change device name is enabled when user is signed in."
+        );
 
-      let syncNoFxaSignIn = syncSettingGroup.querySelector("#noFxaSignIn");
-      let syncConfigured = syncSettingGroup.querySelector("#syncConfigured");
-      ok(
-        BrowserTestUtils.isHidden(syncConfigured) &&
-          BrowserTestUtils.isHidden(syncNoFxaSignIn),
-        "All other sync sections are hidden."
-      );
-    }
-  );
+        let syncNotConfigured =
+          syncSettingGroup.querySelector("#syncNotConfigured");
+        ok(
+          !BrowserTestUtils.isHidden(syncNotConfigured),
+          "Syncing is off section is displayed when user is signed in but sync is disabled."
+        );
+
+        let notConfiguredText = syncNotConfigured.getAttribute("data-l10n-id");
+        Assert.equal(
+          notConfiguredText,
+          testCase.dataL10nId,
+          testCase.assertMessage
+        );
+
+        let syncNoFxaSignIn = syncSettingGroup.querySelector("#noFxaSignIn");
+        let syncConfigured = syncSettingGroup.querySelector("#syncConfigured");
+        ok(
+          BrowserTestUtils.isHidden(syncConfigured) &&
+            BrowserTestUtils.isHidden(syncNoFxaSignIn),
+          "All other sync sections are hidden."
+        );
+      },
+      testCase.isPerDeviceSyncEnabled
+    );
+  }
 });
 
 add_task(async function testSyncFxaSignedInSyncingOn() {

@@ -117,6 +117,7 @@
 #include "mozilla/dom/indexedDB/PBackgroundIDBVersionChangeTransactionParent.h"
 #include "mozilla/dom/indexedDB/PBackgroundIndexedDBUtilsParent.h"
 #include "mozilla/dom/ipc/IdType.h"
+#include "mozilla/dom/quota/ArtificialFailure.h"
 #include "mozilla/dom/quota/Assertions.h"
 #include "mozilla/dom/quota/CachingDatabaseConnection.h"
 #include "mozilla/dom/quota/Client.h"
@@ -5890,6 +5891,9 @@ nsresult RemoveDatabaseFilesAndDirectory(nsIFile& aBaseDirectory,
   MOZ_ASSERT(!aDatabaseFilenameBase.IsEmpty());
 
   AUTO_PROFILER_LABEL("RemoveDatabaseFilesAndDirectory", DOM);
+
+  QM_TRY(ArtificialFailure(
+      nsIQuotaArtificialFailure::CATEGORY_REMOVE_DATABASE_FILES));
 
   QM_TRY_UNWRAP(auto markerFile,
                 CreateMarkerFile(aBaseDirectory, aDatabaseFilenameBase));
@@ -12599,12 +12603,16 @@ nsresult QuotaClient::GetUsageForOriginInternal(
                 GetDatabaseFilenames<ObsoleteFilenamesHandling::Include>(
                     *directory, aCanceled));
 
+  // Databases whose removal failed. Their remaining files still count towards
+  // quota, so that the removal retried later subtracts only what was added.
+  nsTHashSet<nsString> leftoverFilenames;
+
   if (aInitializing) {
     QM_TRY(CollectEachInRange(
         subdirsToProcess,
         [&directory, &obsoleteFilenames = obsoleteFilenames,
-         &databaseFilenames = databaseFilenames, aPersistenceType,
-         &aOriginMetadata](
+         &databaseFilenames = databaseFilenames, &leftoverFilenames,
+         aPersistenceType, &aOriginMetadata](
             const nsAString& subdirName) -> Result<Ok, nsresult> {
           // The directory must have the correct suffix.
           nsDependentSubstring subdirNameBase;
@@ -12630,13 +12638,14 @@ nsresult QuotaClient::GetUsageForOriginInternal(
                  Ok{});
 
           if (obsoleteFilenames.Contains(subdirNameBase)) {
-            // If this fails, it probably means we are in a serious situation.
-            // e.g. Filesystem corruption. Will handle this in bug 1521541.
-            QM_TRY(MOZ_TO_RESULT(RemoveDatabaseFilesAndDirectory(
-                       *directory, subdirNameBase, /* aQuotaManager */ nullptr,
-                       aPersistenceType, aOriginMetadata,
-                       /* aDatabaseName */ u""_ns)),
-                   Err(NS_ERROR_UNEXPECTED));
+            QM_WARNONLY_TRY(
+                MOZ_TO_RESULT(RemoveDatabaseFilesAndDirectory(
+                    *directory, subdirNameBase, /* aQuotaManager */ nullptr,
+                    aPersistenceType, aOriginMetadata,
+                    /* aDatabaseName */ u""_ns)),
+                ([&leftoverFilenames, &subdirNameBase](const auto&) {
+                  leftoverFilenames.Insert(subdirNameBase);
+                }));
 
             databaseFilenames.Remove(subdirNameBase);
             return Ok{};
@@ -12727,6 +12736,42 @@ nsresult QuotaClient::GetUsageForOriginInternal(
 
         *aUsageInfo += fileUsage;
       }
+    }
+  }
+
+  if (aUsageInfo) {
+    for (const auto& leftoverFilename : leftoverFilenames) {
+      if (aCanceled) {
+        break;
+      }
+
+      for (const auto& suffix : {kSQLiteSuffix, kSQLiteWALSuffix}) {
+        QM_TRY_INSPECT(
+            const auto& file,
+            CloneFileAndAppend(*directory, leftoverFilename + suffix));
+
+        QM_TRY_INSPECT(const int64_t& fileSize,
+                       QM_OR_ELSE_LOG_VERBOSE_IF(
+                           // Expression.
+                           MOZ_TO_RESULT_INVOKE_MEMBER(file, GetFileSize),
+                           // Predicate.
+                           IsFileNotFoundError,
+                           // Fallback.
+                           (ErrToOk<0, int64_t>)));
+        MOZ_ASSERT(fileSize >= 0);
+
+        *aUsageInfo += DatabaseUsageType(Some(uint64_t(fileSize)));
+      }
+
+      QM_TRY_INSPECT(
+          const auto& fmDirectory,
+          CloneFileAndAppend(
+              *directory, leftoverFilename + kFileManagerDirectoryNameSuffix));
+
+      QM_TRY_INSPECT(const auto& fileUsage,
+                     DatabaseFileManager::GetUsage(fmDirectory));
+
+      *aUsageInfo += fileUsage;
     }
   }
 

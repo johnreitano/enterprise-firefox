@@ -536,9 +536,15 @@ export const GenAI = {
       panel.hidePopup();
     };
     aiActionButton.setAttribute("type", buttonDefaultState);
-    chatShortcutsOptionsPanel.addEventListener("popuphidden", () =>
-      aiActionButton.setAttribute("type", buttonDefaultState)
-    );
+    aiActionButton.ariaHasPopup = "menu";
+    aiActionButton.ariaExpanded = "false";
+    chatShortcutsOptionsPanel.addEventListener("popupshown", () => {
+      aiActionButton.ariaExpanded = "true";
+    });
+    chatShortcutsOptionsPanel.addEventListener("popuphidden", () => {
+      aiActionButton.setAttribute("type", buttonDefaultState);
+      aiActionButton.ariaExpanded = "false";
+    });
     chatShortcutsOptionsPanel.firstChild.id = "ask-chat-shortcuts";
 
     // Helper to show rounded warning numbers

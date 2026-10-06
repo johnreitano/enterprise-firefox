@@ -28,6 +28,8 @@ skip-if = [
   "os == 'win' && os_version == '11.26200' && opt", # Bug 1974557
 ]
 
+["browser_passwords_policy_disable_reveal.js"]
+
 ["browser_passwords_primary_password.js"]
 skip-if = [
   "tsan", # Bug 1949014

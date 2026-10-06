@@ -2532,9 +2532,6 @@ pref("places.semanticHistory.smartwindow.distanceThreshold", "0.6");
 
 // Smart Window: AITab
 pref("browser.smartwindow.aitab.enabled", false);
-// Base URL of the external AITab viewer used for development prototyping.
-// The generate_aitab tool returns a link to this viewer with the page config in the URL hash.
-pref("browser.smartwindow.aitab.viewerURL", "");
 
 // Smart Window: Auto Tab Grouping (bug 2054500).
 pref("browser.smartwindow.autoTabGrouping.enabled", true);
@@ -3217,6 +3214,12 @@ pref("browser.screenshots.dir", "");
 // Enable/disable opening a tab into a mini window.
 pref("browser.mini-window.enabled", false);
 pref("browser.mini-window.log", false);
+// How long the toolbar stays up before idling away.
+pref("browser.mini-window.toolbar.hide-delay-ms", 2000);
+// Depth of the top-edge strip that reveals the toolbar on hover.
+pref("browser.mini-window.toolbar.edge-zone-px", 12);
+// Dwell before a hover on the top edge reveals the toolbar.
+pref("browser.mini-window.toolbar.hover-reveal-delay-ms", 50);
 
 // DoH Rollout: whether to clear the mode value at shutdown.
 pref("doh-rollout.clearModeOnShutdown", false);

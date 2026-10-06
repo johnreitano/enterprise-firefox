@@ -149,6 +149,8 @@ skip-if = [
 
 ["browser_copy_link_to_highlight_viewsource.js"]
 
+["browser_right_click_select.js"]
+
 ["browser_save_image.js"]
 
 ["browser_strip_on_share_link.js"]

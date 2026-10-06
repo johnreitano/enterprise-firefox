@@ -351,7 +351,9 @@ def components_for_unmatched(records, notices, is_file=None):
             # database while looking like it might.
             "purl": None,
             "type": "file" if all(is_file(path) for path in paths) else "library",
-            "licenses": [notice["spdx"]] if notice["spdx"] else [],
+            # A license with no SPDX id, JPNIC's for one, is still a license:
+            # its title is what CycloneDX's license name is for.
+            "licenses": [notice["spdx"] or notice["title"]],
             "website": notice["url"],
             "vcs": None,
             "bugzilla": None,

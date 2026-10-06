@@ -1,9 +1,9 @@
 (urlbar-telemetry)=
 
-# Address Bar Telemetry
+# Telemetry
 
 This section describes existing telemetry probes measuring interaction with the
-Address Bar.
+address bar and the search bars.
 
 This document only covers Legacy telemetry, not Glean telemetry.
 Glean metrics are self-documenting and can be looked up in the Glean dictionary.
@@ -733,6 +733,9 @@ page unloads before the session ends, the whole exposure list is lost, not just
 one event. How often this happens isn't measured, and a dropped
 `RecordEngagement` message leaves no diagnostic
 ([Bug 2066851](https://bugzilla.mozilla.org/show_bug.cgi?id=2066851)).
+
+A new search bar has to register its search access point in several places
+before its engagements record correctly; {doc}`adding-a-search-bar` lists them.
 
 ## Custom pings for Contextual Services
 

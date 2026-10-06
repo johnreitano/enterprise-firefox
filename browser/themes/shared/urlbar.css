@@ -71,8 +71,8 @@
        below as if the trust panel was enabled. */
     --urlbar-container-min-width: 275px;
   }
-  &[mini-window] {
-    /* The address bar is read-only in mini-window mode. */
+  &[cropped-mini-window] {
+    /* A cropped mini window's address bar is read-only */
     --urlbar-background-color: transparent;
   }
   /* Enabling the trust panel saves up to two icons in the front part of the

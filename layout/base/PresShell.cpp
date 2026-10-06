@@ -77,6 +77,7 @@
 #include "mozilla/StaticPrefs_layout.h"
 #include "mozilla/StaticPrefs_test.h"
 #include "mozilla/StaticPrefs_toolkit.h"
+#include "mozilla/StaticPrefs_ui.h"
 #include "mozilla/StyleSheet.h"
 #include "mozilla/StyleSheetInlines.h"
 #include "mozilla/Telemetry.h"
@@ -437,12 +438,16 @@ class MOZ_STACK_CLASS nsPresShellEventCB : public EventDispatchingCallback {
   virtual void HandleEvent(EventChainPostVisitor& aVisitor) override {
     if (aVisitor.mPresContext && aVisitor.mEvent->mClass != eBasicEventClass) {
       if (aVisitor.mEvent->mMessage == eMouseDown ||
-          aVisitor.mEvent->mMessage == eMouseUp) {
-        // Mouse-up and mouse-down events call nsIFrame::HandlePress/Release
-        // which call GetContentOffsetsFromPoint which requires up-to-date
-        // layout. Bring layout up-to-date now so that GetCurrentEventFrame()
-        // below will return a real frame and we don't have to worry about
-        // destroying it by flushing later.
+          aVisitor.mEvent->mMessage == eMouseUp ||
+          (aVisitor.mEvent->mMessage == eContextMenu &&
+           StaticPrefs::ui_mouse_right_click_select_under_cursor())) {
+        // Mouse-up, mouse-down and contextmenu events call
+        // nsIFrame::HandlePress/Release and
+        // nsIFrame::HandleContextMenuEventToSelectWordOrLink which call
+        // GetContentOffsetsFromPoint which requires up-to-date layout. Bring
+        // layout up-to-date now so that GetCurrentEventFrame() below will
+        // return a real frame and we don't have to worry about destroying it by
+        // flushing later.
         MOZ_KnownLive(mPresShell)->FlushPendingNotifications(FlushType::Layout);
       } else if (aVisitor.mEvent->mMessage == eWheel &&
                  aVisitor.mEventStatus != nsEventStatus_eConsumeNoDefault) {

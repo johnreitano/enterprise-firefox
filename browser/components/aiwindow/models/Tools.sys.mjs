@@ -1530,15 +1530,6 @@ async function persistAITabPage({ metadata, surface }, conversation) {
  */
 export async function createAITab({ url_list, focus }, conversation, signal) {
   lazy.console.log("[Tool] aiTab", JSON.stringify({ url_list, focus }));
-  // The returned link points at the external viewer with the page config in
-  // the URL hash, so the page data never reaches the viewer host.
-  const viewerBase = lazy.AITab.getViewerBaseURL();
-  if (!viewerBase) {
-    return (
-      "The page could not be created: the AITab viewer URL is not configured " +
-      "(set the browser.smartwindow.aitab.viewerURL preference)."
-    );
-  }
   const result = await lazy.AITab.generateAITab(
     { urlList: url_list, focus, signal },
     conversation
@@ -1557,15 +1548,15 @@ export async function createAITab({ url_list, focus }, conversation, signal) {
     return "The page could not be created: it could not be saved.";
   }
 
-  const viewerURL = lazy.AITab.buildViewerURL(viewerBase, result.surface);
+  const viewerURL = lazy.AITab.buildViewerURL(stored.slug);
 
   // Mark the viewer URL as seen so the chat renders it as a trusted, labeled
-  // link. Unseen links are unfurled as "label (full URL)" for disclosure, and
-  // this URL's hash carries the whole page config, so the full URL is very long.
+  // link. An about:smartpage URL that was never seen is not trusted, so a page
+  // name the model invented cannot be presented as a real page.
   conversation.addSeenUrls([viewerURL]);
-  // Register the URL as a token so the model echoes the short token, never the
-  // long URL (which it would otherwise truncate); expandUrlTokens restores the
-  // exact URL when rendering the assistant's reply.
+  // Register the URL as a token so the model echoes the token and cannot alter
+  // the slug; expandUrlTokens restores the exact URL when rendering the
+  // assistant's reply.
   const token = conversation.convertUrlToToken(viewerURL);
   // Model output re-entering the prompt, so cap the length. Brackets would
   // break out of the markdown link text and expose the URL.

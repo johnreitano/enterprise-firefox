@@ -31,11 +31,8 @@
   }
 }
 
-// Resets the h2 defaults to match the small widget-title look.
+// The plain "Finance" title shown at small.
 .stocks-heading {
-  margin: 0;
-  font-size: var(--font-size-small);
-  font-weight: var(--font-weight);
   color: var(--text-color-deemphasized);
 }
 

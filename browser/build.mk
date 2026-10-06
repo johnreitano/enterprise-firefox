@@ -17,9 +17,6 @@ install::
 upload::
 	@$(MAKE) -C browser/installer upload
 
-wget-en-US:
-	@$(MAKE) -C browser/locales $@
-
 ifdef MAKENSISU
 INSTALLER_REPACK_DEPS = browser/installer/windows/nsis-stage.stamp
 endif
@@ -29,16 +26,3 @@ installers-%: $(INSTALLER_REPACK_DEPS)
 
 merge-% langpack-% chrome-%:
 	$(MAKE) -C browser/locales $@
-
-ifdef ENABLE_TESTS
-# Implemented in testing/testsuite-targets.mk
-
-mochitest-browser-chrome:
-	$(RUN_MOCHITEST) --flavor=browser
-	$(CHECK_TEST_ERROR)
-
-mochitest:: mochitest-browser-chrome
-
-.PHONY: mochitest-browser-chrome
-
-endif

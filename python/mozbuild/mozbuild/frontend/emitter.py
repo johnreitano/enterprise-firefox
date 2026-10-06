@@ -1838,6 +1838,9 @@ class TreeMetadataEmitter(LoggingMixin):
                     context,
                 )
 
+        if not context.config.substs.get("COMPILE_ENVIRONMENT"):
+            return
+
         yield XPIDLModule(context, xpidl_module, context["XPIDL_SOURCES"])
 
     def _process_licenses(self, context):

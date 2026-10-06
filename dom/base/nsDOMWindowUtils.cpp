@@ -59,6 +59,7 @@
 #include "nsError.h"
 #include "nsFocusManager.h"
 #include "nsFrameManager.h"
+#include "nsGlobalWindowInner.h"
 #include "nsGlobalWindowOuter.h"
 #include "nsIDocShell.h"
 #include "nsIFrame.h"
@@ -2792,6 +2793,12 @@ nsDOMWindowUtils::GetIsTestControllingRefreshes(bool* aResult) {
   *aResult =
       pc ? pc->RefreshDriver()->IsTestControllingRefreshesEnabled() : false;
 
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::GetIsMouseDown(bool* aResult) {
+  *aResult = nsGlobalWindowInner::sMouseDown;
   return NS_OK;
 }
 

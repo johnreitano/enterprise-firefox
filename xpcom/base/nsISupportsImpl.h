@@ -19,6 +19,7 @@
 #include <utility>
 
 #include "mozilla/Assertions.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/MacroArgs.h"
 #include "mozilla/MacroForEach.h"
@@ -398,26 +399,7 @@ class ThreadSafeAutoRefCnt {
     return mValue.fetch_add(1, std::memory_order_relaxed) + 1;
   }
   MOZ_ALWAYS_INLINE nsrefcnt operator--() {
-    // Since this may be the last release on this thread, we need
-    // release semantics so that prior writes on this thread are visible
-    // to the thread that destroys the object when it reads mValue with
-    // acquire semantics.
-    nsrefcnt result = mValue.fetch_sub(1, std::memory_order_release) - 1;
-    if (result == 0) {
-      // We're going to destroy the object on this thread, so we need
-      // acquire semantics to synchronize with the memory released by
-      // the last release on other threads, that is, to ensure that
-      // writes prior to that release are now visible on this thread.
-#ifdef MOZ_TSAN
-      // TSan doesn't understand std::atomic_thread_fence, so in order
-      // to avoid a false positive for every time a refcounted object
-      // is deleted, we replace the fence with an atomic operation.
-      mValue.load(std::memory_order_acquire);
-#else
-      std::atomic_thread_fence(std::memory_order_acquire);
-#endif
-    }
-    return result;
+    return mozilla::AtomicRefCountDecrement(mValue);
   }
 
   MOZ_ALWAYS_INLINE nsrefcnt operator=(nsrefcnt aValue) {

@@ -1306,6 +1306,8 @@ export const UrlbarShared = {
             return "unit";
           case "UrlbarProviderQuickSuggestContextualOptIn":
             return "fxsuggest_data_sharing_opt_in";
+          case "UrlbarProviderAddonsShortcutMoved":
+            return "addons_shortcut_moved";
           case "UrlbarProviderGlobalActions":
           case "UrlbarProviderActionsSearchMode":
             return "action";

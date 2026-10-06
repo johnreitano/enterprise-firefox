@@ -17,12 +17,17 @@ unit tested from sites that do not vendor it.
 import collections
 import json
 import os
+import re
 import subprocess
 
 import mozpack.path as mozpath
 import toml
 
 VENDOR_DIR = "third_party/rust"
+
+# Cargo once took "MIT/Apache-2.0" to mean "MIT OR Apache-2.0", and crates
+# published back then still say so. It is not an SPDX expression.
+RE_LEGACY_LICENSE_SEPARATOR = re.compile(r"\s*/\s*")
 
 # Workspace members that build or test the product rather than being part of
 # it. A crate reached only from these, or only as a dev dependency, is a
@@ -308,7 +313,7 @@ def crate_records(topsrcdir, lock_path=None, kinds=None):
             properties["moz:cargo.manifest-unreadable"] = manifest_error
         licenses = []
         if metadata.get("license"):
-            licenses = [metadata["license"]]
+            licenses = [RE_LEGACY_LICENSE_SEPARATOR.sub(" OR ", metadata["license"])]
         elif metadata.get("license-file"):
             properties["moz:cargo.license-file"] = metadata["license-file"]
 

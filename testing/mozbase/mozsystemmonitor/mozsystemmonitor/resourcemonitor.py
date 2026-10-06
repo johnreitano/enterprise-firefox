@@ -407,6 +407,23 @@ class _AssertionFallbackLogger:
         self._monitor._record_line_assertion(data)
 
 
+def _ubsan_key(data):
+    """Identity of a UBSan report, shared by the ubsan_error action and the
+    line-based fallback so the two can be matched."""
+    return (data.get("file"), data.get("lineno"), data.get("column"), data["message"])
+
+
+class _UBSanFallbackLogger:
+    """Logger-like sink for the line-based UBSanErrorParser: the actions it
+    would emit become markers instead."""
+
+    def __init__(self, monitor):
+        self._monitor = monitor
+
+    def ubsan_error(self, **data):
+        self._monitor._record_line_ubsan(data)
+
+
 class SystemResourceMonitor:
     """Measures system resources.
 
@@ -527,6 +544,20 @@ class SystemResourceMonitor:
         # (message, file, lineno) of assertion_failure actions that found no
         # pending line-based report, so that one completing later is dropped.
         self._recent_assertion_actions = deque(maxlen=32)
+        # Line-based fallback for harnesses that do not emit ubsan_error
+        # actions: assembles UBSan reports out of process_output lines. A
+        # ubsan_error action for the same report supersedes the pending
+        # line-based one.
+        self._ubsan_parser = None
+        try:
+            from moztest.ubsan import UBSanErrorParser
+        except ImportError:
+            pass
+        else:
+            self._ubsan_parser = UBSanErrorParser(_UBSanFallbackLogger(self))
+        # Keys of ubsan_error actions that found no pending line-based
+        # report, so that one completing later is dropped.
+        self._recent_ubsan_actions = deque(maxlen=32)
         # Multi-line console.<method>: body (Message:/Stack:/frames) waiting
         # to be assembled into a single marker. Tuple of
         # (name, timestamp, marker_data, phase, prefix_body) where phase
@@ -688,6 +719,8 @@ class SystemResourceMonitor:
         self._flush_pending_multiline_console()
         if self._assertion_parser is not None:
             self._assertion_parser.flush()
+        if self._ubsan_parser is not None:
+            self._ubsan_parser.flush()
 
         if self._stream_file:
             self._stream_file.close()
@@ -1109,6 +1142,11 @@ class SystemResourceMonitor:
             if test_name:
                 marker_data["test"] = test_name
             self._add_event("C++ warning", timestamp, marker_data)
+            return True
+
+        if self._ubsan_parser is not None and self._ubsan_parser.log(
+            line, pid=process, test=test_name, time=timestamp
+        ):
             return True
 
         if self._assertion_parser is not None:
@@ -1767,6 +1805,73 @@ class SystemResourceMonitor:
         elif frame_file and lineno is not None:
             marker_data["stack"] = [{"file": frame_file, "line": lineno}]
         self._add_event(data["kind"], timestamp, marker_data)
+
+    @staticmethod
+    def ubsan_error(data):
+        """Record an UndefinedBehaviorSanitizer report.
+
+        Args:
+            data: Dictionary containing ubsan_error data including:
+                  - "kind": check kind (e.g. "undefined-behavior")
+                  - "message": the "runtime error:" message
+                  - "file", "lineno", "column": source location (optional)
+                  - "stack": list of profiler-format frame dicts (optional)
+                  - "scope": identifier for the browser session, e.g. a
+                             directory name (optional)
+                  - "test": test name (optional)
+                  - "time": timestamp in milliseconds
+
+        The same report may be pending in the line-based fallback fed by
+        process_output lines; the structured action wins.
+        """
+        if not SystemResourceMonitor.instance:
+            return
+
+        monitor = SystemResourceMonitor.instance
+        timestamp = monitor.get_monotonic_time_from_data(data)
+
+        key = _ubsan_key(data)
+        if not (monitor._ubsan_parser and monitor._ubsan_parser.discard(key)):
+            monitor._recent_ubsan_actions.append(key)
+        monitor._emit_ubsan_marker(timestamp, data)
+
+    def _record_line_ubsan(self, data):
+        key = _ubsan_key(data)
+        if key in self._recent_ubsan_actions:
+            self._recent_ubsan_actions.remove(key)
+            return
+        self._emit_ubsan_marker(data.pop("time", time.monotonic()), data)
+
+    def _emit_ubsan_marker(self, timestamp, data):
+        marker_data = {
+            "type": "UBSanError",
+            "kind": data["kind"],
+            "message": data["message"],
+            "color": "orange",
+        }
+        frame_file = None
+        if file_ := data.get("file"):
+            marker_data["file"], frame_file = self._clean_frame_file(file_)
+        lineno = data.get("lineno")
+        if lineno is not None:
+            marker_data["line"] = lineno
+        for key in ("column", "scope", "test"):
+            if data.get(key) is not None:
+                marker_data[key] = data[key]
+        if stack := data.get("stack"):
+            rewritten = []
+            for frame in stack:
+                if "file" in frame:
+                    rewritten.append({
+                        **frame,
+                        "file": self._clean_frame_file(frame["file"])[1],
+                    })
+                else:
+                    rewritten.append(frame)
+            marker_data["stack"] = rewritten
+        elif frame_file and lineno is not None:
+            marker_data["stack"] = [{"file": frame_file, "line": lineno}]
+        self._add_event("UBSan Error", timestamp, marker_data)
 
     @staticmethod
     def mozleak_object(data):
@@ -2429,6 +2534,24 @@ class SystemResourceMonitor:
                         {"key": "process", "label": "Process", "format": "string"},
                         {"key": "pid", "label": "Process ID", "format": "integer"},
                         {"key": "thread", "label": "Thread", "format": "string"},
+                        {"key": "test", "label": "Test", "format": "string"},
+                        {"key": "color", "hidden": True},
+                    ],
+                },
+                {
+                    "name": "UBSanError",
+                    "tooltipLabel": "{marker.data.message}",
+                    "tableLabel": "{marker.data.message} — {marker.data.file}:{marker.data.line}",
+                    "chartLabel": "{marker.data.message}",
+                    "display": ["marker-chart", "marker-table"],
+                    "colorField": "color",
+                    "data": [
+                        {"key": "kind", "label": "Kind", "format": "string"},
+                        {"key": "message", "label": "Message", "format": "string"},
+                        {"key": "file", "format": "string", "hidden": True},
+                        {"key": "line", "format": "integer", "hidden": True},
+                        {"key": "column", "format": "integer", "hidden": True},
+                        {"key": "scope", "label": "Scope", "format": "string"},
                         {"key": "test", "label": "Test", "format": "string"},
                         {"key": "color", "hidden": True},
                     ],

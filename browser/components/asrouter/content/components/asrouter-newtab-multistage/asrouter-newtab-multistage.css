@@ -5903,7 +5903,7 @@ html {
     box-shadow: none;
   }
   .multistage-newtab-wrapper .onboardingContainer .screen[pos=split]:where(:not([fullscreen], .zap-border, .zap-shadow)) .section-secondary {
-    background-color: var(--background-color-dimmed);
+    background-color: var(--background-color-box-info);
     border-radius: 0;
     margin: 0;
   }

@@ -217,6 +217,25 @@ void OffscreenCanvasDisplayHelper::FlushForDisplay() {
   task->Dispatch(mWorkerRef->Private());
 }
 
+void OffscreenCanvasDisplayHelper::SetPresentationEnabled(bool aEnabled) {
+  MOZ_ASSERT(NS_IsMainThread());
+
+  bool needsFlush;
+  {
+    MutexAutoLock lock(mMutex);
+    if (mPresentationEnabled == aEnabled) {
+      return;
+    }
+    mPresentationEnabled = aEnabled;
+    needsFlush = aEnabled && mPendingPresent;
+    mPendingPresent = false;
+  }
+
+  if (needsFlush) {
+    FlushForDisplay();
+  }
+}
+
 bool OffscreenCanvasDisplayHelper::CommitFrameToCompositor(
     nsICanvasRenderingContextInternal* aContext,
     const Maybe<OffscreenCanvasDisplayData>& aData) {
@@ -243,6 +262,15 @@ bool OffscreenCanvasDisplayHelper::CommitFrameToCompositor(
   }
 
   if (!mImageContainer) {
+    return false;
+  }
+
+  if (!mPresentationEnabled) {
+    // Nothing on the other end is going to composite what we produce, so
+    // presenting the front buffer would just pile up textures the compositor
+    // never consumes. The context keeps the drawn content in its own buffers
+    // and we present the latest of it once we are visible again.
+    mPendingPresent = true;
     return false;
   }
 

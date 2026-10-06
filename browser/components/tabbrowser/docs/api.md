@@ -11,6 +11,11 @@ carry the underscore only because something outside the class reaches them:
 another class in the same module, or one of the sibling modules that implement
 the tab strip. Everything else internal is `#private`.
 
+Members such as `reload`, `goBack`, `currentURI` and `fullZoom` forward to the
+selected tab's browser, so they act on whichever tab is selected when they run.
+Code holding a particular tab should use the same member on its
+`linkedBrowser`.
+
 ## Tabbrowser
 
 ```{js:autoclass} Tabbrowser

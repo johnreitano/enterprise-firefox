@@ -20,3 +20,8 @@ type SavedTabGroupStateData =
   import("../TabGroupState.sys.mjs").SavedTabGroupStateData;
 type SavedGroupTabStateData =
   import("../TabGroupState.sys.mjs").SavedGroupTabStateData;
+
+type SessionStoreLogger =
+  typeof import("../SessionLogger.sys.mjs").sessionStoreLogger;
+type TabMetricsContext =
+  import("../../tabbrowser/TabMetrics.sys.mjs").TabMetricsContext;

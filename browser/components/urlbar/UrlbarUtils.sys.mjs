@@ -2084,7 +2084,9 @@ export class UrlbarProvider {
    *
    *   For "abandonment", only `searchString` is defined.
    *
-   * onEngagement(_queryContext, _controller, _details) {}
+   * @function onEngagement
+   * @memberof UrlbarProvider
+   * @instance
    */
 
   /**
@@ -2099,7 +2101,9 @@ export class UrlbarProvider {
    * @param {UrlbarParentController} _controller
    * The associated controller.
    *
-   * onAbandonment(_queryContext, _controller) {}
+   * @function onAbandonment
+   * @memberof UrlbarProvider
+   * @instance
    */
 
   /**
@@ -2118,7 +2122,7 @@ export class UrlbarProvider {
    *    The current query context.
    * @param {UrlbarParentController} _controller
    *    The associated controller.
-   * @param {{index: number, result: UrlbarResult}[]} _providerVisibleResults
+   * @param {Array<{index: number, result: UrlbarResult}>} _providerVisibleResults
    *    Array of visible results at the time of either an engagement or
    *    abandonment event relevant to the provider. Each object in the array
    *    contains:
@@ -2130,8 +2134,9 @@ export class UrlbarProvider {
    *    object that's also passed to `onEngagement()`. Otherwise it will be
    *    null. See `onEngagement()` documentation for info.
    *
-   * onImpression(_state, _queryContext, _controller, _providerVisibleResults, _details)
-   * {}
+   * @function onImpression
+   * @memberof UrlbarProvider
+   * @instance
    */
 
   /**
@@ -2144,7 +2149,9 @@ export class UrlbarProvider {
    * @param {UrlbarParentController} _controller
    *    The associated controller.
    *
-   * onSearchSessionEnd(_queryContext, _controller) {}
+   * @function onSearchSessionEnd
+   * @memberof UrlbarProvider
+   * @instance
    */
 
   /**
@@ -2255,7 +2262,7 @@ export class UrlbarProvider {
 
   /**
    * This is called only for dynamic result types by the providers manager. It
-   * should return an object describing the view update that looks like this:
+   * should return an object describing the view update that looks like this::
    *
    *   {
    *     nodeNameFoo: {
@@ -2351,7 +2358,6 @@ export class UrlbarProvider {
    *
    * @returns {boolean} Whether the provider wants to defer user selection
    *          events.
-   * @see {@link UrlbarEventBufferer}
    */
   get deferUserSelection() {
     return false;

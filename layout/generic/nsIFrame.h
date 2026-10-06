@@ -2287,6 +2287,17 @@ class nsIFrame : public nsQueryFrame {
    * @see     WidgetGUIEvent
    * @see     nsEventStatus
    */
+  /**
+   * Select the word or the link at aContextMenuEvent's point, so that the
+   * context menu can act on it. Called from HandleEvent(), after the event
+   * has been dispatched to the page and before the system group listeners
+   * open the context menu, and only if the page did not cancel the event.
+   *
+   * @param aContextMenuEvent       Its message must be eContextMenu.
+   */
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY void HandleContextMenuEventToSelectWordOrLink(
+      const mozilla::WidgetMouseEvent& aContextMenuEvent);
+
   MOZ_CAN_RUN_SCRIPT_BOUNDARY
   virtual nsresult HandleEvent(nsPresContext* aPresContext,
                                mozilla::WidgetGUIEvent* aEvent,
@@ -2356,6 +2367,38 @@ class nsIFrame : public nsQueryFrame {
       mozilla::WidgetMouseEvent& aSecondaryButtonEvent,
       const nsIContent& aContentAtEventPoint,
       int32_t aOffsetAtEventPoint) const;
+
+  /**
+   * Check whether aContextMenuEvent should select what it points at instead of
+   * leaving the selection alone.
+   *
+   * @param aFrameSelection         The nsFrameSelection which owns the
+   *                                selection to compare the event point with.
+   * @param aContextMenuEvent       Its message must be eContextMenu.
+   * @param aPoint                  The event point, relative to this frame.
+   * @param aContentAtEventPoint    The content node at the event point.
+   * @param aOffsetAtEventPoint     The offset in aContentAtEventPoint which
+   *                                aContextMenuEvent points at.
+   */
+  [[nodiscard]] bool SelectingWordOrLinkAtEventPointAllowed(
+      const nsFrameSelection& aFrameSelection,
+      const mozilla::WidgetMouseEvent& aContextMenuEvent, const nsPoint& aPoint,
+      const nsIContent& aContentAtEventPoint,
+      int32_t aOffsetAtEventPoint) const;
+
+  /**
+   * Select the whole text of the link containing aContentAtEventPoint, or the
+   * word at aPoint when it is not in a link.  A link is selected as a whole
+   * because the context menu acts on the link rather than on one of its words.
+   * Blink does the same in
+   * SelectionController::SelectClosestWordOrLinkFromMouseEvent() and WebKit in
+   * EventHandler::selectClosestContextualWordOrLinkFromHitTestResult().
+   *
+   * @param aPoint                  The event point, relative to this frame.
+   * @param aContentAtEventPoint    The content node at aPoint.
+   */
+  MOZ_CAN_RUN_SCRIPT nsresult SelectWordOrLinkAtPoint(
+      const nsPoint& aPoint, const nsIContent& aContentAtEventPoint);
 
   MOZ_CAN_RUN_SCRIPT_BOUNDARY NS_IMETHOD HandleMultiplePress(
       nsPresContext* aPresContext, mozilla::WidgetGUIEvent* aEvent,

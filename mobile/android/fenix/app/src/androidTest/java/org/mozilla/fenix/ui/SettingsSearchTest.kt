@@ -671,11 +671,12 @@ class SettingsSearchTest {
                 verifyEnginesShortcutsListHeader()
                 verifyManageShortcutsList(composeTestRule)
                 verifySearchShortcutChecked(
-                    EngineShortcut(name = "Bing", checkboxIndex = 1, isChecked = true),
-                    EngineShortcut(name = "DuckDuckGo", checkboxIndex = 4, isChecked = true),
-                    EngineShortcut(name = "Wikipedia (en)", checkboxIndex = 7, isChecked = true),
-                    EngineShortcut(name = "Reddit", checkboxIndex = 10, isChecked = false),
-                    EngineShortcut(name = "YouTube", checkboxIndex = 13, isChecked = false),
+                    composeTestRule,
+                    EngineShortcut(name = "Bing", isChecked = true),
+                    EngineShortcut(name = "DuckDuckGo", isChecked = true),
+                    EngineShortcut(name = "Wikipedia (en)", isChecked = true),
+                    EngineShortcut(name = "Reddit", isChecked = false),
+                    EngineShortcut(name = "YouTube", isChecked = false),
                 )
             }
     }
@@ -697,8 +698,8 @@ class SettingsSearchTest {
             .clickSettingsButton {}
             .openSearchSubMenu {
                 openManageShortcutsMenu()
-                selectSearchShortcut(EngineShortcut(name = "Reddit", checkboxIndex = 10))
-                selectSearchShortcut(EngineShortcut(name = "YouTube", checkboxIndex = 13))
+                selectSearchShortcut(composeTestRule, EngineShortcut(name = "Reddit"))
+                selectSearchShortcut(composeTestRule, EngineShortcut(name = "YouTube"))
                 exitMenu()
             }
         searchScreen(composeTestRule) {

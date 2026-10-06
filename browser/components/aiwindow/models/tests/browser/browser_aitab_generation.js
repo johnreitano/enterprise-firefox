@@ -513,15 +513,7 @@ add_task(async function test_generateAITab_default_title_is_localized() {
   }
 });
 
-// Stands in for the external viewer until its components are in-tree. Served by
-// the mochitest server so the link is a real https page a tab can load.
-const VIEWER_URL =
-  "https://example.com/browser/browser/components/aiwindow/models/tests/browser/aitab_viewer_stub.html";
-
-add_task(async function test_createAITab_link_loads_config_in_a_tab() {
-  await SpecialPowers.pushPrefEnv({
-    set: [["browser.smartwindow.aitab.viewerURL", VIEWER_URL]],
-  });
+add_task(async function test_createAITab_links_to_the_stored_page() {
   const mockEngine = new lazy.MockEngineManager();
   const { url, cleanup: stopServing } = servePage();
   const conversation = lazy.newConversation();
@@ -547,38 +539,19 @@ add_task(async function test_createAITab_link_loads_config_in_a_tab() {
       toolResult.message,
       conversation.tokenToUrl
     );
-    const [, viewerURL] = expanded.match(/\]\((https:\/\/[^\s)]+)\)/) ?? [];
-    Assert.ok(viewerURL, `the tool returns a viewer link: ${expanded}`);
+    const viewerURL = `about:smartpage?page=${toolResult.aiTab.slug}`;
     Assert.ok(
-      viewerURL.startsWith(`${VIEWER_URL}#`),
-      "the link points at the configured viewer, with the config in the hash"
+      expanded.includes(`](${viewerURL})`),
+      `the link names the stored page: ${expanded}`
     );
-
-    const tab = await BrowserTestUtils.openNewForegroundTab(
-      gBrowser,
-      viewerURL,
-      true // waitForLoad
+    Assert.ok(
+      conversation.seenUrls.has(viewerURL),
+      "the link is seen, so the chat renders it as a trusted link"
     );
-    try {
-      const [title, hash] = await SpecialPowers.spawn(
-        tab.linkedBrowser,
-        [],
-        () => [content.document.title, content.location.hash]
-      );
-      Assert.equal(title, "AITab viewer stub", "the viewer page loaded");
-      Assert.deepEqual(
-        JSON.parse(decodeURIComponent(hash.slice(1))),
-        GENERATED_SURFACE,
-        "the surface round-trips through the hash of the loaded URL"
-      );
-    } finally {
-      BrowserTestUtils.removeTab(tab);
-    }
   } finally {
     await lazy.AITabStore.destroyDatabase();
     await stopServing();
     mockEngine.cleanupMocks();
-    await SpecialPowers.popPrefEnv();
   }
 });
 

@@ -738,7 +738,6 @@ interface GleanImpl {
   }
 
   osEnvironment: {
-    desktopEntryExists: GleanString;
     invokedToHandle: Record<string, GleanCounter>;
     isDefaultHandler: Record<string, GleanBoolean>;
     isKeptInDock: GleanBoolean;

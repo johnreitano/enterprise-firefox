@@ -249,7 +249,7 @@ export class _AdsClient {
          * lazy.MozAdsEnvironment.Prod()`
          */
         .environment(
-          lazy.MozAdsEnvironment.PROD
+          lazy.MozAdsEnvironment.PROD !== undefined
             ? lazy.MozAdsEnvironment.PROD
             : new lazy.MozAdsEnvironment.Prod()
         )

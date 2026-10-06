@@ -20,8 +20,8 @@
  */
 
 /**
- * pdfjsVersion = 6.4.305
- * pdfjsBuild = 2581d8f70
+ * pdfjsVersion = 6.5.10
+ * pdfjsBuild = 17bb2442f
  */
 
 ;// ./src/scripting_api/constants.js
@@ -3387,7 +3387,7 @@ class Util extends PDFObject {
         }
       }
       let sign = "";
-      if (intPart < 0) {
+      if (intPart < 0 || cConvChar === "f" && arg < 0) {
         sign = "-";
         intPart = -intPart;
       } else if (cFlags & PLUS) {

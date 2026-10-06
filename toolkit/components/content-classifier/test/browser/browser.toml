@@ -14,6 +14,8 @@ support-files = [
 
 ["browser_content_classifier_engines_pref.js"]
 
+["browser_content_classifier_first_party.js"]
+
 ["browser_content_classifier_harmful_addon.js"]
 
 ["browser_content_classifier_memory_reporter.js"]

@@ -16,16 +16,20 @@ import mozilla.components.compose.menu.data.StandardMenuItem
 import org.mozilla.fenix.components.menu.FenixMenuItem.AddToHomeScreen
 import org.mozilla.fenix.components.menu.FenixMenuItem.Back
 import org.mozilla.fenix.components.menu.FenixMenuItem.Bookmark
+import org.mozilla.fenix.components.menu.FenixMenuItem.Bookmarks
 import org.mozilla.fenix.components.menu.FenixMenuItem.CustomizeReaderView
 import org.mozilla.fenix.components.menu.FenixMenuItem.DesktopSite
+import org.mozilla.fenix.components.menu.FenixMenuItem.Downloads
 import org.mozilla.fenix.components.menu.FenixMenuItem.Extensions
 import org.mozilla.fenix.components.menu.FenixMenuItem.FindInPage
 import org.mozilla.fenix.components.menu.FenixMenuItem.Forward
+import org.mozilla.fenix.components.menu.FenixMenuItem.History
 import org.mozilla.fenix.components.menu.FenixMenuItem.IPProtection
 import org.mozilla.fenix.components.menu.FenixMenuItem.More
 import org.mozilla.fenix.components.menu.FenixMenuItem.MoveToNormalTabs
 import org.mozilla.fenix.components.menu.FenixMenuItem.MozillaAccount
 import org.mozilla.fenix.components.menu.FenixMenuItem.OpenInApp
+import org.mozilla.fenix.components.menu.FenixMenuItem.Passwords
 import org.mozilla.fenix.components.menu.FenixMenuItem.Print
 import org.mozilla.fenix.components.menu.FenixMenuItem.Quit
 import org.mozilla.fenix.components.menu.FenixMenuItem.Refresh
@@ -122,6 +126,7 @@ class BrowserMenuBuilder(
         @VisibleForTesting internal val BROWSER_MENU_GROUP_3_ID = "browser_group_3"
         @VisibleForTesting internal val BROWSER_MENU_GROUP_4_ID = "browser_group_4"
         @VisibleForTesting internal val BROWSER_MENU_GROUP_5_ID = "browser_group_5"
+        @VisibleForTesting internal val BROWSER_MENU_GROUP_6_ID = "browser_group_6"
 
         @VisibleForTesting
         internal fun buildDefaultConfiguration(
@@ -174,11 +179,16 @@ class BrowserMenuBuilder(
                     ),
                     MenuSectionConfiguration(
                         id = BROWSER_MENU_GROUP_4_ID,
+                        presentationMode = Grid,
+                        items = listOf(History, Bookmarks, Downloads, Passwords),
+                    ),
+                    MenuSectionConfiguration(
+                        id = BROWSER_MENU_GROUP_5_ID,
                         presentationMode = Row,
                         items = listOf(MozillaAccount, Settings),
                     ),
                     MenuSectionConfiguration(
-                        id = BROWSER_MENU_GROUP_5_ID,
+                        id = BROWSER_MENU_GROUP_6_ID,
                         presentationMode = Row,
                         items = listOf(Quit),
                     ),

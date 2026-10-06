@@ -285,6 +285,13 @@
   font-size: var(--font-size-small);
 }
 
+// Shared widget header typography.
+.newtab-widget-title {
+  margin: 0;
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight);
+}
+
 // @experiment(remove) { bug 2066527 }
 // The height transition itself comes from .is-animating-height above.
 .nova-enabled .widgets-container[data-section-collapsed] {

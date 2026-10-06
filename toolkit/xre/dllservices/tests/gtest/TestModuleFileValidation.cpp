@@ -2,7 +2,7 @@
  * http://creativecommons.org/publicdomain/zero/1.0/
  */
 
-// Tests that ValidateAndResolveModuleSection rejects invalid section modules.
+// Tests that ValidateAndResolveModuleFile rejects invalid module files.
 //
 // Everything here runs in the parent process and needs no child process.
 // Driving a real content process into loading a chosen DLL - is not currently
@@ -11,9 +11,9 @@
 
 #include <windows.h>
 #include <aclapi.h>
+#include <psapi.h>
 #include <sddl.h>
 
-#include "mozilla/FileUtilsWin.h"
 #include "mozilla/ipc/FileDescriptor.h"
 #include "mozilla/UntrustedModulesProcessor.h"
 #include "nsCOMPtr.h"
@@ -23,39 +23,28 @@
 #include "nsString.h"
 #include "nsWindowsHelpers.h"
 
-// NativeNt.h declares this only for the freestanding launcher, inside its
-// !MOZILLA_INTERNAL_API block, so declare it locally the way
-// TestDllBlocklistAssumptions.cpp does for NtMapViewOfSection.
-extern "C" NTSTATUS NTAPI NtCreateSection(PHANDLE aSectionHandle,
-                                          ACCESS_MASK aDesiredAccess,
-                                          POBJECT_ATTRIBUTES aObjectAttributes,
-                                          PLARGE_INTEGER aMaximumSize,
-                                          ULONG aSectionPageProtection,
-                                          ULONG aAllocationAttributes,
-                                          HANDLE aFileHandle);
-
 using namespace mozilla;
 
 namespace {
 
-// Creates a SEC_IMAGE section over aFile with the same arguments the loader
-// uses.
-nsAutoHandle MakeImageSection(HANDLE aFile) {
-  HANDLE section = nullptr;
-  NTSTATUS status = ::NtCreateSection(
-      &section, SECTION_QUERY | SECTION_MAP_READ | SECTION_MAP_EXECUTE, nullptr,
-      nullptr, PAGE_EXECUTE, SEC_IMAGE, aFile);
-  if (!NT_SUCCESS(status)) {
+// Opens aPath with the access and sharing the loader uses, then duplicates
+// that handle the way the DLL blocklist's NtCreateSection hook does.
+nsAutoHandle OpenLikeLoader(const nsString& aPath) {
+  nsAutoHandle file(
+      ::CreateFileW(aPath.get(), SYNCHRONIZE | FILE_EXECUTE | FILE_READ_DATA,
+                    FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+                    FILE_ATTRIBUTE_NORMAL, nullptr));
+  if (file.get() == INVALID_HANDLE_VALUE) {
     return nsAutoHandle();
   }
-  return nsAutoHandle(section);
-}
 
-nsAutoHandle OpenForImageSection(const nsString& aPath) {
-  return nsAutoHandle(
-      ::CreateFileW(aPath.get(), GENERIC_READ | GENERIC_EXECUTE,
-                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                    nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+  HANDLE duplicate = nullptr;
+  if (!::DuplicateHandle(::GetCurrentProcess(), file.get(),
+                         ::GetCurrentProcess(), &duplicate, SYNCHRONIZE, FALSE,
+                         0)) {
+    return nsAutoHandle();
+  }
+  return nsAutoHandle(duplicate);
 }
 
 // A private copy of a small real module, so that a test can apply an integrity
@@ -143,37 +132,36 @@ class ScopedModuleCopy final {
 
 TEST(TestModuleFileValidation, AcceptsLoadedModuleAndVerifiesPathsMatch)
 {
+  HMODULE xul = ::GetModuleHandleW(L"xul.dll");
+  ASSERT_NE(xul, nullptr);
+
   wchar_t xulPath[MAX_PATH + 1] = {};
-  ASSERT_NE(::GetModuleFileNameW(::GetModuleHandleW(L"xul.dll"), xulPath,
-                                 std::size(xulPath)),
-            0UL);
+  ASSERT_NE(::GetModuleFileNameW(xul, xulPath, std::size(xulPath)), 0UL);
 
   nsAutoString path(xulPath);
-  nsAutoHandle file(OpenForImageSection(path));
-  ASSERT_NE(file.get(), INVALID_HANDLE_VALUE);
+  nsAutoHandle file(OpenLikeLoader(path));
+  ASSERT_NE(file.get(), nullptr);
 
-  nsAutoHandle section(MakeImageSection(file.get()));
-  ASSERT_NE(section.get(), nullptr);
-
-  ipc::FileDescriptor fd(section.get());
+  ipc::FileDescriptor fd(file.get());
   ASSERT_TRUE(fd.IsValid());
 
   nsAutoString resolved;
-  ASSERT_TRUE(ValidateAndResolveModuleSection(fd, resolved));
+  ASSERT_TRUE(ValidateAndResolveModuleFile(fd, resolved));
 
   // CompleteProcessing looks up the parent's ModulesMap by this path, so it
   // has to name the file the child loaded; if it named it differently, lookup
-  // would miss and every module would be mistakenly reported as trusted. It is
-  // in the NT device form that a child's loader observer records and that
-  // ModuleRecord expects, so it needs converting before it can be compared
-  // against a DOS path.
+  // would miss and every module would be mistakenly reported as trusted.  The
+  // child's loader observer records the name of the module's mapped section,
+  // which is what GetMappedFileNameW reports.
+  wchar_t mappedName[MAX_PATH + 1] = {};
+  ASSERT_NE(::GetMappedFileNameW(::GetCurrentProcess(), xul, mappedName,
+                                 std::size(mappedName)),
+            0UL);
   EXPECT_TRUE(StringBeginsWith(resolved, u"\\Device\\"_ns));
-
-  nsAutoString resolvedDosPath;
-  ASSERT_TRUE(NtPathToDosPath(resolved, resolvedDosPath));
-  EXPECT_TRUE(resolvedDosPath.Equals(path, nsCaseInsensitiveStringComparator))
-      << "resolved: " << NS_ConvertUTF16toUTF8(resolvedDosPath).get()
-      << ", expected: " << NS_ConvertUTF16toUTF8(path).get();
+  EXPECT_TRUE(resolved.Equals(nsDependentString(mappedName),
+                              nsCaseInsensitiveStringComparator))
+      << "resolved: " << NS_ConvertUTF16toUTF8(resolved).get()
+      << ", mapped: " << NS_ConvertUTF16toUTF8(mappedName).get();
 }
 
 // An invalid descriptor must be refused rather than producing a path.
@@ -183,12 +171,12 @@ TEST(TestModuleFileValidation, RejectsInvalidDescriptor)
   ASSERT_FALSE(fd.IsValid());
 
   nsAutoString resolved;
-  EXPECT_FALSE(ValidateAndResolveModuleSection(fd, resolved));
+  EXPECT_FALSE(ValidateAndResolveModuleFile(fd, resolved));
   EXPECT_TRUE(resolved.IsEmpty());
 }
 
-// A handle to something unmappable must be refused.
-TEST(TestModuleFileValidation, RejectsNonSectionHandle)
+// A handle to something other than a file on a disk must be refused.
+TEST(TestModuleFileValidation, RejectsNonDiskHandle)
 {
   HANDLE readEnd = nullptr;
   HANDLE writeEnd = nullptr;
@@ -200,34 +188,7 @@ TEST(TestModuleFileValidation, RejectsNonSectionHandle)
   ASSERT_TRUE(fd.IsValid());
 
   nsAutoString resolved;
-  EXPECT_FALSE(ValidateAndResolveModuleSection(fd, resolved));
-  EXPECT_TRUE(resolved.IsEmpty());
-}
-
-// A handle to a non-MEM_IMAGE section must be refused.
-TEST(TestModuleFileValidation, RejectsDataSection)
-{
-  wchar_t xulPath[MAX_PATH + 1] = {};
-  ASSERT_NE(::GetModuleFileNameW(::GetModuleHandleW(L"xul.dll"), xulPath,
-                                 std::size(xulPath)),
-            0UL);
-
-  nsAutoHandle file(
-      ::CreateFileW(xulPath, GENERIC_READ,
-                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                    nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-  ASSERT_NE(file.get(), INVALID_HANDLE_VALUE);
-
-  // The same file, but mapped as data rather than as an image.
-  nsAutoHandle mapping(::CreateFileMappingW(file.get(), nullptr, PAGE_READONLY,
-                                            0, 4096, nullptr));
-  ASSERT_NE(mapping.get(), nullptr);
-
-  ipc::FileDescriptor fd(mapping.get());
-  ASSERT_TRUE(fd.IsValid());
-
-  nsAutoString resolved;
-  EXPECT_FALSE(ValidateAndResolveModuleSection(fd, resolved));
+  EXPECT_FALSE(ValidateAndResolveModuleFile(fd, resolved));
   EXPECT_TRUE(resolved.IsEmpty());
 }
 
@@ -238,17 +199,14 @@ TEST(TestModuleFileValidation, AcceptsUnlabelledModule)
   ScopedModuleCopy copy;
   ASSERT_TRUE(copy.IsValid());
 
-  nsAutoHandle file(OpenForImageSection(copy.Path()));
-  ASSERT_NE(file.get(), INVALID_HANDLE_VALUE);
+  nsAutoHandle file(OpenLikeLoader(copy.Path()));
+  ASSERT_NE(file.get(), nullptr);
 
-  nsAutoHandle section(MakeImageSection(file.get()));
-  ASSERT_NE(section.get(), nullptr);
-
-  ipc::FileDescriptor fd(section.get());
+  ipc::FileDescriptor fd(file.get());
   ASSERT_TRUE(fd.IsValid());
 
   nsAutoString resolved;
-  EXPECT_TRUE(ValidateAndResolveModuleSection(fd, resolved));
+  EXPECT_TRUE(ValidateAndResolveModuleFile(fd, resolved));
   EXPECT_TRUE(StringBeginsWith(resolved, u"\\Device\\"_ns));
 
   // The copy carries a generated temp name, not the name of the module it was
@@ -267,17 +225,14 @@ TEST(TestModuleFileValidation, RejectsLowIntegrityModule)
   ASSERT_TRUE(copy.IsValid());
   ASSERT_TRUE(copy.SetIntegrityLabel(L"S:(ML;;NW;;;LW)"));
 
-  nsAutoHandle file(OpenForImageSection(copy.Path()));
-  ASSERT_NE(file.get(), INVALID_HANDLE_VALUE);
+  nsAutoHandle file(OpenLikeLoader(copy.Path()));
+  ASSERT_NE(file.get(), nullptr);
 
-  nsAutoHandle section(MakeImageSection(file.get()));
-  ASSERT_NE(section.get(), nullptr);
-
-  ipc::FileDescriptor fd(section.get());
+  ipc::FileDescriptor fd(file.get());
   ASSERT_TRUE(fd.IsValid());
 
   nsAutoString resolved;
-  EXPECT_FALSE(ValidateAndResolveModuleSection(fd, resolved));
+  EXPECT_FALSE(ValidateAndResolveModuleFile(fd, resolved));
   EXPECT_TRUE(resolved.IsEmpty());
 }
 
@@ -288,17 +243,14 @@ TEST(TestModuleFileValidation, RejectsUntrustedIntegrityModule)
   ASSERT_TRUE(copy.IsValid());
   ASSERT_TRUE(copy.SetIntegrityLabel(L"S:(ML;;NW;;;S-1-16-0)"));
 
-  nsAutoHandle file(OpenForImageSection(copy.Path()));
-  ASSERT_NE(file.get(), INVALID_HANDLE_VALUE);
+  nsAutoHandle file(OpenLikeLoader(copy.Path()));
+  ASSERT_NE(file.get(), nullptr);
 
-  nsAutoHandle section(MakeImageSection(file.get()));
-  ASSERT_NE(section.get(), nullptr);
-
-  ipc::FileDescriptor fd(section.get());
+  ipc::FileDescriptor fd(file.get());
   ASSERT_TRUE(fd.IsValid());
 
   nsAutoString resolved;
-  EXPECT_FALSE(ValidateAndResolveModuleSection(fd, resolved));
+  EXPECT_FALSE(ValidateAndResolveModuleFile(fd, resolved));
   EXPECT_TRUE(resolved.IsEmpty());
 }
 
@@ -310,16 +262,13 @@ TEST(TestModuleFileValidation, AcceptsMediumIntegrityModule)
   ASSERT_TRUE(copy.IsValid());
   ASSERT_TRUE(copy.SetIntegrityLabel(L"S:(ML;;NW;;;ME)"));
 
-  nsAutoHandle file(OpenForImageSection(copy.Path()));
-  ASSERT_NE(file.get(), INVALID_HANDLE_VALUE);
+  nsAutoHandle file(OpenLikeLoader(copy.Path()));
+  ASSERT_NE(file.get(), nullptr);
 
-  nsAutoHandle section(MakeImageSection(file.get()));
-  ASSERT_NE(section.get(), nullptr);
-
-  ipc::FileDescriptor fd(section.get());
+  ipc::FileDescriptor fd(file.get());
   ASSERT_TRUE(fd.IsValid());
 
   nsAutoString resolved;
-  EXPECT_TRUE(ValidateAndResolveModuleSection(fd, resolved));
+  EXPECT_TRUE(ValidateAndResolveModuleFile(fd, resolved));
   EXPECT_TRUE(StringBeginsWith(resolved, u"\\Device\\"_ns));
 }

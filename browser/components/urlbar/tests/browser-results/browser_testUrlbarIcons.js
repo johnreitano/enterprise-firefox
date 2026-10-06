@@ -192,17 +192,13 @@ add_task(async function test_icon_updates() {
 });
 
 add_task(async function test_superseded_icon_update_does_not_paint() {
-  let tabsMode = UrlbarShared.LOCAL_SEARCH_MODES.find(
-    m => m.source == UrlbarShared.RESULT_SOURCE.TABS
-  );
+  let engine = SearchService.visibleEngines[1];
+  let engineIcon = await engine.getIconURL();
 
-  gURLBar.searchMode = {
-    source: UrlbarShared.RESULT_SOURCE.TABS,
-    entry: "other",
-  };
+  gURLBar.searchMode = { engineName: engine.name };
   await TestUtils.waitForCondition(
-    () => getSwitcherIconUrl(window) == tabsMode.icon,
-    "The local search mode's icon is shown while the mode is active"
+    () => getSwitcherIconUrl(window) == engineIcon,
+    "The engine's icon is shown while its search mode is active"
   );
 
   // Hold this lookup, which starts in search mode, so the update that leaves
@@ -219,15 +215,15 @@ add_task(async function test_superseded_icon_update_does_not_paint() {
 
   gURLBar.searchMode = null;
   await TestUtils.waitForCondition(
-    () => getSwitcherIconUrl(window) != tabsMode.icon,
-    "The icon leaves the local search mode with it"
+    () => getSwitcherIconUrl(window) != engineIcon,
+    "The icon leaves the engine's search mode with it"
   );
 
   release();
   await superseded;
   Assert.notEqual(
     getSwitcherIconUrl(window),
-    tabsMode.icon,
-    "The superseded lookup did not paint the local search mode's icon again"
+    engineIcon,
+    "The superseded lookup did not paint the engine's icon again"
   );
 });

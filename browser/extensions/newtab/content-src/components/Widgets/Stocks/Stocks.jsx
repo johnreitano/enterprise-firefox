@@ -477,7 +477,7 @@ function Stocks({
           {/* Keep the region name while the search panel replaces the body. */}
           <h2
             id="stocks-widget-label"
-            className="stocks-heading sr-only"
+            className="newtab-widget-title stocks-heading sr-only"
             data-l10n-id="newtab-stocks-widget-title2"
           />
           <StockSearch
@@ -503,7 +503,7 @@ function Stocks({
               {/* Keep the heading mounted so aria-labelledby always resolves. */}
               <h2
                 id="stocks-widget-label"
-                className={`stocks-heading${
+                className={`newtab-widget-title stocks-heading${
                   showDropdown || (widgetSize === "small" && chosenSymbol)
                     ? " sr-only"
                     : ""

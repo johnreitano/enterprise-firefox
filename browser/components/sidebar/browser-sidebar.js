@@ -2147,6 +2147,7 @@ var SidebarController = {
         `url("${sidebar.iconUrl}")`
       );
       el.setAttribute("label", sidebar.label);
+      el.toggleAttribute("auto-accesskey", true);
     };
 
     updateAttributes(document.getElementById(sidebar.menuId), sidebar);

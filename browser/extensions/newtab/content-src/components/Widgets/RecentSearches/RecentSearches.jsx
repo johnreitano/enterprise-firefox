@@ -213,7 +213,7 @@ function RecentSearches({
           )}
           <h2
             id="recent-searches-widget-label"
-            className="recent-searches-title"
+            className="newtab-widget-title recent-searches-title"
             data-l10n-id="newtab-search-widget-title"
             hidden={true}
           />

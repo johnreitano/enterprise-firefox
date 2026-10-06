@@ -2048,7 +2048,8 @@ void AndroidDoSign(size_t certLen, const uint8_t* cert, size_t dataLen,
 
 // Similar to `DoFindObjects`, this function implements searching for
 // certificates stored on remote PKCS#11 tokens.
-void RemoteCertsDoFindObjects(FindObjectsCallback cb, void* ctx) {
+void RemoteCertsDoFindObjects(SearchingFor searchingFor, FindObjectsCallback cb,
+                              void* ctx) {
 #if defined(NIGHTLY_BUILD) && !defined(MOZ_NO_SMART_CARDS)
   MOZ_ASSERT(!NS_IsMainThread());
   if (NS_IsMainThread()) {
@@ -2057,9 +2058,9 @@ void RemoteCertsDoFindObjects(FindObjectsCallback cb, void* ctx) {
 
   Monitor monitor{__func__};
   bool done = false;
-  nsTArray<Certificate> certificates;
-  nsresult rv = NS_DispatchToMainThread(
-      NS_NewRunnableFunction(__func__, [&monitor, &done, &certificates] {
+  nsTArray<IPCClientCertObject> objects;
+  nsresult rv = NS_DispatchToMainThread(NS_NewRunnableFunction(
+      __func__, [searchingFor, &monitor, &done, &objects] {
         RefPtr<PKCS11ModuleDB> pkcs11ModuleDB(PKCS11ModuleDB::GetSingleton());
         if (!pkcs11ModuleDB) {
           MonitorAutoLock lock(monitor);
@@ -2067,18 +2068,18 @@ void RemoteCertsDoFindObjects(FindObjectsCallback cb, void* ctx) {
           lock.Notify();
           return;
         }
-        pkcs11ModuleDB->FindCertificates()->Then(
-            GetCurrentSerialEventTarget(), __func__,
-            [&monitor, &done,
-             &certificates](const PKCS11ModuleDB::FindCertificatesPromise::
-                                ResolveOrRejectValue& value) {
-              MonitorAutoLock lock(monitor);
-              if (value.IsResolve()) {
-                certificates.Assign(value.ResolveValue());
-              }
-              done = true;
-              lock.Notify();
-            });
+        pkcs11ModuleDB->FindObjects(searchingFor)
+            ->Then(GetCurrentSerialEventTarget(), __func__,
+                   [&monitor, &done,
+                    &objects](const PKCS11ModuleDB::FindObjectsPromise::
+                                  ResolveOrRejectValue& value) {
+                     MonitorAutoLock lock(monitor);
+                     if (value.IsResolve()) {
+                       objects.Assign(value.ResolveValue());
+                     }
+                     done = true;
+                     lock.Notify();
+                   });
       }));
   if (NS_FAILED(rv)) {
     return;
@@ -2088,11 +2089,90 @@ void RemoteCertsDoFindObjects(FindObjectsCallback cb, void* ctx) {
   while (!done) {
     lock.Wait();
   }
-  for (const auto& certificate : certificates) {
-    uint8_t serverAuthTrustAnchor = certificate.serverAuthTrustAnchor() ? 1 : 0;
-    cb(kIPCClientCertsObjectTypeCert, certificate.der().Length(),
-       certificate.der().Elements(), 1, &serverAuthTrustAnchor, ctx);
+  for (const auto& object : objects) {
+    switch (object.type()) {
+      case IPCClientCertObject::TECKey:
+        cb(kIPCClientCertsObjectTypeECKey, object.get_ECKey().params().Length(),
+           object.get_ECKey().params().Elements(),
+           object.get_ECKey().cert().Length(),
+           object.get_ECKey().cert().Elements(), ctx);
+        break;
+      case IPCClientCertObject::TRSAKey:
+        cb(kIPCClientCertsObjectTypeRSAKey,
+           object.get_RSAKey().modulus().Length(),
+           object.get_RSAKey().modulus().Elements(),
+           object.get_RSAKey().cert().Length(),
+           object.get_RSAKey().cert().Elements(), ctx);
+        break;
+      case IPCClientCertObject::TCertificate: {
+        uint8_t serverAuthTrustAnchor =
+            object.get_Certificate().serverAuthTrustAnchor() ? 1 : 0;
+        cb(kIPCClientCertsObjectTypeCert,
+           object.get_Certificate().der().Length(),
+           object.get_Certificate().der().Elements(), 1, &serverAuthTrustAnchor,
+           ctx);
+        break;
+      }
+      default:
+        MOZ_ASSERT_UNREACHABLE("unhandled IPCClientCertObject type");
+        break;
+    }
   }
+#endif  // NIGHTLY_BUILD && !MOZ_NO_SMART_CARDS
+}
+
+// Similar to `DoSign`, this function implements signing using private keys
+// stored on remote PKCS#11 tokens.
+void RemoteCertsDoSign(size_t certLen, const uint8_t* cert, size_t dataLen,
+                       const uint8_t* data, size_t paramsLen,
+                       const uint8_t* params, SignCallback cb, void* ctx) {
+#if defined(NIGHTLY_BUILD) && !defined(MOZ_NO_SMART_CARDS)
+  MOZ_ASSERT(!NS_IsMainThread());
+  if (NS_IsMainThread()) {
+    return;
+  }
+
+  nsTArray<uint8_t> certificate(cert, certLen);
+  nsTArray<uint8_t> dataArray(data, dataLen);
+  nsTArray<uint8_t> paramsArray(params, paramsLen);
+
+  Monitor monitor{__func__};
+  bool done = false;
+  nsTArray<uint8_t> signature;
+  nsresult rv = NS_DispatchToMainThread(NS_NewRunnableFunction(
+      __func__,
+      [certificate(std::move(certificate)), data(std::move(dataArray)),
+       params(std::move(paramsArray)), &monitor, &done, &signature]() mutable {
+        RefPtr<PKCS11ModuleDB> pkcs11ModuleDB(PKCS11ModuleDB::GetSingleton());
+        if (!pkcs11ModuleDB) {
+          MonitorAutoLock lock(monitor);
+          done = true;
+          lock.Notify();
+          return;
+        }
+        pkcs11ModuleDB
+            ->Sign(std::move(certificate), std::move(data), std::move(params))
+            ->Then(GetCurrentSerialEventTarget(), __func__,
+                   [&monitor, &done, &signature](
+                       const PKCS11ModuleDB::SignPromise::ResolveOrRejectValue&
+                           value) {
+                     MonitorAutoLock lock(monitor);
+                     if (value.IsResolve()) {
+                       signature.Assign(value.ResolveValue());
+                     }
+                     done = true;
+                     lock.Notify();
+                   });
+      }));
+  if (NS_FAILED(rv)) {
+    return;
+  }
+
+  MonitorAutoLock lock(monitor);
+  while (!done) {
+    lock.Wait();
+  }
+  cb(signature.Length(), signature.Elements(), ctx);
 #endif  // NIGHTLY_BUILD && !MOZ_NO_SMART_CARDS
 }
 }  // extern "C"

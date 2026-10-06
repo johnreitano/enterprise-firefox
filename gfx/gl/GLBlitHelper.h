@@ -46,6 +46,7 @@ class MacIOSurface;
 #endif
 
 #ifdef MOZ_WIDGET_GTK
+class BufferSurface;
 class DMABufSurface;
 #endif
 
@@ -278,8 +279,7 @@ class GLBlitHelper final {
             OriginPos destOrigin, const gfx::IntSize& fbSize = gfx::IntSize(),
             Maybe<gfxAlphaType> convertAlpha = {},
             gfx::SurfaceFormat aDestFormat = gfx::SurfaceFormat::UNKNOWN) const;
-  bool BlitYCbCrImageToDMABuf(const layers::PlanarYCbCrData& yuvData,
-                              DMABufSurface* surface);
+  bool BlitYCbCrTexturesToDMABuf(BufferSurface* aSource, DMABufSurface* aDest);
 #endif
 
   explicit GLBlitHelper(GLContext* gl);

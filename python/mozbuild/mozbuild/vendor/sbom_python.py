@@ -37,6 +37,24 @@ CLASSIFIER_LICENSES = {
     "License :: OSI Approved :: ISC License (ISCL)": "ISC",
     "License :: OSI Approved :: MIT License": "MIT",
     "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)": "MPL-2.0",
+    "License :: OSI Approved :: Python Software Foundation License": "PSF-2.0",
+}
+
+# Free-text License values, lowercased, that can only mean one SPDX license.
+# "BSD" or "GPL/LGPL" could mean several, so they are left as they are.
+LICENSE_ALIASES = {
+    "apache 2": "Apache-2.0",
+    "apache 2.0": "Apache-2.0",
+    "apache license 2.0": "Apache-2.0",
+    "apache license, version 2.0": "Apache-2.0",
+    "apache v2": "Apache-2.0",
+    "apl 2": "Apache-2.0",
+    "mpl 2.0": "MPL-2.0",
+    "mpl 2.0 (mozilla public license)": "MPL-2.0",
+    "mpl2": "MPL-2.0",
+    "mplv2.0": "MPL-2.0",
+    "psfl": "PSF-2.0",
+    "python software foundation license": "PSF-2.0",
 }
 
 # A classifier that says nothing about which license.
@@ -115,7 +133,7 @@ def licenses_from_metadata(metadata):
         return [expression]
     license = (metadata.get("License") or "").strip()
     if license and "\n" not in license and license != "UNKNOWN":
-        return [license]
+        return [LICENSE_ALIASES.get(license.lower(), license)]
     return sorted({
         CLASSIFIER_LICENSES.get(classifier, classifier.rpartition(" :: ")[2])
         for classifier in metadata.get_all("Classifier") or ()

@@ -128,9 +128,11 @@ static CSSPoint ScrollFrameTo(ScrollContainerFrame* aFrame,
   bool scrollInProgress = APZCCallbackHelper::IsScrollInProgress(aFrame);
   if (!scrollInProgress) {
     ScrollSnapTargetIds snapTargetIds = aRequest.GetLastSnapTargetIds();
-    aFrame->ScrollToCSSPixelsForApz(targetScrollPosition,
-                                    std::move(snapTargetIds),
-                                    aRequest.GetScrollGenerationOnApz());
+    if (!aFrame->ScrollToCSSPixelsForApz(targetScrollPosition,
+                                         std::move(snapTargetIds),
+                                         aRequest.GetScrollGenerationOnApz())) {
+      return targetScrollPosition;
+    }
     geckoScrollPosition = CSSPoint::FromAppUnits(aFrame->GetScrollPosition());
     aSuccessOut = true;
   }
@@ -181,6 +183,8 @@ static DisplayPortMargins ScrollFrame(nsIContent* aContent,
       sf, aRequest.GetDisplayPortMargins());
   CSSPoint apzScrollOffset = aRequest.GetVisualScrollOffset();
   CSSPoint actualScrollOffset = ScrollFrameTo(sf, aRequest, scrollUpdated);
+  // sf might have been destroyed by the call to ScrollFrameTo, so re-get it.
+  sf = nsLayoutUtils::FindScrollContainerFrameFor(aRequest.GetScrollId());
   CSSPoint scrollDelta = apzScrollOffset - actualScrollOffset;
 
   if (scrollUpdated) {
@@ -387,8 +391,10 @@ void APZCCallbackHelper::UpdateRootFrame(const RepaintRequest& aRequest) {
     CSSPoint currentScrollPosition =
         CSSPoint::FromAppUnits(sf->GetScrollPosition());
     ScrollSnapTargetIds snapTargetIds = aRequest.GetLastSnapTargetIds();
-    sf->ScrollToCSSPixelsForApz(currentScrollPosition, std::move(snapTargetIds),
-                                sf->ScrollGenerationOnApz());
+    // Ignoring the result is safe only because sf isn't used after this call.
+    (void)sf->ScrollToCSSPixelsForApz(currentScrollPosition,
+                                      std::move(snapTargetIds),
+                                      sf->ScrollGenerationOnApz());
   }
 
   // Do this as late as possible since scrolling can flush layout. It also

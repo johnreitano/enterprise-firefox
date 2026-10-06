@@ -13,8 +13,6 @@
     /** background-color **/
     --background-color-box: light-dark(var(--color-white), var(--color-gray-80));
     --background-color-critical: light-dark(var(--color-red-0), var(--color-red-90));
-    --background-color-dimmed: light-dark(color-mix(in srgb, currentColor 12%, transparent), color-mix(in srgb, currentColor 17%, transparent));
-    --background-color-dimmed-further: light-dark(color-mix(in srgb, currentColor 20%, transparent), color-mix(in srgb, currentColor 14%, transparent));
     --background-color-information: light-dark(var(--color-blue-0), var(--color-blue-90));
     --background-color-overlay: var(--color-black-alpha-50);
     --background-color-success: light-dark(var(--color-green-0), var(--color-green-90));
@@ -435,12 +433,12 @@
 
     /** panel **/
     --panel-background-color: light-dark(var(--color-white), rgb(66, 65, 77));
-    --panel-background-color-dimmed: var(--background-color-dimmed);
-    --panel-background-color-dimmed-further: var(--background-color-dimmed-further);
     --panel-border-color: light-dark(rgb(240, 240, 244), rgb(82, 82, 94));
     --panel-border-radius: var(--border-radius-medium);
     --panel-box-shadow: 0 0 var(--panel-box-shadow-margin) hsla(0, 0%, 0%, 0.2);
     --panel-box-shadow-margin: 4px;
+    --panel-footer-background-color: light-dark(color-mix(in srgb, currentColor 12%, transparent), color-mix(in srgb, currentColor 17%, transparent));
+    --panel-footer-text-color: inherit;
     --panel-menuitem-border-radius: var(--border-radius-small);
     /* Block margin must be 0 so that there's always an item highlighted and no dead space when moving the pointer across items. */
     --panel-menuitem-margin: 0 var(--panel-menuitem-margin-inline);
@@ -455,8 +453,6 @@
     --panel-separator-padding-block: 4px;
     --panel-separator-padding-inline: 8px;
     --panel-text-color: light-dark(var(--color-black), rgb(251, 251, 254));
-    --panel-text-color-dimmed: var(--panel-text-color);
-    --panel-text-color-dimmed-further: var(--panel-text-color);
     --panel-width: initial;
 
     /** popup **/

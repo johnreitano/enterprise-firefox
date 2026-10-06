@@ -315,10 +315,15 @@ IPCResult BrowserBridgeParent::RecvSetEmbedderAccessible(uint64_t aID) {
     // document and add it when the new OuterDocAccessible arrives.
     RefPtr<WindowGlobalParent> embedderWgp =
         GetBrowsingContext()->GetEmbedderWindowGlobal();
-    auto* embedderDoc = embedderWgp
-                            ? a11y::DocAccessibleParent::GetFrom(
-                                  embedderWgp, /* aAllowShutdown */ true)
-                            : nullptr;
+    if (!embedderWgp || embedderWgp->IsDiscarded()) {
+      // The embedder WindowGlobalParent is discarded, which means its actor
+      // and thus its PDocAccessibleParent actor have been destroyed. The
+      // embedder's content process hasn't caught up yet, so its
+      // PDocAccessibleChild is still alive. Just ignore this.
+      return IPC_OK();
+    }
+    auto* embedderDoc = a11y::DocAccessibleParent::GetFrom(
+        embedderWgp, /* aAllowShutdown */ true);
     if (!embedderDoc) {
       return IPC_FAIL(this, "Embedder's PDocAccessible doesn't exist");
     }

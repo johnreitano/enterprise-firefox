@@ -6,7 +6,6 @@
 
 #include <windows.h>
 #include <aclapi.h>
-#include <psapi.h>
 
 #include "GMPPlatform.h"
 #include "GMPServiceParent.h"
@@ -14,7 +13,6 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/dom/ContentParent.h"
-#include "mozilla/FileUtilsWin.h"
 #include "mozilla/Likely.h"
 #include "mozilla/net/SocketProcessChild.h"
 #include "mozilla/net/SocketProcessParent.h"
@@ -43,40 +41,86 @@ namespace mozilla {
 static const uint32_t kMaxNtPathLen = 0x8000;
 
 /**
- * Returns true if aDosPath lives on a remote device.
+ * Gets the path of the file that aFile refers to, in the form that aFlags
+ * selects (see GetFinalPathNameByHandleW).
  */
-static bool IsRemoteFile(const nsAString& aDosPath) {
-  // A UNC path is always remote.
-  if (StringBeginsWith(aDosPath, u"\\\\"_ns)) {
+static bool GetPathFromHandle(HANDLE aFile, DWORD aFlags, nsAString& aOutPath) {
+  aOutPath.Truncate();
+
+  for (uint32_t bufLen = MAX_PATH; bufLen <= kMaxNtPathLen; bufLen *= 2) {
+    nsAutoString buf;
+    if (!buf.SetLength(bufLen, fallible)) {
+      return false;
+    }
+
+    DWORD charsWritten = ::GetFinalPathNameByHandleW(
+        aFile, reinterpret_cast<wchar_t*>(buf.BeginWriting()), bufLen, aFlags);
+    if (!charsWritten) {
+      return false;
+    }
+
+    if (charsWritten >= bufLen) {
+      // Too small; retry with more room.
+      continue;
+    }
+
+    buf.SetLength(charsWritten);
+    aOutPath = buf;
     return true;
   }
 
-  if (aDosPath.Length() < 3 || aDosPath[1] != u':') {
+  return false;
+}
+
+/**
+ * Returns true if aFile lives on a remote device.
+ */
+static bool IsRemoteFile(HANDLE aFile) {
+  nsAutoString dosPath;
+  if (!GetPathFromHandle(aFile, FILE_NAME_OPENED | VOLUME_NAME_DOS, dosPath)) {
+    // Treat errors as remote.
+    return true;
+  }
+
+  // A UNC path is always remote.
+  if (StringBeginsWith(dosPath, u"\\\\?\\UNC\\"_ns,
+                       nsCaseInsensitiveStringComparator)) {
+    return true;
+  }
+
+  if (dosPath.Length() < 7 || !StringBeginsWith(dosPath, u"\\\\?\\"_ns) ||
+      dosPath[5] != u':') {
     // Some shape we do not recognise; do not guess.
     return true;
   }
 
   // GetDriveTypeW also catches a drive letter mapped to a network share.
-  const wchar_t root[] = {static_cast<wchar_t>(aDosPath[0]), L':', L'\\',
-                          L'\0'};
+  const wchar_t root[] = {static_cast<wchar_t>(dosPath[4]), L':', L'\\', L'\0'};
   UINT driveType = ::GetDriveTypeW(root);
   return driveType == DRIVE_REMOTE || driveType == DRIVE_UNKNOWN ||
          driveType == DRIVE_NO_ROOT_DIR;
 }
 
 /**
- * Returns true if the file at aDosPath carries a mandatory integrity label
- * below medium.  A file with no label ACE is medium by default, which is the
- * most common case, and is accepted.
+ * Returns true if aFile carries a mandatory integrity label below medium.  A
+ * file with no label ACE is medium by default, which is the most common case,
+ * and is accepted.
  */
-static bool IsBelowMediumIntegrityFile(const nsAString& aDosPath) {
+static bool IsBelowMediumIntegrityFile(HANDLE aFile) {
+  // aFile grants no access to the file, so reopen it to read its label.
+  UniqueFileHandle labelAccess(
+      ::ReOpenFile(aFile, READ_CONTROL,
+                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 0));
+  if (!labelAccess) {
+    // Treat errors as untrustworthy.
+    return true;
+  }
+
   PACL sacl = nullptr;
   PSECURITY_DESCRIPTOR rawSd = nullptr;
-  nsAutoString path(aDosPath);
-  if (::GetNamedSecurityInfoW(reinterpret_cast<wchar_t*>(path.BeginWriting()),
-                              SE_FILE_OBJECT, LABEL_SECURITY_INFORMATION,
-                              nullptr, nullptr, nullptr, &sacl,
-                              &rawSd) != ERROR_SUCCESS) {
+  if (::GetSecurityInfo(labelAccess.get(), SE_FILE_OBJECT,
+                        LABEL_SECURITY_INFORMATION, nullptr, nullptr, nullptr,
+                        &sacl, &rawSd) != ERROR_SUCCESS) {
     // Treat errors as untrustworthy.
     return true;
   }
@@ -118,80 +162,39 @@ static bool IsBelowMediumIntegrityFile(const nsAString& aDosPath) {
   return false;
 }
 
-bool ValidateAndResolveModuleSection(const ipc::FileDescriptor& aSection,
-                                     nsAString& aOutNtPath) {
+bool ValidateAndResolveModuleFile(const ipc::FileDescriptor& aFile,
+                                  nsAString& aOutNtPath) {
   aOutNtPath.Truncate();
 
-  if (!aSection.IsValid()) {
+  if (!aFile.IsValid()) {
     return false;
   }
 
-  UniqueFileHandle section(aSection.ClonePlatformHandle());
-  if (!section) {
+  UniqueFileHandle file(aFile.ClonePlatformHandle());
+  if (!file) {
     return false;
   }
 
-  // Recover the backing file's path by mapping a view.
-  nsAutoString resolved;
-  {
-    PVOID view = ::MapViewOfFile(section.get(), FILE_MAP_READ, 0, 0, 0);
-    if (!view) {
-      return false;
-    }
-    auto unmapView = MakeScopeExit([&]() { ::UnmapViewOfFile(view); });
-
-    // A module is an IMAGE section.
-    MEMORY_BASIC_INFORMATION mbi{};
-    if (!::VirtualQuery(view, &mbi, sizeof(mbi)) || mbi.Type != MEM_IMAGE) {
-      return false;
-    }
-
-    // GetMappedFileNameW reports the NT device form
-    // (\Device\HarddiskVolumeN\...), which is what the child's loader observer
-    // records via NtQueryVirtualMemory(..., MemorySectionName) and what
-    // ModuleRecord expects, so the two are directly comparable.
-    for (uint32_t bufLen = MAX_PATH; bufLen <= kMaxNtPathLen; bufLen *= 2) {
-      nsAutoString buf;
-      if (!buf.SetLength(bufLen, fallible)) {
-        break;
-      }
-
-      DWORD charsWritten = ::GetMappedFileNameW(
-          ::GetCurrentProcess(), view,
-          reinterpret_cast<wchar_t*>(buf.BeginWriting()), bufLen);
-      if (!charsWritten) {
-        break;
-      }
-
-      if (charsWritten >= bufLen - 1) {
-        // May have been truncated; retry with more room.
-        continue;
-      }
-
-      buf.SetLength(charsWritten);
-      resolved = buf;
-      break;
-    }
-  }
-
-  if (resolved.IsEmpty()) {
-    return false;
-  }
-
-  // The remaining checks are about the file, so they need its DOS path.
-  nsAutoString dosPath;
-  if (!NtPathToDosPath(resolved, dosPath)) {
+  // A module is a file on a disk.  Asking for the path of anything else could
+  // block.
+  if (::GetFileType(file.get()) != FILE_TYPE_DISK) {
     return false;
   }
 
   // Reject a file on a remote device, or one carrying a mandatory integrity
-  // label below medium.
-  if (IsRemoteFile(dosPath) || IsBelowMediumIntegrityFile(dosPath)) {
+  // label below medium.  The label check reopens the file, so it must not be
+  // reached for a remote one.
+  if (IsRemoteFile(file.get()) || IsBelowMediumIntegrityFile(file.get())) {
     return false;
   }
 
-  aOutNtPath = resolved;
-  return true;
+  // FILE_NAME_OPENED | VOLUME_NAME_NT gives the NT device form
+  // (\Device\HarddiskVolumeN\...) of the path the loader opened, which is what
+  // the child's loader observer records via
+  // NtQueryVirtualMemory(..., MemorySectionName) and what ModuleRecord
+  // expects, so the two are directly comparable.
+  return GetPathFromHandle(file.get(), FILE_NAME_OPENED | VOLUME_NAME_NT,
+                           aOutNtPath);
 }
 
 class MOZ_RAII BackgroundPriorityRegion final {
@@ -718,10 +721,10 @@ RefPtr<ModuleRecord> UntrustedModulesProcessor::GetModuleRecord(
     const glue::EnhancedModuleLoadInfo& aModuleLoadInfo) {
   MOZ_ASSERT(!XRE_IsParentProcess());
 
-  // aModules is keyed by the path the parent derived with GetMappedFileNameW,
-  // while mSectionName comes from NtQueryVirtualMemory(..., MemorySectionName).
-  // Both name the same section's backing file in NT device form; if they ever
-  // diverged, every lookup here would miss and every module would look trusted.
+  // aModules is keyed by the path the parent derived with
+  // GetFinalPathNameByHandleW, while mSectionName comes from
+  // NtQueryVirtualMemory(..., MemorySectionName).  Both name the module's file
+  // in NT device form.
   return aModules.Get(aModuleLoadInfo.mNtLoadInfo.mSectionName.AsString());
 }
 
@@ -975,7 +978,6 @@ UntrustedModulesProcessor::ProcessModuleLoadQueueChildProcess(
 
   nsTHashtable<nsStringCaseInsensitiveHashKey> alreadyAdded;
   ModuleIdentifiers moduleIdents;
-  uint32_t unverifiableLoads = 0;
 
   // Build the set of modules to be processed by the parent.
   for (UnprocessedModuleLoadInfoContainer* container : loadsToProcess) {
@@ -986,11 +988,8 @@ UntrustedModulesProcessor::ProcessModuleLoadQueueChildProcess(
           NS_ERROR_ILLEGAL_DURING_SHUTDOWN, __func__);
     }
 
-    if (!entry.mNtLoadInfo.mSectionHandle) {
-      // No section handle, so nothing the parent can verify.
-      if (entry.mNtLoadInfo.mSectionHandleUnavailable) {
-        ++unverifiableLoads;
-      }
+    if (!entry.mNtLoadInfo.mFileHandle) {
+      // No file handle, so nothing the parent can verify.
       continue;
     }
 
@@ -999,23 +998,18 @@ UntrustedModulesProcessor::ProcessModuleLoadQueueChildProcess(
       continue;
     }
 
-    ipc::FileDescriptor section(entry.mNtLoadInfo.mSectionHandle.get());
-    if (!section.IsValid()) {
-      // We had a handle but could not wrap it for IPC, which is the same kind
-      // of anomaly as failing to duplicate it.
-      ++unverifiableLoads;
+    ipc::FileDescriptor file(entry.mNtLoadInfo.mFileHandle.get());
+    if (!file.IsValid()) {
       continue;
     }
 
-    moduleIdents.AppendElement(std::move(section));
+    moduleIdents.AppendElement(std::move(file));
   }
 
   if (!IsReadyForBackgroundProcessing()) {
     return GetModulesTrustPromise::CreateAndReject(
         NS_ERROR_ILLEGAL_DURING_SHUTDOWN, __func__);
   }
-
-  mProcessedModuleLoads.mUnverifiableLoads += unverifiableLoads;
 
   if (moduleIdents.IsEmpty()) {
     // Nothing to process
@@ -1081,11 +1075,11 @@ void UntrustedModulesProcessor::CompleteProcessing(
   ModulesMap& modules = aModulesAndLoads.mModMapResult.ref().mModules;
   const uint32_t& trustTestFailures =
       aModulesAndLoads.mModMapResult.ref().mTrustTestFailures;
-  const uint32_t& rejectedSections =
-      aModulesAndLoads.mModMapResult.ref().mRejectedSections;
+  const uint32_t& rejectedFiles =
+      aModulesAndLoads.mModMapResult.ref().mRejectedFiles;
   UnprocessedModuleLoads& loads = aModulesAndLoads.mLoads;
 
-  if (modules.IsEmpty() && !trustTestFailures && !rejectedSections) {
+  if (modules.IsEmpty() && !trustTestFailures && !rejectedFiles) {
     // No data, nothing to save.
     return;
   }
@@ -1158,7 +1152,7 @@ void UntrustedModulesProcessor::CompleteProcessing(
   }
 
   if (processedStacks.empty() && processedEvents.isEmpty() &&
-      !sanitizationFailures && !trustTestFailures && !rejectedSections) {
+      !sanitizationFailures && !trustTestFailures && !rejectedFiles) {
     // Nothing to save
     return;
   }
@@ -1176,7 +1170,7 @@ void UntrustedModulesProcessor::CompleteProcessing(
 
   mProcessedModuleLoads.mSanitizationFailures += sanitizationFailures;
   mProcessedModuleLoads.mTrustTestFailures += trustTestFailures;
-  mProcessedModuleLoads.mRejectedSections += rejectedSections;
+  mProcessedModuleLoads.mRejectedFiles += rejectedFiles;
 }
 
 // The thread priority of this job should match the priority that the child
@@ -1211,7 +1205,7 @@ RefPtr<ModulesTrustPromise> UntrustedModulesProcessor::GetModulesTrustInternal(
 
   ModulesMap& modMap = result.mModules;
   uint32_t& trustTestFailures = result.mTrustTestFailures;
-  uint32_t& rejectedSections = result.mRejectedSections;
+  uint32_t& rejectedFiles = result.mRejectedFiles;
 
   ModuleEvaluator modEval;
   MOZ_ASSERT(!!modEval);
@@ -1219,17 +1213,17 @@ RefPtr<ModulesTrustPromise> UntrustedModulesProcessor::GetModulesTrustInternal(
     return ModulesTrustPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
   }
 
-  for (auto& section : aModIdents) {
+  for (auto& file : aModIdents) {
     if (!IsReadyForBackgroundProcessing()) {
       return ModulesTrustPromise::CreateAndReject(
           NS_ERROR_ILLEGAL_DURING_SHUTDOWN, __func__);
     }
 
-    // The authoritative path, derived from the handle.
+    // The path, derived from the handle.
     nsAutoString resolvedNtPath;
-    if (!ValidateAndResolveModuleSection(section, resolvedNtPath) ||
+    if (!ValidateAndResolveModuleFile(file, resolvedNtPath) ||
         resolvedNtPath.IsEmpty()) {
-      ++rejectedSections;
+      ++rejectedFiles;
       continue;
     }
 

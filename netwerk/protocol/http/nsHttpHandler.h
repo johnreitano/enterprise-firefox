@@ -853,7 +853,8 @@ class nsHttpHandler final : public nsIHttpProtocolHandler,
   // This is parsed pref network.http.http3.alt-svc-mapping-for-testing.
   // The pref set artificial altSvc-s for origin for testing.
   // This maps an origin to an altSvc.
-  nsClassHashtable<nsCStringHashKey, nsCString> mAltSvcMappingTemptativeMap;
+  DataMutex<nsClassHashtable<nsCStringHashKey, nsCString>>
+      mAltSvcMappingTemptativeMap{"nsHttpHandler::AltSvcMappingTemptativeMap"};
 
   nsCOMPtr<nsIHttpActivityDistributor> mActivityDistributor;
 };

@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -11,6 +13,29 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/sessionstore/TabStateFlusher.sys.mjs",
   MiniWindowUtils:
     "moz-src:///browser/components/miniwindow/MiniWindowUtils.sys.mjs",
+});
+
+ChromeUtils.defineLazyGetter(lazy, "prefs", () => {
+  let prefs = {};
+  XPCOMUtils.defineLazyPreferenceGetter(
+    prefs,
+    "hideDelayMs",
+    "browser.mini-window.toolbar.hide-delay-ms",
+    1000
+  );
+  XPCOMUtils.defineLazyPreferenceGetter(
+    prefs,
+    "edgeZonePx",
+    "browser.mini-window.toolbar.edge-zone-px",
+    12
+  );
+  XPCOMUtils.defineLazyPreferenceGetter(
+    prefs,
+    "hoverRevealDelayMs",
+    "browser.mini-window.toolbar.hover-reveal-delay-ms",
+    50
+  );
+  return prefs;
 });
 
 ChromeUtils.defineLazyGetter(lazy, "logConsole", () =>
@@ -31,13 +56,9 @@ export const MiniWindowState = {
   CLOSED: "closed",
 };
 
-const WINDOW_EVENTS = ["unload"];
+const WINDOW_EVENTS = ["unload", "activate"];
 
 const TOOLBAR_HIDE_DELAY_FIRST_OPEN_MS = 2500;
-const TOOLBAR_HIDE_DELAY_MS = 2000;
-const TOOLBAR_HOVER_REVEAL_DELAY_MS = 100;
-// How deep the reveal strip along the top edge is.
-const TOOLBAR_EDGE_ZONE_PX = 8;
 
 /**
  * One always-on-top popup hosting a live moved tab. The tab keeps its
@@ -300,6 +321,8 @@ export class MiniWindow {
     this._state = MiniWindowState.FRAMED;
     lazy.logConsole.debug("open: state -> FRAMED");
 
+    this.#avoidOtherWindows();
+
     this.#abortController = new AbortController();
     this.#wireNavBarButtons();
     this.#wireToolbarReveal();
@@ -315,6 +338,20 @@ export class MiniWindow {
     // Now that the tab is settled in the mini window, watch for it navigating away.
     this.#attachHistoryListener();
     return this.miniWin;
+  }
+
+  /**
+   * Nudge the freshly-opened window clear of the other always-on-top windows.
+   */
+  #avoidOtherWindows() {
+    if (!this.miniWin || this.miniWin.closed) {
+      return;
+    }
+    let avoid = this.manager.windowsToAvoid(this.miniWin);
+    let pos = lazy.MiniWindowUtils.repositionToAvoid(this.miniWin, avoid);
+    if (pos) {
+      this.miniWin.moveTo(pos.left, pos.top);
+    }
   }
 
   /**
@@ -501,7 +538,12 @@ export class MiniWindow {
         let { width } = win.windowUtils.getBoundsWithoutFlushing(
           win.document.documentElement
         );
-        return { top: 0, bottom: TOOLBAR_EDGE_ZONE_PX, left: 0, right: width };
+        return {
+          top: 0,
+          bottom: lazy.prefs.edgeZonePx,
+          left: 0,
+          right: width,
+        };
       },
       onMouseEnter: () => {
         // A scroll down dismissed the bar while the pointer was already at the
@@ -638,7 +680,7 @@ export class MiniWindow {
    *
    * @param {number} hideDelay - how long the toolbar stays up.
    */
-  revealToolbar(hideDelay = TOOLBAR_HIDE_DELAY_MS) {
+  revealToolbar(hideDelay = lazy.prefs.hideDelayMs) {
     this.#keepToolbarShown();
     this.#startHideCountdown(hideDelay);
   }
@@ -648,7 +690,7 @@ export class MiniWindow {
    *
    * @param {number} hideDelay - how long until the toolbar hides.
    */
-  #startHideCountdown(hideDelay = TOOLBAR_HIDE_DELAY_MS) {
+  #startHideCountdown(hideDelay = lazy.prefs.hideDelayMs) {
     this.#clearHideTimer();
     this.#hideToolbarTimer = this.miniWin.setTimeout(() => {
       if (this.#toolbarHeld()) {
@@ -696,7 +738,7 @@ export class MiniWindow {
       this.#hoverRevealTimer = this.miniWin.setTimeout(() => {
         this.#hoverRevealTimer = null;
         this.#keepToolbarShown();
-      }, TOOLBAR_HOVER_REVEAL_DELAY_MS);
+      }, lazy.prefs.hoverRevealDelayMs);
     }
   }
 
@@ -738,6 +780,14 @@ export class MiniWindow {
     switch (event.type) {
       case "unload":
         this.#onUnload();
+        break;
+      case "activate":
+        if (this._state === MiniWindowState.ACTIVE) {
+          this.miniWin.setTimeout(
+            () => this.revealToolbar(),
+            lazy.prefs.hoverRevealDelayMs
+          );
+        }
         break;
     }
   }
@@ -974,7 +1024,6 @@ export class MiniWindow {
       return;
     }
 
-    // A throw during teardown must not strand this popup registered;
     try {
       let flavour = this.#cropped ? "fragment" : "full_tab";
       let openDuration = Math.round(ChromeUtils.now() - this.#createdAt);
@@ -986,7 +1035,12 @@ export class MiniWindow {
       Glean.miniWindow.openDuration[flavour].accumulateSingleSample(
         openDuration
       );
+    } catch (e) {
+      lazy.logConsole.error("uninit: recording telemetry failed", e);
+    }
 
+    // A throw during teardown must not strand this popup registered;
+    try {
       this.#detachHistoryListener();
       this.#abortController?.abort();
       this.#unwireToolbarReveal();
@@ -994,12 +1048,16 @@ export class MiniWindow {
       for (let ev of WINDOW_EVENTS) {
         this.miniWin?.removeEventListener(ev, this);
       }
-      if (this.miniWin && !this.miniWin.closed) {
-        this.miniWin.close();
-      }
     } catch (e) {
       lazy.logConsole.error("uninit: teardown failed", e);
     } finally {
+      try {
+        if (this.miniWin && !this.miniWin.closed) {
+          this.miniWin.close();
+        }
+      } catch (e) {
+        lazy.logConsole.error("uninit: closing the popup failed", e);
+      }
       this._state = MiniWindowState.CLOSED;
       this.manager._unregister(this);
       this.miniWin = null;

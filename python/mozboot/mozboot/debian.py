@@ -55,9 +55,9 @@ class DebianBootstrapper(LinuxBootstrapper, BaseBootstrapper):
 
     def _check_packages_installed(self, *packages):
         # `dpkg-query -W` succeeds for any name dpkg merely knows about, which
-        # includes virtual packages and packages that are only ever mentioned
-        # in an installed package's dependency fields, so the status of every
-        # match has to be inspected rather than relying on the exit code alone.
+        # includes packages that were installed in the past but were removed,
+        # so the status of every match has to be inspected rather than relying
+        # on the exit code alone.
         command = ["dpkg-query", "-W", "-f=${db:Status-Status}\n"]
         command.extend(packages)
         result = subprocess.run(

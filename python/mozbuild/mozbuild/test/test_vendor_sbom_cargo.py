@@ -135,6 +135,18 @@ class TestCrateRecords(unittest.TestCase):
         self.assertEqual(record["website"], "https://serde.rs")
         self.assertEqual(record["vcs"], "https://github.com/serde-rs/serde")
 
+    def test_legacy_slash_license_becomes_an_spdx_expression(self):
+        manifest = os.path.join(
+            self.topsrcdir, "third_party", "rust", "serde", "Cargo.toml"
+        )
+        with open(manifest, "w") as legacy:
+            legacy.write(CARGO_TOML.replace("MIT OR Apache-2.0", "MIT / Apache-2.0"))
+
+        records, _ = self.records()
+        self.assertEqual(
+            records["third_party/rust/serde"]["licenses"], ["MIT OR Apache-2.0"]
+        )
+
     def test_dependencies_become_edges(self):
         _, edges = self.records()
         self.assertEqual(edges["third_party/rust/serde"], ["cargo:log@0.4.20"])

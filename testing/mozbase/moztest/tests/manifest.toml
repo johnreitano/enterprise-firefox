@@ -8,3 +8,5 @@ subsuite = "mozbase"
 ["test_resolve.py"]
 
 ["test_tsan.py"]
+
+["test_ubsan.py"]
