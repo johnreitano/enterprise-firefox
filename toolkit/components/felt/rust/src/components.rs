@@ -48,6 +48,18 @@ fn peer_is_authorized(peer_pid: Option<u32>, expected_pid: u32) -> bool {
     matches!(peer_pid, Some(peer) if peer == expected_pid)
 }
 
+fn accept_ipc_peer(
+    server: ipc_channel::ipc::IpcOneShotServer<ipc_channel::ipc::IpcSender<FeltMessage>>,
+) -> Result<(ipc_channel::ipc::IpcSender<FeltMessage>, Option<u32>), nsresult> {
+    match server.accept_with_peer_pid() {
+        Ok((_, tx, peer_pid)) => Ok((tx, peer_pid)),
+        Err(err) => {
+            error!("FeltXPCOM:IpcChannel() accept() failed: {}", err);
+            Err(NS_ERROR_FAILURE)
+        }
+    }
+}
+
 #[allow(non_snake_case)]
 impl FeltXPCOM {
     pub fn new(
@@ -427,10 +439,8 @@ impl FeltXPCOM {
         trace!("FeltXPCOM:IpcChannel() waiting on accept()");
         // Identify the connecting peer by its OS process id, so the peer can be
         // matched against the browser child the launcher spawned before any
-        // managed secret is sent. The accept receiver is not used past this
-        // point.
-        let (_, tx, peer_pid): (_, ipc_channel::ipc::IpcSender<FeltMessage>, _) =
-            felt_server.accept_with_peer_pid().unwrap();
+        // managed secret is sent.
+        let (tx, peer_pid) = accept_ipc_peer(felt_server)?;
 
         // AUTHORIZATION: decided from the peer's pid alone, before the version
         // handshake below, and kept separate from it. Any other same-user
@@ -852,5 +862,30 @@ mod tests {
         assert!(peer_is_authorized(Some(child_pid), child_pid));
         assert!(!peer_is_authorized(Some(child_pid + 1), child_pid));
         assert!(!peer_is_authorized(None, child_pid));
+    }
+
+    // Bug 2072053: a peer that fails the accept must fail the launch instead
+    // of aborting felt. On macOS a peer that sends nothing leaves the accept
+    // waiting, so that case only applies elsewhere.
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn a_peer_that_sends_nothing_fails_the_accept() {
+        let (server, name) =
+            ipc_channel::ipc::IpcOneShotServer::<ipc_channel::ipc::IpcSender<FeltMessage>>::new()
+                .unwrap();
+        drop(ipc_channel::ipc::IpcSender::<FeltMessage>::connect(name).unwrap());
+        assert!(matches!(accept_ipc_peer(server), Err(rv) if rv == NS_ERROR_FAILURE));
+    }
+
+    #[test]
+    fn a_first_message_that_is_not_a_sender_fails_the_accept() {
+        let (server, name) =
+            ipc_channel::ipc::IpcOneShotServer::<ipc_channel::ipc::IpcSender<FeltMessage>>::new()
+                .unwrap();
+        ipc_channel::ipc::IpcSender::<()>::connect(name)
+            .unwrap()
+            .send(())
+            .unwrap();
+        assert!(matches!(accept_ipc_peer(server), Err(rv) if rv == NS_ERROR_FAILURE));
     }
 }
