@@ -111,24 +111,62 @@ add_task(async function test_poll_failure_is_logged_again_after_recovery() {
   );
 });
 
-add_task(async function test_repeated_missing_policies_are_logged_once() {
+add_task(async function test_repeated_malformed_responses_are_logged_once() {
   await EnterprisePolicyTesting.setupEngineWithRemotePolicies(
     { policies: {} },
     null
   );
 
+  // An empty policy set is a well-formed response. A body without the policies
+  // field, which the console never sends, is treated like a failed request.
   const errors = collectPolicyErrors();
+  await pollRepeatedly(() => Promise.resolve({ policies: {} }));
+  Assert.deepEqual(
+    errors.messages,
+    [],
+    "An empty policy set is not logged as an error"
+  );
   await pollRepeatedly(() => Promise.resolve({}));
   errors.stop();
   EnterprisePolicyTesting.stubRemotePolicies({ policies: {} });
 
-  const missing = errors.messages.filter(m =>
-    m.startsWith("No policies were found in the response")
+  const malformed = errors.messages.filter(m =>
+    m.startsWith("The console response has no policies field")
   );
   Assert.equal(
-    missing.length,
+    malformed.length,
     1,
-    `A response without policies is logged once: ${errors.messages.join(" | ")}`
+    `A response without a policies field is logged once: ${errors.messages.join(" | ")}`
+  );
+});
+
+add_task(async function test_malformed_response_keeps_the_last_policies() {
+  const policies = { DisableFeedbackCommands: true };
+  await EnterprisePolicyTesting.setupEngineWithRemotePolicies(
+    { policies },
+    null
+  );
+
+  await pollRepeatedly(() => Promise.resolve({}));
+  const active = Services.policies.getActivePolicies();
+  const status = Services.policies.status;
+
+  // Applying a policy marks the profile as managed, which changes how a later
+  // failed startup is handled, so leave the engine with an empty set.
+  await EnterprisePolicyTesting.setupEngineWithRemotePolicies(
+    { policies: {} },
+    null
+  );
+
+  Assert.deepEqual(
+    active,
+    policies,
+    "The last well-formed policy set stays applied"
+  );
+  Assert.equal(
+    status,
+    Ci.nsIEnterprisePolicies.ACTIVE,
+    "The engine stays ACTIVE while the console answers without policies"
   );
 });
 
@@ -145,13 +183,16 @@ add_task(async function test_failed_startup_fetch_is_logged_once() {
   errors.stop();
   EnterprisePolicyTesting.stubRemotePolicies({ policies: {} });
 
+  const fetchErrors = errors.messages.filter(m =>
+    m.includes("remote policies")
+  );
   Assert.equal(
-    errors.messages.length,
+    fetchErrors.length,
     1,
     `A failed startup fetch is logged once: ${errors.messages.join(" | ")}`
   );
   Assert.ok(
-    errors.messages[0]?.includes(CONSOLE_HOST),
-    `The logged line is the one that names the console host: ${errors.messages[0]}`
+    fetchErrors[0]?.includes(CONSOLE_HOST),
+    `The logged line is the one that names the console host: ${fetchErrors[0]}`
   );
 });

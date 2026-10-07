@@ -274,10 +274,9 @@ EnterprisePoliciesManager.prototype = {
       // about:policies lists the first logged argument only, so the error
       // goes into the message as well as being passed along for its stack.
       if (e instanceof RemotePolicyProviderInitError) {
-        // _buildProvider() already logged why the fetch failed. Fail closed
-        // rather than run with no policies. This only takes effect under Felt,
-        // which fetched from this console just before launching Firefox, so a
-        // failure here should be rare.
+        // Fail closed rather than run with no policies. This only takes effect
+        // under Felt, which fetched from this console just before launching
+        // Firefox, so a failure here should be rare.
         lazy.initiateShutdown();
       } else if (AppConstants.MOZ_ENTERPRISE && Services.felt.isFeltBrowser()) {
         // A managed (felt) browser that cannot finish policy initialization
@@ -1712,7 +1711,7 @@ class RemotePoliciesProvider extends PoliciesProvider {
     const res = await lazy.ConsoleClient.getRemotePolicies();
     if (!res?.policies) {
       this._reportPollFailure(
-        `No policies were found in the response: ${JSON.stringify(res)}.`
+        `The console response has no policies field: ${JSON.stringify(res)}.`
       );
       const wasFailed = this._failed;
       this._failed = true;
