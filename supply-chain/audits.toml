@@ -4193,6 +4193,20 @@ invalid source, corrects documentation, and adds two Unix tests. The public API
 surface is unchanged.
 """
 
+[[audits.ipc-channel]]
+who = "John Reitano <jreitano@mozilla.com>"
+criteria = "safe-to-deploy"
+delta = "0.21.0@git:c94d624bded1060078b9b1ffd82ec21937c4300a -> 0.21.0@git:91bce598bdcab5fd30ad876658b9a7347bbeca56"
+importable = false
+notes = """
+Rebases the raw fd/handle accessors onto v0.21.0+gecko e27888a, which adds
+peer pid reporting: IpcReceiver::peer_pid() (Linux SO_PEERCRED via nix
+getsockopt, Windows GetNamedPipeClientProcessId) and
+IpcOneShotServer::accept_with_peer_pid(), which on macOS requests the Mach
+audit trailer (using mach2's constants and types) and reads the sender's pid
+with libbsm's audit_token_to_pid. The raw fd/handle accessors are unchanged.
+"""
+
 [[audits.itertools]]
 who = "Mike Hommey <mh+mozilla@glandium.org>"
 criteria = "safe-to-deploy"
