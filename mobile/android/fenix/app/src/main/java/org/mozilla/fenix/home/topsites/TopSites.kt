@@ -42,6 +42,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.semantics.testTagsAsResourceId
@@ -208,6 +210,8 @@ fun TopSites(
             )
 
             if (isExpandToggleEnabled && (hasHiddenShortcuts || hasHiddenAddShortcut)) {
+                Spacer(modifier = Modifier.height(FirefoxTheme.layout.space.static100))
+
                 TopSitesExpandToggle(
                     isExpanded = isExpanded,
                     contentColor = topSiteColors.titleTextColor,
@@ -226,7 +230,7 @@ private fun TopSitesExpandToggle(
 ) {
     TextButton(
         onClick = onClick,
-        modifier = Modifier.testTag(TopSitesTestTag.EXPAND_TOGGLE),
+        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }.testTag(TopSitesTestTag.EXPAND_TOGGLE),
         colors = ButtonDefaults.textButtonColors(contentColor = contentColor),
     ) {
         Icon(
@@ -242,7 +246,7 @@ private fun TopSitesExpandToggle(
             tint = LocalContentColor.current,
         )
 
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(FirefoxTheme.layout.space.static100))
 
         Text(
             text =

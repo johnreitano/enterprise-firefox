@@ -340,6 +340,7 @@ TEST(Layers, TextureYCbCrSerialization)
   clientData.mCrSkip = 0;
   clientData.mCrSkip = 0;
 
+  gfxPlatform::GetPlatform();
   uint32_t namespaceId = 1;
   ImageBridgeChild::InitSameProcess(namespaceId);
 

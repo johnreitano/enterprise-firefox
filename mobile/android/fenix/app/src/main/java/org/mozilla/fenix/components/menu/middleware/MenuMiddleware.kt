@@ -11,8 +11,11 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import mozilla.appservices.places.BookmarkRoot
+import mozilla.components.browser.state.action.WebExtensionAction
 import mozilla.components.browser.state.selector.selectedTab
 import mozilla.components.browser.state.state.SessionState
+import mozilla.components.browser.state.state.extension.WebExtensionPromptRequest
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.menu.data.ExpandableMenuItem
 import mozilla.components.compose.menu.store.MenuAction
@@ -22,17 +25,25 @@ import mozilla.components.compose.menu.store.MenuState
 import mozilla.components.compose.menu.store.MenuStore
 import mozilla.components.concept.engine.EngineSession.LoadUrlFlags
 import mozilla.components.concept.engine.prompt.ShareData
+import mozilla.components.concept.engine.webextension.InstallationMethod
+import mozilla.components.feature.addons.Addon
 import mozilla.components.feature.ipprotection.store.IPProtectionAction
 import mozilla.components.feature.ipprotection.store.IPProtectionStore
 import mozilla.components.feature.top.sites.PinnedSiteStorage
 import mozilla.components.feature.top.sites.TopSite
 import mozilla.components.lib.state.Middleware
 import mozilla.components.lib.state.Store
+import mozilla.components.service.fxa.manager.AccountState.Authenticated
+import mozilla.components.service.fxa.manager.AccountState.Authenticating
+import mozilla.components.service.fxa.manager.AccountState.AuthenticationProblem
+import mozilla.components.service.fxa.manager.AccountState.NotAuthenticated
+import mozilla.components.service.fxa.manager.AccountState.Unknown
 import mozilla.components.ui.widgets.withCenterAlignedButtons
 import mozilla.telemetry.glean.private.NoExtras
 import org.mozilla.fenix.GleanMetrics.Vpn
 import org.mozilla.fenix.NavGraphDirections
 import org.mozilla.fenix.R
+import org.mozilla.fenix.addons.findWebExtensionMenuAction
 import org.mozilla.fenix.collections.SaveCollectionStep
 import org.mozilla.fenix.components.AppStore
 import org.mozilla.fenix.components.UseCases
@@ -47,8 +58,10 @@ import org.mozilla.fenix.components.menu.store.IPProtectionMenuStatus
 import org.mozilla.fenix.components.menu.store.MenuAction.AddBookmark
 import org.mozilla.fenix.components.menu.store.MenuAction.AddShortcut
 import org.mozilla.fenix.components.menu.store.MenuAction.CustomizeReaderView
+import org.mozilla.fenix.components.menu.store.MenuAction.DeleteBrowsingDataAndQuit
 import org.mozilla.fenix.components.menu.store.MenuAction.FindInPage
 import org.mozilla.fenix.components.menu.store.MenuAction.IPProtectionToggle
+import org.mozilla.fenix.components.menu.store.MenuAction.InstallAddon
 import org.mozilla.fenix.components.menu.store.MenuAction.MoveToNonPrivateTab
 import org.mozilla.fenix.components.menu.store.MenuAction.Navigate
 import org.mozilla.fenix.components.menu.store.MenuAction.OnMoreMenuClicked
@@ -59,6 +72,8 @@ import org.mozilla.fenix.components.menu.store.MenuAction.RemoveShortcut
 import org.mozilla.fenix.components.menu.store.MenuAction.RequestDesktopSite
 import org.mozilla.fenix.components.menu.store.MenuAction.RequestMobileSite
 import org.mozilla.fenix.components.menu.store.MenuAction.SaveAsPdfRequested
+import org.mozilla.fenix.components.menu.store.MenuAction.WebExtensionActionClicked
+import org.mozilla.fenix.components.menu.toFenixFxAEntryPoint
 import org.mozilla.fenix.components.menu.toMenuState
 import org.mozilla.fenix.components.metrics.MetricsUtils
 import org.mozilla.fenix.components.share.ShareSource
@@ -66,6 +81,8 @@ import org.mozilla.fenix.ext.nav
 import org.mozilla.fenix.ext.openToBrowser
 import org.mozilla.fenix.home.topsites.AddShortcutEntryPoint
 import org.mozilla.fenix.home.topsites.AddShortcutSource
+import org.mozilla.fenix.settings.SupportUtils.AMO_HOMEPAGE_FOR_ANDROID
+import org.mozilla.fenix.settings.deletebrowsingdata.DeleteBrowsingDataController
 import org.mozilla.fenix.summarization.eligibility.SummarizationEligibilityChecker
 import org.mozilla.fenix.summarization.isSummarizePageMenuItem
 import org.mozilla.fenix.summarization.onboarding.FenixSummarizationFeatureConfiguration
@@ -94,12 +111,15 @@ import org.mozilla.fenix.webcompat.WebCompatReporterMoreInfoSender
  * @param pinnedSiteStorage [PinnedSiteStorage] for checking the shortcuts the user already has.
  * @param materialAlertDialogBuilder [MaterialAlertDialogBuilder] for telling the user when they cannot have another
  *   shortcut.
+ * @param deleteBrowsingDataController Provides the [DeleteBrowsingDataController] for deleting the data the user wants
+ *   gone when they quit the application. Asked for it only if they ever do, since building it is not free.
+ * @param quitApplicationDelegate Quits the application, once there is nothing left to delete.
  * @param scope [CoroutineScope] tied to the lifetime of the menu, used for all work that is only useful while the menu
  *   is shown.
  * @param applicationScope [CoroutineScope] tied to the lifetime of the application, used for the work that cannot be
  *   interrupted and so must not be tied to the menu.
  */
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "TooManyFunctions", "LongMethod")
 class MenuMiddleware(
     private val appStore: AppStore,
     private val browserStore: BrowserStore,
@@ -113,10 +133,11 @@ class MenuMiddleware(
     private val webCompatReporterMoreInfoSender: WebCompatReporterMoreInfoSender,
     private val pinnedSiteStorage: PinnedSiteStorage,
     private val materialAlertDialogBuilder: MaterialAlertDialogBuilder,
+    private val deleteBrowsingDataController: () -> DeleteBrowsingDataController,
+    private val quitApplicationDelegate: () -> Unit,
     private val scope: CoroutineScope,
     private val applicationScope: CoroutineScope,
 ) : Middleware<MenuState, MenuAction> {
-
     @Suppress("LongMethod", "CyclomaticComplexMethod")
     override fun invoke(
         store: Store<MenuState, MenuAction>,
@@ -152,6 +173,28 @@ class MenuMiddleware(
             is RequestDesktopSite -> requestSiteMode(enableDesktopMode = true)
 
             is RequestMobileSite -> requestSiteMode(enableDesktopMode = false)
+
+            is InstallAddon -> installAddon(action.addon, action.addonName)
+
+            is Navigate.AddonDetails ->
+                navigate(NavGraphDirections.actionGlobalAddonDetailsFragment(addon = action.addon))
+
+            is Navigate.InstalledAddonDetails ->
+                navigate(NavGraphDirections.actionGlobalToInstalledAddonDetailsFragment(addon = action.addon))
+
+            is Navigate.ManageExtensions -> navigate(NavGraphDirections.actionGlobalAddonsManagementFragment())
+
+            is WebExtensionActionClicked -> handleWebExtensionActionClicked(action)
+
+            is Navigate.DiscoverMoreExtensions -> {
+                dismissMenu()
+                navController.openToBrowser()
+                useCases.fenixBrowserUseCases.loadUrlOrSearch(
+                    searchTermOrURL = AMO_HOMEPAGE_FOR_ANDROID,
+                    newTab = true,
+                    private = appStore.state.mode.isPrivate,
+                )
+            }
 
             is Navigate.Translate -> {
                 navController.nav(
@@ -205,7 +248,36 @@ class MenuMiddleware(
                 useCases.sessionUseCases.printContent(browserStore.state.selectedTabId)
             }
 
+            is Navigate.MozillaAccount -> navigateToMozillaAccount(action)
+
+            is Navigate.Settings -> navigate(NavGraphDirections.actionGlobalSettingsFragment())
+
+            is DeleteBrowsingDataAndQuit -> deleteBrowsingDataAndQuit()
+
             is Navigate.Back -> handleBackNavigation(action)
+
+            is Navigate.History -> {
+                val navOptions = NavOptions.Builder().setPopUpTo(R.id.browserFragment, false).build()
+                navigate(NavGraphDirections.actionGlobalHistoryFragment(), navOptions)
+            }
+
+            is Navigate.Bookmarks -> {
+                val navOptions = NavOptions.Builder().setPopUpTo(R.id.browserFragment, false).build()
+                navigate(
+                    NavGraphDirections.actionGlobalBookmarkFragment(BookmarkRoot.Mobile.id),
+                    navOptions,
+                )
+            }
+
+            is Navigate.Downloads -> {
+                val navOptions = NavOptions.Builder().setPopUpTo(R.id.browserFragment, false).build()
+                navigate(NavGraphDirections.actionGlobalDownloadsFragment(), navOptions)
+            }
+
+            is Navigate.Passwords -> {
+                val navOptions = NavOptions.Builder().setPopUpTo(R.id.browserFragment, false).build()
+                navigate(MenuFragmentDirections.actionMenuFragmentToLoginsListFragment(), navOptions)
+            }
 
             is Navigate.Forward -> handleForwardNavigation(action)
 
@@ -245,6 +317,38 @@ class MenuMiddleware(
             IPProtectionMenuStatus.DataLimitReached,
             IPProtectionMenuStatus.ConnectionError -> ipProtectionStore.dispatch(IPProtectionAction.Toggle)
         }
+    }
+
+    /**
+     * What an extension does when the user clicks what it offers is up to it, so the menu gets out of the way first.
+     * The action is resolved as late as possible - what the extension shows may have changed since the menu was built.
+     */
+    private fun handleWebExtensionActionClicked(action: WebExtensionActionClicked) {
+        val extensionAction =
+            browserStore.state.findWebExtensionMenuAction(
+                extensionId = action.extensionId,
+                isPageAction = action.isPageAction,
+            ) ?: return
+
+        dismissMenu()
+        extensionAction.onClick()
+    }
+
+    private fun installAddon(addon: Addon, addonName: String?) {
+        if (addon.isInstalled()) return
+
+        dismissMenu()
+
+        browserStore.dispatch(
+            WebExtensionAction.UpdatePromptRequestWebExtensionAction(
+                WebExtensionPromptRequest.InstallationRequested(
+                    url = addon.downloadUrl,
+                    name = addonName,
+                    iconUrl = addon.iconUrl,
+                    installationMethod = InstallationMethod.MANAGER,
+                )
+            )
+        )
     }
 
     private fun requestSiteMode(enableDesktopMode: Boolean) {
@@ -399,6 +503,25 @@ class MenuMiddleware(
         )
     }
 
+    private fun navigateToMozillaAccount(action: Navigate.MozillaAccount) {
+        val directions =
+            when (action.accountState) {
+                Authenticated -> MenuFragmentDirections.actionGlobalAccountSettingsFragment()
+                AuthenticationProblem ->
+                    MenuFragmentDirections.actionGlobalAccountProblemFragment(
+                        entrypoint = action.accesspoint.toFenixFxAEntryPoint()
+                    )
+                is Authenticating,
+                NotAuthenticated,
+                Unknown ->
+                    MenuFragmentDirections.actionGlobalTurnOnSync(
+                        entrypoint = action.accesspoint.toFenixFxAEntryPoint()
+                    )
+            }
+
+        navigate(directions)
+    }
+
     private fun handleMoreBeingClicked(store: Store<MenuState, MenuAction>) {
         val moreItem =
             store.state.menuGroups
@@ -462,6 +585,16 @@ class MenuMiddleware(
                 navOptions = NavOptions.Builder().setPopUpTo(R.id.browserFragment, false).build(),
             )
         }
+    }
+
+    /** The process of clearing app data happens after the menu is closed and then the application is closed. */
+    private fun deleteBrowsingDataAndQuit() {
+        val controller = deleteBrowsingDataController()
+        val quitApplicationDelegate = this@MenuMiddleware.quitApplicationDelegate
+
+        dismissMenu()
+
+        applicationScope.launch { controller.clearBrowsingDataOnQuit(onDeletionComplete = quitApplicationDelegate) }
     }
 
     private fun handleBackNavigation(action: Navigate.Back) {

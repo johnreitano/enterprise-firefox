@@ -124,6 +124,9 @@ add_task(async function test_page_and_tab_menu_prompt() {
       ["browser.ml.chat.page", true],
       ["browser.ml.chat.page.menuBadge", true],
       ["sidebar.revamp", true],
+      // Right-clicking text selects the word under the cursor on macOS, which
+      // would offer the selection prompts instead of the page ones.
+      ["ui.mouse.right_click.select_under_cursor", false],
     ],
   });
   await SidebarTestUtils.ensureLauncherVisible(window);

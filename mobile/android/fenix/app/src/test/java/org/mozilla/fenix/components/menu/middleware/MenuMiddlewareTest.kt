@@ -23,17 +23,22 @@ import io.mockk.verify
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
+import mozilla.appservices.places.BookmarkRoot
 import mozilla.components.ExperimentalAndroidComponentsApi
 import mozilla.components.browser.state.state.BrowserState
 import mozilla.components.browser.state.state.ContentState
 import mozilla.components.browser.state.state.EngineState
 import mozilla.components.browser.state.state.TabSessionState
+import mozilla.components.browser.state.state.WebExtensionState
 import mozilla.components.browser.state.state.createTab
+import mozilla.components.browser.state.state.extension.WebExtensionPromptRequest
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.ExpandableMenuItem
@@ -45,6 +50,9 @@ import mozilla.components.compose.menu.store.MenuStore
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.concept.engine.EngineSession
 import mozilla.components.concept.engine.ipprotection.ServiceState
+import mozilla.components.concept.engine.webextension.Action
+import mozilla.components.concept.engine.webextension.InstallationMethod.MANAGER
+import mozilla.components.feature.addons.Addon
 import mozilla.components.feature.app.links.AppLinkRedirect
 import mozilla.components.feature.app.links.AppLinksUseCases
 import mozilla.components.feature.ipprotection.store.IPProtectionAction
@@ -58,6 +66,9 @@ import mozilla.components.feature.tabs.TabsUseCases
 import mozilla.components.feature.top.sites.PinnedSiteStorage
 import mozilla.components.feature.top.sites.TopSite
 import mozilla.components.feature.top.sites.TopSitesUseCases
+import mozilla.components.service.fxa.manager.AccountState.Authenticated
+import mozilla.components.service.fxa.manager.AccountState.AuthenticationProblem
+import mozilla.components.service.fxa.manager.AccountState.NotAuthenticated
 import mozilla.components.support.test.robolectric.testContext
 import org.junit.Rule
 import org.junit.Test
@@ -77,6 +88,7 @@ import org.mozilla.fenix.components.appstate.AppState
 import org.mozilla.fenix.components.bookmarks.BookmarksUseCase
 import org.mozilla.fenix.components.menu.BrowserMenuBuilder
 import org.mozilla.fenix.components.menu.FenixMenuItem.CustomizeReaderView
+import org.mozilla.fenix.components.menu.MenuAccessPoint
 import org.mozilla.fenix.components.menu.MenuFragmentDirections
 import org.mozilla.fenix.components.menu.MenuItemProvider
 import org.mozilla.fenix.components.menu.MenuPresentationMode.Row
@@ -99,6 +111,8 @@ import org.mozilla.fenix.ext.optionsEq
 import org.mozilla.fenix.helpers.FenixGleanTestRule
 import org.mozilla.fenix.home.topsites.AddShortcutEntryPoint
 import org.mozilla.fenix.home.topsites.AddShortcutSource
+import org.mozilla.fenix.settings.SupportUtils.AMO_HOMEPAGE_FOR_ANDROID
+import org.mozilla.fenix.settings.deletebrowsingdata.DeleteBrowsingDataController
 import org.mozilla.fenix.summarization.eligibility.SummarizationEligibilityChecker
 import org.mozilla.fenix.summarization.onboarding.SummarizationFeatureDiscoveryConfiguration
 import org.mozilla.fenix.summarization.onboarding.SummarizeDiscoveryEvent
@@ -193,6 +207,8 @@ class MenuMiddlewareTest {
     private val webCompatReporterMoreInfoSender: WebCompatReporterMoreInfoSender = mockk(relaxed = true)
     private val pinnedSiteStorage: PinnedSiteStorage = mockk(relaxed = true)
     private val materialAlertDialogBuilder: MaterialAlertDialogBuilder = mockk(relaxed = true)
+    private val deleteBrowsingDataController: DeleteBrowsingDataController = mockk()
+    private var quitCount = 0
     private val testDispatcher = StandardTestDispatcher()
 
     @Test
@@ -374,6 +390,121 @@ class MenuMiddlewareTest {
             navController.popBackStack(R.id.menuFragment, true)
             requestDesktopSiteUseCase(enable = false, tabId = TAB_ID)
         }
+    }
+
+    @Test
+    fun `WHEN handling a request to show the extensions manager THEN navigate to it`() {
+        val store = createStore()
+
+        store.dispatch(Navigate.ManageExtensions)
+
+        verify { navController.navigate(NavGraphDirections.actionGlobalAddonsManagementFragment(), null) }
+    }
+
+    @Test
+    fun `WHEN handling a request to show the details of a not installed extension THEN navigate to its details`() {
+        val store = createStore()
+        val addon = Addon(id = "addon")
+
+        store.dispatch(Navigate.AddonDetails(addon))
+
+        verify { navController.navigate(NavGraphDirections.actionGlobalAddonDetailsFragment(addon), null) }
+    }
+
+    @Test
+    fun `WHEN handling a request to show the details of an installed extension THEN navigate to its details`() {
+        val store = createStore()
+        val addon = Addon(id = "addon")
+
+        store.dispatch(Navigate.InstalledAddonDetails(addon))
+
+        verify {
+            navController.navigate(NavGraphDirections.actionGlobalToInstalledAddonDetailsFragment(addon), null)
+        }
+    }
+
+    @Test
+    fun `WHEN handling a request to discover more extensions THEN dismiss the menu and open the add-ons website`() {
+        val store = createStore()
+
+        store.dispatch(Navigate.DiscoverMoreExtensions)
+
+        verify {
+            navController.popBackStack(R.id.menuFragment, true)
+            navController.navigate(R.id.browserFragment)
+            fenixBrowserUseCase.loadUrlOrSearch(
+                searchTermOrURL = AMO_HOMEPAGE_FOR_ANDROID,
+                newTab = true,
+                private = false,
+            )
+        }
+    }
+
+    @Test
+    fun `WHEN handling installing an addon THEN start installing it and dismiss the menu`() =
+        runTest(testDispatcher) {
+            val addon =
+                Addon(
+                    id = "addon",
+                    downloadUrl = "https://mozilla.org/addon.xpi",
+                    iconUrl = "https://mozilla.org/addon.png",
+                )
+            val store = createStore()
+
+            store.dispatch(MenuAction.InstallAddon(addon = addon, addonName = "test"))
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            verify { navController.popBackStack(R.id.menuFragment, true) }
+            // Installing it this way is what shows the progress dialog keeping the user from asking for it again.
+            assertEquals(
+                WebExtensionPromptRequest.InstallationRequested(
+                    url = addon.downloadUrl,
+                    name = "test",
+                    iconUrl = addon.iconUrl,
+                    installationMethod = MANAGER,
+                ),
+                browserStore.state.webExtensionPromptRequest,
+            )
+        }
+
+    @Test
+    fun `GIVEN an addon is already installed WHEN handling installing it THEN abort trying to install it again`() =
+        runTest(testDispatcher) {
+            val addon =
+                Addon(
+                    id = "addon",
+                    installedState = Addon.InstalledState(id = "addon", version = "1.0", optionsPageUrl = null),
+                )
+            val store = createStore()
+
+            store.dispatch(MenuAction.InstallAddon(addon = addon, addonName = "test"))
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            verify(exactly = 0) { navController.popBackStack(R.id.menuFragment, true) }
+            assertNull(browserStore.state.webExtensionPromptRequest)
+        }
+
+    @Test
+    fun `WHEN handling a click on what an extension offers THEN dismiss the menu and let the extension handle it`() {
+        var wasClicked = false
+        val store =
+            createStore(
+                browserStore = browserStoreWithExtension(browserAction = webExtensionAction { wasClicked = true })
+            )
+
+        store.dispatch(MenuAction.WebExtensionActionClicked(extensionId = EXTENSION_ID, isPageAction = false))
+
+        verify { navController.popBackStack(R.id.menuFragment, true) }
+        assertTrue(wasClicked)
+    }
+
+    @Test
+    fun `GIVEN an extension no longer offers anything WHEN handling a click on what it offered THEN keep the menu open`() {
+        val store = createStore()
+
+        store.dispatch(MenuAction.WebExtensionActionClicked(extensionId = EXTENSION_ID, isPageAction = false))
+
+        verify(exactly = 0) { navController.popBackStack(R.id.menuFragment, true) }
     }
 
     @Test
@@ -838,6 +969,103 @@ class MenuMiddlewareTest {
     }
 
     @Test
+    fun `WHEN handling history navigation THEN open the history screen and dismiss the menu`() {
+        val store = createStore()
+
+        store.dispatch(Navigate.History)
+
+        verify {
+            navController.navigate(
+                NavGraphDirections.actionGlobalHistoryFragment(),
+                optionsEq(NavOptions.Builder().setPopUpTo(R.id.browserFragment, false).build()),
+            )
+        }
+    }
+
+    @Test
+    fun `WHEN handling bookmarks navigation THEN open the bookmarks screen and dismiss the menu`() {
+        val store = createStore()
+
+        store.dispatch(Navigate.Bookmarks)
+
+        verify {
+            navController.navigate(
+                NavGraphDirections.actionGlobalBookmarkFragment(BookmarkRoot.Mobile.id),
+                optionsEq(NavOptions.Builder().setPopUpTo(R.id.browserFragment, false).build()),
+            )
+        }
+    }
+
+    @Test
+    fun `WHEN handling downloads navigation THEN open the downloads screen and dismiss the menu`() {
+        val store = createStore()
+
+        store.dispatch(Navigate.Downloads)
+
+        verify {
+            navController.navigate(
+                NavGraphDirections.actionGlobalDownloadsFragment(),
+                optionsEq(NavOptions.Builder().setPopUpTo(R.id.browserFragment, false).build()),
+            )
+        }
+    }
+
+    @Test
+    fun `WHEN handling passwords navigation THEN open the saved passwords list and dismiss the menu`() {
+        val store = createStore()
+
+        store.dispatch(Navigate.Passwords)
+
+        verify {
+            navController.navigate(
+                MenuFragmentDirections.actionMenuFragmentToLoginsListFragment(),
+                optionsEq(NavOptions.Builder().setPopUpTo(R.id.browserFragment, false).build()),
+            )
+        }
+    }
+
+    @Test
+    fun `GIVEN someone is signed in WHEN handling a click on their account THEN open the account settings`() {
+        val store = createStore()
+
+        store.dispatch(Navigate.MozillaAccount(accountState = Authenticated, accesspoint = MenuAccessPoint.Browser))
+
+        verify { navController.navigate(MenuFragmentDirections.actionGlobalAccountSettingsFragment(), null) }
+    }
+
+    @Test
+    fun `GIVEN the account needs signing in again WHEN handling a click on it THEN offer signing in`() {
+        val store = createStore()
+
+        store.dispatch(
+            Navigate.MozillaAccount(accountState = AuthenticationProblem, accesspoint = MenuAccessPoint.Browser)
+        )
+
+        verify {
+            navController.navigate(
+                MenuFragmentDirections.actionGlobalAccountProblemFragment(
+                    entrypoint = FenixFxAEntryPoint.BrowserToolbar
+                ),
+                null,
+            )
+        }
+    }
+
+    @Test
+    fun `GIVEN nobody is signed in WHEN handling a click on the account item THEN offer signing in`() {
+        val store = createStore()
+
+        store.dispatch(Navigate.MozillaAccount(accountState = NotAuthenticated, accesspoint = MenuAccessPoint.Browser))
+
+        verify {
+            navController.navigate(
+                MenuFragmentDirections.actionGlobalTurnOnSync(entrypoint = FenixFxAEntryPoint.BrowserToolbar),
+                null,
+            )
+        }
+    }
+
+    @Test
     fun `WHEN handling back navigation THEN dismiss the menu and navigate back in the current tab`() {
         val store = createStore()
 
@@ -1009,6 +1237,63 @@ class MenuMiddlewareTest {
             )
         )
 
+    private fun browserStoreWithExtension(browserAction: Action) =
+        BrowserStore(
+            BrowserState(
+                tabs = listOf(createTab(url = TEST_URL, title = TEST_TITLE, id = TAB_ID)),
+                selectedTabId = TAB_ID,
+                extensions =
+                    mapOf(
+                        EXTENSION_ID to
+                            WebExtensionState(
+                                id = EXTENSION_ID,
+                                url = "url",
+                                name = "extension",
+                                enabled = true,
+                                browserAction = browserAction,
+                            )
+                    ),
+            )
+        )
+
+    private fun webExtensionAction(onClick: () -> Unit) =
+        Action(
+            title = "extension action",
+            enabled = true,
+            loadIcon = null,
+            badgeText = null,
+            badgeTextColor = null,
+            badgeBackgroundColor = null,
+            onClick = onClick,
+        )
+
+    @Test
+    fun `WHEN handling a request to show the settings THEN open them`() {
+        val store = createStore()
+
+        store.dispatch(Navigate.Settings)
+
+        verify { navController.navigate(NavGraphDirections.actionGlobalSettingsFragment(), null) }
+    }
+
+    @Test
+    fun `WHEN handling a request to quit THEN dismiss the menu and delete the data before quitting`() =
+        runTest(testDispatcher) {
+            val onDeletionComplete = slot<() -> Unit>()
+            coEvery { deleteBrowsingDataController.clearBrowsingDataOnQuit(capture(onDeletionComplete)) } just Runs
+            val store = createStore()
+
+            store.dispatch(MenuAction.DeleteBrowsingDataAndQuit)
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            verify { navController.popBackStack(R.id.menuFragment, true) }
+            coVerify { deleteBrowsingDataController.clearBrowsingDataOnQuit(any()) }
+            // The application is quit only once there is nothing left to delete.
+            assertEquals(0, quitCount)
+            onDeletionComplete.captured()
+            assertEquals(1, quitCount)
+        }
+
     private fun ipProtectionStore(proxyStatus: ProxyStatus): IPProtectionStore = mockk {
         every { state } returns IPProtectionState(proxyStatus = proxyStatus)
         every { dispatch(any()) } just Runs
@@ -1047,6 +1332,8 @@ class MenuMiddlewareTest {
                         webCompatReporterMoreInfoSender = webCompatReporterMoreInfoSender,
                         pinnedSiteStorage = pinnedSiteStorage,
                         materialAlertDialogBuilder = materialAlertDialogBuilder,
+                        deleteBrowsingDataController = { deleteBrowsingDataController },
+                        quitApplicationDelegate = { quitCount++ },
                         scope = CoroutineScope(testDispatcher),
                         applicationScope = CoroutineScope(testDispatcher),
                     )
@@ -1062,6 +1349,7 @@ class MenuMiddlewareTest {
         const val TEST_TITLE = "Mozilla"
         const val TAB_ID = "tab1"
         const val TOP_SITES_MAX_LIMIT = 16
+        const val EXTENSION_ID = "extensionId"
 
         val otherShortcut = TopSite.Pinned(id = 2, title = "Example", url = "https://example.org", createdAt = 0)
 

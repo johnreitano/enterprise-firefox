@@ -685,6 +685,7 @@ bool GLContext::InitImpl() {
       "Gallium 0.4 on llvmpipe",
       "Microsoft Basic Render Driver",
       "Samsung Xclipse",
+      "AMD Radeon HD GFX10",
       "Unknown"};
 
   mRenderer = GLRenderer::Other;

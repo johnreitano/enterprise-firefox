@@ -9,7 +9,7 @@
  * its own copy of the module).
  */
 
-import * as UrlbarContentUtils from "chrome://browser/content/urlbar/UrlbarContentUtils.mjs";
+import { UrlbarContentUtils } from "chrome://browser/content/urlbar/UrlbarContentUtils.mjs";
 import UrlbarPrefs from "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs";
 
 /**
@@ -353,6 +353,10 @@ export const UrlbarShared = {
     GLOBE: "chrome://global/skin/icons/defaultFavicon.svg",
     DEFAULT: "chrome://global/skin/icons/defaultFavicon.svg",
   },
+
+  // Size in `px` of icons in top-pick rows in the view. Should be kept in sync
+  // with the `--urlbarview-top-pick-icon-size` CSS variable.
+  TOP_PICK_ICON_SIZE: 58,
 
   // The number of results by which Page Up/Down move the selection.
   PAGE_UP_DOWN_DELTA: 5,
@@ -711,6 +715,24 @@ export const UrlbarShared = {
    */
   navigationEnabled(sapName) {
     return sapName != "searchbar";
+  },
+
+  /**
+   * Whether a string that is a URL may be navigated to in an engine search
+   * mode, as it would be outside of search mode, rather than searched for. This
+   * holds where the unified search button is always available.
+   *
+   * @param {string} sapName
+   *   The SAP name to check.
+   * @returns {boolean}
+   *   Whether navigation is enabled in an engine search mode.
+   */
+  navigationInSearchModeEnabled(sapName) {
+    return (
+      this.navigationEnabled(sapName) &&
+      (this.isSearchbarSAP(sapName) ||
+        UrlbarPrefs.get("unifiedSearchButton.always"))
+    );
   },
 
   /**
@@ -1284,6 +1306,8 @@ export const UrlbarShared = {
             return "unit";
           case "UrlbarProviderQuickSuggestContextualOptIn":
             return "fxsuggest_data_sharing_opt_in";
+          case "UrlbarProviderAddonsShortcutMoved":
+            return "addons_shortcut_moved";
           case "UrlbarProviderGlobalActions":
           case "UrlbarProviderActionsSearchMode":
             return "action";

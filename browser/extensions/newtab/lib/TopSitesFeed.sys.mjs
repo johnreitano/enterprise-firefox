@@ -1431,7 +1431,7 @@ export class TopSitesFeed {
    * shouldFilterSearchTile - is default filtering enabled and does a given hostname match the user's default search engine?
    *
    * @param {string} hostname a top site hostname, such as "amazon" or "foo"
-   * @returns {bool}
+   * @returns {boolean}
    */
   shouldFilterSearchTile(hostname) {
     if (
@@ -1449,7 +1449,7 @@ export class TopSitesFeed {
    * needed.
    *
    * @param {Array} plainPinnedSites (from the pinnedSitesCache)
-   * @returns {boolean} Did we insert any search shortcuts?
+   * @returns {Promise<boolean>} Did we insert any search shortcuts?
    */
   async _maybeInsertSearchShortcuts(plainPinnedSites) {
     // Only insert shortcuts if the experiment is running
@@ -1540,7 +1540,7 @@ export class TopSitesFeed {
   /**
    * Fetch topsites spocs that are frecency boosted.
    *
-   * @returns {Array} An array of sponsored tile objects.
+   * @returns {Promise<Array>} An array of sponsored tile objects.
    */
   async fetchFrecencyBoostedSpocs() {
     let candidates = [];
@@ -2091,8 +2091,8 @@ export class TopSitesFeed {
   /**
    * Refresh the top sites data for content.
    *
-   * @param {bool} options.broadcast Should the update be broadcasted.
-   * @param {bool} options.isStartup Being called while TopSitesFeed is initting.
+   * @param {boolean} options.broadcast Should the update be broadcasted.
+   * @param {boolean} options.isStartup Being called while TopSitesFeed is initting.
    */
   async refresh(options = {}) {
     if (this._uninitialized) {

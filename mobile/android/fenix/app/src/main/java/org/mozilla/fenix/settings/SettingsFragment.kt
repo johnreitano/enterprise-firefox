@@ -677,6 +677,16 @@ class SettingsFragment : PreferenceFragmentCompat(), SystemInsetsPaddedFragment 
         setupTrackingProtectionPreference(settings)
         setupDnsOverHttpsPreference(settings)
         setupEmailMaskPreference(settings, requireComponents)
+        setupAutofillPreferences(settings)
+    }
+
+    private fun setupAutofillPreferences(settings: Settings) {
+        if (settings.isAutofillSupported) {
+            return
+        }
+
+        requirePreference<Preference>(R.string.pref_key_passwords).isVisible = false
+        requirePreference<Preference>(R.string.pref_key_credit_cards).isVisible = false
     }
 
     private val setToDefaultPromptRequestLauncher: ActivityResultLauncher<Intent> =

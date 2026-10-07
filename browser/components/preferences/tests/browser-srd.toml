@@ -23,6 +23,8 @@ tags = "os_integration"
 
 ["browser_accessibility_zoom.js"]
 
+["browser_addressBarNavigation.js"]
+
 ["browser_appearance_pane.js"]
 
 ["browser_backup_visibility.js"]

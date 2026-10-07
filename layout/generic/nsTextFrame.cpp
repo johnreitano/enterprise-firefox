@@ -7289,7 +7289,8 @@ bool nsTextFrame::PaintTextWithSelectionColors(
       RefPtr<ComputedStyle> selectionStyle =
           aParams.textPaintStyle->GetComputedStyleForSelectionPseudo(
               selectionTypes[index], highlightName);
-      if (selectionStyle && selectionStyle->HasAuthorSpecifiedTextShadow()) {
+      if (selectionStyle &&
+          selectionStyle->HasAuthorOrUserSpecifiedTextShadow()) {
         // text-shadow was explicitly specified (including "none")
         hasSelectionShadow = true;
         Span<const StyleSimpleShadow> shadowSpan =

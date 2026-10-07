@@ -33,7 +33,7 @@ add_task(async function () {
   });
 
   let tab = await BrowserTestUtils.openNewForegroundTab(gBrowser);
-  await TestUtils.waitForCondition(() => tab._fullyOpen);
+  await BrowserTestUtils.allTabOpenAnimationsFinished(window);
 
   let tabStripRect =
     gBrowser.tabContainer.arrowScrollbox.getBoundingClientRect();

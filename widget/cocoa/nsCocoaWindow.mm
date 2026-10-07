@@ -1500,7 +1500,7 @@ void nsCocoaWindow::DispatchAPZWheelInputEvent(InputData& aEvent) {
           return;
         }
 
-        event = MayStartSwipeForAPZ(aEvent.AsPanGestureInput(), result);
+        event = MayStartSwipe(aEvent.AsPanGestureInput(), result);
         break;
       }
       case SCROLLWHEEL_INPUT: {
@@ -1529,9 +1529,6 @@ void nsCocoaWindow::DispatchAPZWheelInputEvent(InputData& aEvent) {
 
   switch (aEvent.mInputType) {
     case PANGESTURE_INPUT: {
-      if (MayStartSwipeForNonAPZ(aEvent.AsPanGestureInput())) {
-        return;
-      }
       event = aEvent.AsPanGestureInput().ToWidgetEvent(this);
       break;
     }
@@ -7079,15 +7076,13 @@ CGFloat nsCocoaWindow::BackingScaleFactor() const {
 void nsCocoaWindow::BackingScaleFactorChanged() {
   CGFloat newScale = ComputeBackingScaleFactor();
 
-  // Ignore notification if it hasn't really changed
   if (BackingScaleFactor() == newScale) {
     return;
   }
 
-  UpdateBounds();
-
   SuspendAsyncCATransactions();
   mBackingScaleFactor = newScale;
+  UpdateBounds();
   if (mNativeLayerRoot) {
     mNativeLayerRoot->SetBackingScale(newScale);
   }

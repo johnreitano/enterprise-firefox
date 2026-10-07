@@ -2374,7 +2374,6 @@ already_AddRefed<CSSValue> nsComputedDOMStyle::GetTransformValue(
   nsStyleTransformMatrix::TransformReferenceBox refBox(mInnerFrame, nsRect());
   gfx::Matrix4x4 matrix = nsStyleTransformMatrix::ReadTransforms(
       aTransform, refBox, float(mozilla::AppUnitsPerCSSPixel()),
-      mInnerFrame ? mInnerFrame->Style()->EffectiveZoom() : StyleZoom::ONE,
       nsStyleTransformMatrix::Zoomed::
           No);  // We need to unzoom the translations for GetComputedStyle().
 

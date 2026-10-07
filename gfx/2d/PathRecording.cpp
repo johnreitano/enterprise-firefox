@@ -147,7 +147,7 @@ bool PathOps::CheckedStreamToSink(PathSink& aPathSink) const {
 
 void PathOps::TransformedCopyTo(const Matrix& aTransform,
                                 PathOps& aDest) const {
-  MOZ_ALWAYS_TRUE(
+  MOZ_RELEASE_ASSERT(
       aDest.mPathData.reserve(aDest.mPathData.length() + mPathData.length()));
   const uint8_t* nextByte = mPathData.begin();
   const uint8_t* end = mPathData.end();

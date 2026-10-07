@@ -155,7 +155,7 @@ const PAGE_LAYOUTS_INFO = {
     label: "Spaces (Buttons at the bottom)",
     description:
       "Stories, widgets and Highlights each get their own panel, navigated " +
-      "with a segmented control below the content and arrows at either edge.",
+      "with a segmented control floating at the bottom of the window.",
   },
   [PAGE_LAYOUT_VARIANTS.SPACES_BUTTONS_TOP]: {
     label: "Spaces (Buttons at the top)",
@@ -167,6 +167,13 @@ const PAGE_LAYOUTS_INFO = {
       "Panels named for interests rather than for what is in them, each " +
       "holding the whole side-by-side pair over only its own content topics " +
       "and widgets.",
+  },
+  [PAGE_LAYOUT_VARIANTS.SPACES_FLOATING_ARROWS]: {
+    label: "Spaces (Floating arrows)",
+    description:
+      "Same panels as the buttons variants, navigated with an arrow at each " +
+      "edge leading to the space beyond it instead of a segmented control. " +
+      "pageLayouts.spacesOrder sets the order.",
   },
   // @experiment(remove) { bug 2069496 }
   [PAGE_LAYOUT_VARIANTS.WIDGETS_AD_LARGE]: {

@@ -388,6 +388,13 @@ bool js::ParseEvalOptions(JSContext* cx, HandleValue value,
     options.setLineno(lineno);
   }
 
+  if (!JS_GetProperty(cx, opts, "allowRedeclaringExistingLexicalBinding", &v)) {
+    return false;
+  }
+  if (v.isBoolean()) {
+    options.setAllowRedeclaringExistingLexicalBinding(v.toBoolean());
+  }
+
   if (!JS_GetProperty(cx, opts, "hideFromDebugger", &v)) {
     return false;
   }
@@ -405,6 +412,21 @@ bool js::ParseEvalOptions(JSContext* cx, HandleValue value,
     if (ToBoolean(v)) {
       options.setUseInnerBindings();
     }
+  }
+
+  // allowRedeclaringExistingLexicalBinding only applies to
+  // executeInGlobal and executeInGlobalWithBindings (without
+  // useInnerBindings). It isn't supported by Frame.eval and its
+  // variants, and combining it with useInnerBindings should throw.
+  if (options.allowRedeclaringExistingLexicalBinding() &&
+      options.kind() != EvalOptions::EnvKind::Global &&
+      options.kind() != EvalOptions::EnvKind::GlobalWithExtraOuterBindings) {
+    JS_ReportErrorASCII(
+        cx,
+        "allowRedeclaringExistingLexicalBinding is only supported by "
+        "executeInGlobal and executeInGlobalWithBindings without "
+        "useInnerBindings");
+    return false;
   }
 
   return true;

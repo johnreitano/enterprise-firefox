@@ -16,6 +16,7 @@ const mockState = {
     values: {
       ...INITIAL_STATE.Prefs.values,
       "widgets.system.enabled": true,
+      "widgets.enabled": true,
       "widgets.system.privacy.enabled": true,
       "widgets.privacy.enabled": true,
       "widgets.privacy.size": "medium",

@@ -187,3 +187,43 @@ add_task(async function test_tokens_persist_across_reload() {
 
   lazy.FeltStorage.clearLockingToken(EMAIL_A);
 });
+
+add_task(async function test_interrupted_session_requires_sign_in() {
+  await lazy.FeltStorage.setLockingToken(EMAIL_A, "stale-token");
+  await lazy.FeltStorage.setLockingToken(EMAIL_B, "other-user-token");
+  await lazy.FeltStorage.beginSession(EMAIL_A);
+
+  lazy.FeltStorage.uninit();
+  await lazy.FeltStorage.init();
+  Assert.ok(await lazy.FeltStorage.recoverInterruptedSession());
+  Assert.ok(!lazy.FeltStorage.hasLockingToken(EMAIL_A));
+  Assert.ok(lazy.FeltStorage.hasLockingToken(EMAIL_B));
+
+  lazy.FeltStorage.uninit();
+  await lazy.FeltStorage.init();
+  Assert.ok(!(await lazy.FeltStorage.recoverInterruptedSession()));
+  Assert.ok(!lazy.FeltStorage.hasLockingToken(EMAIL_A));
+  lazy.FeltStorage.clearLockingToken(EMAIL_B);
+});
+
+add_task(async function test_completed_lock_remains_unlockable() {
+  await lazy.FeltStorage.beginSession(EMAIL_A);
+  await lazy.FeltStorage.setLockingToken(EMAIL_A, "locked-token");
+  await lazy.FeltStorage.endSession();
+
+  lazy.FeltStorage.uninit();
+  await lazy.FeltStorage.init();
+  Assert.ok(!(await lazy.FeltStorage.recoverInterruptedSession()));
+  Assert.equal(await lazy.FeltStorage.getLockingToken(EMAIL_A), "locked-token");
+  lazy.FeltStorage.clearLockingToken(EMAIL_A);
+});
+
+add_task(async function test_interrupted_session_without_email() {
+  await lazy.FeltStorage.setLockingToken(EMAIL_A, "stale-token");
+  await lazy.FeltStorage.beginSession();
+
+  lazy.FeltStorage.uninit();
+  await lazy.FeltStorage.init();
+  Assert.ok(await lazy.FeltStorage.recoverInterruptedSession());
+  Assert.ok(!lazy.FeltStorage.hasLockingToken(EMAIL_A));
+});

@@ -396,12 +396,6 @@ pref("gfx.downloadable_fonts.enabled", true);
 pref("gfx.downloadable_fonts.fallback_delay", 3000);
 pref("gfx.downloadable_fonts.fallback_delay_short", 100);
 
-#ifdef XP_WIN
-  // Bug 2011408 will remove this pref and the code that uses it completely if
-  // we don't see any performance issues.
-  pref("gfx.font_rendering.directwrite.use_gdi_table_loading", false);
-#endif
-
 // comma separated list of backends to use in order of preference
 // e.g., pref("gfx.canvas.azure.backends", "direct2d,skia");
 pref("gfx.canvas.azure.backends", "skia");
@@ -3699,6 +3693,12 @@ pref("browser.ml.modelHubUrlTemplate", "{model}/{revision}");
 pref("browser.ml.modelCacheMaxSize", 4);
 // Model cache timeout in ms
 pref("browser.ml.modelCacheTimeout", 120000);
+// Route llama.cpp inference to the HWInference utility process
+#ifdef NIGHTLY_BUILD
+  pref("browser.ml.llama.hwInference", true);
+#else
+  pref("browser.ml.llama.hwInference", false);
+#endif
 // Minimal Physical RAM required in GiB
 pref("browser.ml.minimumPhysicalMemory", 3);
 // Check for memory before running
@@ -4222,6 +4222,14 @@ pref("extensions.formautofill.creditCards.cvv.supported", "off");
 // CVVs are only captured and stored when both prefs are true; see
 // FormAutofill.isAutofillCreditCardCVVEnabled.
 pref("extensions.formautofill.creditCards.cvv.enabled", true);
+
+// Leave a field whose autocomplete attribute is present but cannot be parsed
+// into a known field name, e.g. autocomplete="shopify checkout", out of
+// autofill entirely: it is offered no dropdown of its own, and it is not
+// filled when autofill is triggered from another field in the same form.
+// Treated as a signal that the site provides its own suggestion UI. A field
+// with no autocomplete attribute, or with "off"/"on", is unaffected.
+pref("extensions.formautofill.suppressUnrecognizedAutocomplete.enabled", false);
 
 // Supported countries need to follow ISO 3166-1 to align with "browser.search.region"
 pref("extensions.formautofill.creditCards.supportedCountries", "US,CA,GB,FR,DE,IT,ES,AT,BE,PL");

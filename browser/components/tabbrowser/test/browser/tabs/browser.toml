@@ -196,9 +196,6 @@ tags = "vertical-tabs"
 fail-if =  [
   "vertical_tab", # Bug 1932786, fails in the "vertical-tabs" variant
 ]
-skip-if = [
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64'", # Bug 1904826
-]
 
 ["browser_list_all_tabs_menu_items.js"]
 
@@ -263,7 +260,6 @@ tags = "vertical-tabs"
 ["browser_multiselect_tabs_move_to_another_window_drag.js"]
 tags = "vertical-tabs"
 skip-if = [
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64'", # Bug 1940606
   "os == 'win' && os_version == '11.26200' && asan", # Bug 2019745
 ]
 
@@ -496,11 +492,6 @@ tags = "vertical-tabs"
 
 ["browser_tabCloseProbes.js"]
 tags = "vertical-tabs"
-skip-if = [
-  "os == 'mac' && os_version == '10.15' && arch == 'x86_64'", # Bug 1932997
-  "os == 'mac' && os_version == '14.70' && arch == 'x86_64'", # Bug 1932997
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64'", # Bug 1932997
-]
 fail-if = [
   "vertical_tab", # Bug 1976110, fails in the "vertical-tabs" variant
 ]
@@ -525,10 +516,6 @@ tags = "vertical-tabs"
 
 ["browser_tabReorder_overflow.js"]
 tags = "vertical-tabs"
-skip-if = [
-  "os == 'mac' && os_version == '10.15' && arch == 'x86_64' && vertical_tab", # Bug 1938525
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64' && vertical_tab", # Bug 1928146
-]
 fail-if = [
   "vertical_tab", # Bug 1976110, fails in the "vertical-tabs" variant
 ]
@@ -598,7 +585,6 @@ skip-if = [
 ["browser_tab_groups_tab_interactions_telemetry.js"]
 skip-if = [
   "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && opt && swgl", # Bug 1968371
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64'", # Bug 1968371
   "os == 'win' && os_version == '11.26100' && arch == 'x86_64' && ccov", # Bug 1968371
   "os == 'win' && os_version == '11.26200' && arch == 'x86_64' && ccov", # Bug 1968371
 ]
@@ -626,7 +612,6 @@ tags = "vertical-tabs"
 tags = "vertical-tabs"
 skip-if = [
   "opt && standalone", # Bug 2028649
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64'", # Bug 1994900
   "os == 'win' && os_version == '11.26200' && arch == 'x86_64' && asan", # Bug 2028660
 ]
 
@@ -778,10 +763,6 @@ skip-if = [
 ["browser_window_open_modifiers.js"]
 support-files = ["file_window_open.html"]
 tags = "vertical-tabs"
-skip-if = [
-  "os == 'mac' && os_version == '10.15' && arch == 'x86_64' && vertical_tab", # Bug 1928146
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64' && vertical_tab", # Bug 1928146
-]
 fail-if = [
   "vertical_tab", # Bug 1976110, fails in the "vertical-tabs" variant
 ]

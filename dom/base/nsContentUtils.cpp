@@ -124,6 +124,7 @@
 #ifdef FUZZING
 #  include "mozilla/StaticPrefs_fuzzing.h"
 #endif
+#include "mozilla/StaticPrefs_mathml.h"
 #include "mozilla/StaticPrefs_nglayout.h"
 #include "mozilla/StaticPrefs_privacy.h"
 #include "mozilla/StaticPrefs_test.h"
@@ -4769,7 +4770,7 @@ void nsContentUtils::GenerateStateKey(nsIContent* aContent, Document* aDocument,
           appendedForm = true;
         } else {
           KeyAppendString("fn"_ns, aKey);
-          int32_t index = htmlForms->IndexOf(formElement, false);
+          int32_t index = htmlForms->IndexOf(formElement);
           if (index <= -1) {
             //
             // XXX HACK this uses some state that was dumped into the document
@@ -4811,7 +4812,7 @@ void nsContentUtils::GenerateStateKey(nsIContent* aContent, Document* aDocument,
           generatedUniqueKey = true;
         } else {
           KeyAppendString("dn"_ns, aKey);
-          int32_t index = htmlFormControls->IndexOf(aContent, true);
+          int32_t index = htmlFormControls->IndexOf(aContent);
           if (index > -1) {
             KeyAppendInt(index, aKey);
             generatedUniqueKey = true;
@@ -7641,7 +7642,9 @@ void nsContentUtils::TriggerLinkClick(
     nsAutoString fileName;
     if ((!aContent->IsHTMLElement(nsGkAtoms::a) &&
          !aContent->IsHTMLElement(nsGkAtoms::area) &&
-         !aContent->IsSVGElement(nsGkAtoms::a)) ||
+         !aContent->IsSVGElement(nsGkAtoms::a) &&
+         !(aContent->IsMathMLElement(nsGkAtoms::a) &&
+           StaticPrefs::mathml_a_element_enabled())) ||
         !aContent->AsElement()->GetAttr(nsGkAtoms::download, fileName) ||
         NS_FAILED(aContent->NodePrincipal()->CheckMayLoad(aLinkURI, true))) {
       fileName.SetIsVoid(true);  // No actionable download attribute was found.
@@ -10845,7 +10848,9 @@ bool nsContentUtils::HasRelNoReferrer(const Element& aElement) {
   // rel=noreferrer is only supported in <a>, <area>, and <form>
   if (!aElement.IsAnyOfHTMLElements(nsGkAtoms::a, nsGkAtoms::area,
                                     nsGkAtoms::form) &&
-      !aElement.IsSVGElement(nsGkAtoms::a)) {
+      !aElement.IsSVGElement(nsGkAtoms::a) &&
+      !(aElement.IsMathMLElement(nsGkAtoms::a) &&
+        StaticPrefs::mathml_a_element_enabled())) {
     return false;
   }
 

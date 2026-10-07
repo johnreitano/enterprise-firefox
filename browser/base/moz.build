@@ -37,6 +37,7 @@ BROWSER_CHROME_MANIFESTS += [
     "content/test/browser-keyboard/browser.toml",
     "content/test/browser-keyboard/browserSidebarRevamp.toml",
     "content/test/browser-linkHandling/browser.toml",
+    "content/test/browser-mathml/browser.toml",
     "content/test/browser-maximized/browser.toml",
     "content/test/browser-maximized/browserNova.toml",
     "content/test/browser-menubar/browser.toml",

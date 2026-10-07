@@ -4601,7 +4601,7 @@ already_AddRefed<PathCacheEntry> PathCache::FindOrInsertEntry(
     float aSigma) {
   HashNumber hash =
       PathCacheEntry::HashPath(aPath, aPattern, aTransform, aBounds, aOrigin);
-  for (const RefPtr<PathCacheEntry>& entry : GetChain(hash)) {
+  for (PathCacheEntry* entry : GetChain(hash)) {
     if (entry->MatchesPath(aPath, aPattern, aStrokeOptions, aStrokeMode,
                            aTransform, aBounds, aOrigin, hash, aSigma)) {
       return do_AddRef(entry);
@@ -4637,7 +4637,7 @@ already_AddRefed<PathCacheEntry> PathCache::FindEntry(
     float aSigma, bool aHasSecondaryHandle) {
   HashNumber hash =
       PathCacheEntry::HashPath(aPath, aPattern, aTransform, aBounds, aOrigin);
-  for (const RefPtr<PathCacheEntry>& entry : GetChain(hash)) {
+  for (PathCacheEntry* entry : GetChain(hash)) {
     if (entry->MatchesPath(aPath, aPattern, aStrokeOptions, aStrokeMode,
                            aTransform, aBounds, aOrigin, hash, aSigma) &&
         (!aHasSecondaryHandle || (entry->GetSecondaryHandle() &&
@@ -6084,7 +6084,7 @@ already_AddRefed<GlyphCacheEntry> GlyphCache::FindEntry(
   IntPoint offset = QuantizeOffset(aTransform, aQuantizeScale, aBuffer);
   IntPoint boundsOffset(offset.x / aQuantizeScale.x,
                         offset.y / aQuantizeScale.y);
-  for (const RefPtr<GlyphCacheEntry>& entry : GetChain(aHash)) {
+  for (GlyphCacheEntry* entry : GetChain(aHash)) {
     if (entry->MatchesGlyphs(aBuffer, aColor, aTransform, offset, boundsOffset,
                              aClipRect, aHash, aStrokeOptions)) {
       return do_AddRef(entry);
@@ -6736,6 +6736,7 @@ already_AddRefed<SourceSurface> SharedContextWebgl::ImportSurfaceDescriptor(
   if (!handle) {
     return nullptr;
   }
+
   BackingTexture* backing = handle->GetBackingTexture();
   RefPtr<WebGLTexture> tex = backing->GetWebGLTexture();
   if (mLastTexture != tex) {
@@ -6756,6 +6757,7 @@ already_AddRefed<SourceSurface> SharedContextWebgl::ImportSurfaceDescriptor(
   webgl::TexUnpackBlobDesc texDesc = {
       LOCAL_GL_TEXTURE_2D, {uint32_t(aSize.width), uint32_t(aSize.height), 1}};
   texDesc.sd = Some(aDesc);
+  texDesc.destFormat = aFormat;
   texDesc.structuredSrcSize = uvec2::FromSize(aSize);
   GLenum intFormat =
       aFormat == SurfaceFormat::A8 ? LOCAL_GL_R8 : LOCAL_GL_RGBA8;

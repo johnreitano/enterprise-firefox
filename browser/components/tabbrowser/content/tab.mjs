@@ -2,8 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const lazy = {};
-ChromeUtils.defineESModuleGetters(lazy, {
+const lazy = XPCOMUtils.declareLazy({
   TabMetrics: "moz-src:///browser/components/tabbrowser/TabMetrics.sys.mjs",
 });
 
@@ -67,50 +66,42 @@ export class MozTabbrowserTab extends MozElements.MozTab {
      */
     this.muteReason = undefined;
 
+    /**
+     * Whether the tab's label is the title of the page, as opposed to its URL
+     * or a placeholder.
+     */
+    this.labelIsContentTitle = false;
+
     this.closing = false;
 
-    // Assigned by other modules, mostly Tabbrowser.sys.mjs. Declared here for
-    // type checking only; these lines assign nothing.
-    /** @type {MozBrowser} */
-    this.linkedBrowser;
-    /** @type {object} */
-    this.permanentKey;
-    /** @type {MozTabbrowserTab|null} */
-    this.successor;
-    /** @type {Set<MozTabbrowserTab>} */
-    this.predecessors;
-    /** @type {string} */
-    this.canonicalUrl;
-    /** @type {boolean} */
-    this.initializingTab;
-    /** @type {boolean} */
-    this.removedByAdoption;
-    /** @type {boolean} */
-    this._fullyOpen;
-    /** @type {string} */
-    this._fullLabel;
-    /** @type {boolean} */
-    this._labelIsContentTitle;
-    /** @type {boolean} */
-    this._labelIsInitialTitle;
-    /** @type {boolean} */
-    this._pinnedUnscrollable;
-    /** @type {boolean} */
-    this._pendingPermitUnload;
-    /** @type {number} */
-    this._closeTimeAnimTimerId;
-    /** @type {number} */
-    this._closeTimeNoAnimTimerId;
-    /** @type {MozFindbar} */
-    this._findBar;
-    /** @type {Promise<MozFindbar | null>} */
-    this._pendingFindBar;
-    /** @type {[boolean, boolean]} */
-    this._endRemoveArgs;
-    /** @type {{uriIsAboutBlank: boolean, remoteType: string, usingPreloadedContent: boolean}} */
-    this._browserParams;
-    /** @type {nsIURI} */
-    this._originalRegisteredOpenURI;
+    /**
+     * Whether the tab has yet to dispatch TabOpen, or is having another
+     * window's tab state restored into it by `swapBrowsersAndCloseOther`.
+     * Extension code ignores the tab's events while this is true. The
+     * window's first tab never dispatches TabOpen; Tabbrowser clears the flag
+     * for it when setting it up.
+     */
+    this.initializing = true;
+
+    /**
+     * The canonical URL of the tab's page: the URL the page declares through
+     * `<link rel="canonical">`, `og:url` or JSON-LD, or else the page's own
+     * URL. It is detected once the page has loaded, or restored with the
+     * session, and is null before that, after the tab navigates, and while
+     * canonical URL detection is off.
+     *
+     * @type {string|null}
+     */
+    // TODO(bug 2076466): Either tab notes or tabbrowser should fully own this.
+    this.canonicalUrl = null;
+
+    /**
+     * The tab's browser. Tabbrowser sets it while adding the tab and clears
+     * it when the tab is removed.
+     *
+     * @type {MozBrowser|null}
+     */
+    this.linkedBrowser = null;
   }
 
   static get inheritedAttributes() {
@@ -284,6 +275,16 @@ export class MozTabbrowserTab extends MozElements.MozTab {
     return this.hasAttribute("usercontextid")
       ? parseInt(this.getAttribute("usercontextid"))
       : 0;
+  }
+
+  /**
+   * The permanent key of the tab's browser, or undefined once the tab has
+   * been closed.
+   *
+   * @type {object|undefined}
+   */
+  get permanentKey() {
+    return this.linkedBrowser?.permanentKey;
   }
 
   get soundPlaying() {
@@ -701,7 +702,7 @@ export class MozTabbrowserTab extends MozElements.MozTab {
     ) {
       if (this.activeMediaBlocked) {
         if (this.multiselected) {
-          gBrowser.resumeDelayedMediaOnMultiSelectedTabs(this);
+          gBrowser.resumeDelayedMediaOnMultiSelectedTabs();
         } else {
           this.resumeDelayedMedia();
         }

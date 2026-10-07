@@ -73,7 +73,6 @@ requesttimeoutfactor = 3  # Slow on Windows msix
 ["test_prefFlips.js"]
 requesttimeoutfactor = 2  # Slow on Linux and Windows
 skip-if = [
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64'", # Bug 1960885
   "os == 'win' && msix", # Bug 1991153
 ]
 

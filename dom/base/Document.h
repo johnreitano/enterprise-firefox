@@ -5966,7 +5966,25 @@ class Document : public nsINode,
   // Collection of data used by the pageload event.
   PageloadEventData mPageloadEventData;
 
-  // Submit the page load event at the end of the document's lifetime.
+  // Whether AccumulatePageLoadTelemetry() collected metrics, and whether the
+  // tab was foreground when the load event started. Background loads are still
+  // reported, but are left out of the paint and load timing histograms, as is
+  // a load whose load event never fired.
+  bool mPageLoadMetricsAccumulated = false;
+  bool mPageLoadWasForeground = false;
+
+  // Whether the load event fired. Tracked separately from loadTime, which is
+  // only set for a strictly positive duration.
+  bool mPageLoadCompleted = false;
+
+  // Whether ReportPageLoadTelemetry() has already run for this document.
+  bool mPageLoadTelemetryReported = false;
+
+  // Submit the page load event and the LCP histograms, once the document is
+  // hidden or at the end of its lifetime if it never was. ReportPageLoadEvent
+  // must run first: ReportLCP skips its histogram when the event carried the
+  // same LCP value.
+  void ReportPageLoadTelemetry();
   void ReportPageLoadEvent();
 
   // Accumulate JS telemetry collected

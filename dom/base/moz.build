@@ -566,7 +566,7 @@ if CONFIG["TARGET_CPU"].startswith("ppc"):
     SOURCES += ["CharacterDataBufferVMX.cpp"]
     SOURCES["CharacterDataBufferVMX.cpp"].flags += CONFIG["PPC_VMX_FLAGS"]
 
-EXTRA_JS_MODULES += [
+MOZ_SRC_FILES += [
     "ContentAreaDropListener.sys.mjs",
     "IndexedDBHelper.sys.mjs",
     "LocationHelper.sys.mjs",

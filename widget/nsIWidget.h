@@ -1254,9 +1254,6 @@ class nsIWidget : public nsSupportsWeakReference {
    */
   virtual void ReportSwipeStarted(uint64_t aInputBlockId, bool aStartSwipe);
 
-  // Returns true if |aPanInput| event was used for SwipeTracker, false
-  // otherwise.
-  bool MayStartSwipeForNonAPZ(const mozilla::PanGestureInput& aPanInput);
   void TrackScrollEventAsSwipe(const mozilla::PanGestureInput& aSwipeStartEvent,
                                uint32_t aAllowedDirections,
                                uint64_t aInputBlockId);
@@ -1267,7 +1264,7 @@ class nsIWidget : public nsSupportsWeakReference {
   SwipeInfo SendMayStartSwipe(const mozilla::PanGestureInput& aSwipeStartEvent);
   // Returns a WidgetWheelEvent which needs to be handled by APZ regardless of
   // whether |aPanInput| event was used for SwipeTracker or not.
-  mozilla::WidgetWheelEvent MayStartSwipeForAPZ(
+  mozilla::WidgetWheelEvent MayStartSwipe(
       const mozilla::PanGestureInput& aPanInput,
       const mozilla::layers::APZEventResult& aApzResult);
 
@@ -2442,13 +2439,6 @@ class nsIWidget : public nsSupportsWeakReference {
   // if the window is fully occluded (rendering may be paused in response)
   bool mIsFullyOccluded;
   bool mNeedFastSnaphot;
-  // This flag is only used when APZ is off. It indicates that the current pan
-  // gesture was processed as a swipe. Sometimes the swipe animation can finish
-  // before momentum events of the pan gesture have stopped firing, so this
-  // flag tells us that we shouldn't allow the remaining events to cause
-  // scrolling. It is reset to false once a new gesture starts (as indicated by
-  // a PANGESTURE_(MAY)START event).
-  bool mCurrentPanGestureBelongsToSwipe;
 
   mozilla::widget::PiPType mPiPType;
 

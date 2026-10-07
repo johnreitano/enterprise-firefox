@@ -104,6 +104,7 @@
 #include "js/Vector.h"
 #include "js/Wrapper.h"
 #include "threading/CpuCount.h"
+#include "util/Denormals.h"
 #include "util/DifferentialTesting.h"
 #include "util/LanguageId.h"
 #include "util/StringBuilder.h"
@@ -600,14 +601,9 @@ static bool GetBuildConfiguration(JSContext* cx, unsigned argc, Value* vp) {
     return false;
   }
 
-#if (defined(__GNUC__) && defined(__SSE__) && defined(__x86_64__)) || \
-    defined(__arm__) || defined(__aarch64__)
-  // See js.cpp "disable-main-thread-denormals" command line option.
-  value = BooleanValue(true);
-#else
-  value = BooleanValue(false);
-#endif
-  if (!JS_SetProperty(cx, info, "can-disable-main-thread-denormals", value)) {
+  value = BooleanValue(CanDisableDenormals());
+  if (!JS_SetProperty(cx, info, "can-disable-main-thread-wasm-denormals",
+                      value)) {
     return false;
   }
 
@@ -2343,7 +2339,12 @@ static bool WasmDumpIon(JSContext* cx, unsigned argc, Value* vp) {
   return true;
 }
 
-enum class Flag { Tier2Complete, Deserialized, ParsedBranchHints };
+enum class Flag {
+  Tier2Complete,
+  Deserialized,
+  ParsedBranchHints,
+  ParsedNameSection
+};
 
 static bool WasmReturnFlag(JSContext* cx, unsigned argc, Value* vp, Flag flag) {
   CallArgs args = CallArgsFromVp(argc, vp);
@@ -2370,6 +2371,9 @@ static bool WasmReturnFlag(JSContext* cx, unsigned argc, Value* vp, Flag flag) {
       break;
     case Flag::ParsedBranchHints:
       b = !module->module().codeMeta().branchHints.failedParse();
+      break;
+    case Flag::ParsedNameSection:
+      b = module->module().codeMeta().nameSection.isSome();
       break;
   }
 
@@ -2447,6 +2451,10 @@ static bool WasmParsedBranchHints(JSContext* cx, unsigned argc, Value* vp) {
   return WasmReturnFlag(cx, argc, vp, Flag::ParsedBranchHints);
 }
 #endif  // ENABLE_WASM_BRANCH_HINTING
+
+static bool WasmParsedNameSection(JSContext* cx, unsigned argc, Value* vp) {
+  return WasmReturnFlag(cx, argc, vp, Flag::ParsedNameSection);
+}
 
 static bool WasmBuiltinI8VecMul(JSContext* cx, unsigned argc, Value* vp) {
   if (!wasm::HasSupport(cx)) {
@@ -5056,7 +5064,6 @@ static bool ResolvePromise(JSContext* cx, unsigned argc, Value* vp) {
   return result;
 }
 
-#ifdef NIGHTLY_BUILD
 static bool SafeResolvePromise(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
   if (!args.requireAtLeast(cx, "safeResolvePromise", 2)) {
@@ -5082,7 +5089,6 @@ static bool SafeResolvePromise(JSContext* cx, unsigned argc, Value* vp) {
   args.rval().setUndefined();
   return JS::SafeResolve(cx, promise, resolution);
 }
-#endif  // NIGHTLY_BUILD
 
 static bool RejectPromise(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
@@ -5545,6 +5551,12 @@ const ShellAllocationMetadataBuilder
 static bool EnableShellAllocationMetadataBuilder(JSContext* cx, unsigned argc,
                                                  Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
+
+  // ShellAllocationMetadataBuilder::build constructs arrays. Ensure the
+  // Array constructor is already resolved.
+  if (!GlobalObject::ensureConstructor(cx, cx->global(), JSProto_Array)) {
+    return false;
+  }
 
   SetAllocationMetadataBuilder(
       cx, &ShellAllocationMetadataBuilder::metadataBuilder);
@@ -10666,13 +10678,11 @@ static const JSFunctionSpecWithHelp TestingFunctions[] = {
 JS_FN_HELP("resolvePromise", ResolvePromise, 2, 0,
 "resolvePromise(promise, resolution)",
 "  Resolve a Promise by calling the JSAPI function JS::ResolvePromise."),
-#ifdef NIGHTLY_BUILD
 JS_FN_HELP("safeResolvePromise", SafeResolvePromise, 2, 0,
 "safeResolvePromise(promise, resolution)",
 "  Resolve a Promise by calling the JSAPI function JS::SafeResolve, which\n"
 "  implements the SafePromiseResolve abstract operation from the\n"
 "  thenable-curtailment proposal."),
-#endif  // NIGHTLY_BUILD
 JS_FN_HELP("rejectPromise", RejectPromise, 2, 0,
 "rejectPromise(promise, reason)",
 "  Reject a Promise by calling the JSAPI function JS::RejectPromise."),
@@ -11021,6 +11031,11 @@ JS_FOR_WASM_FEATURES(WASM_FEATURE)
 "  custom branch hinting section."),
 
 #endif // ENABLE_WASM_BRANCH_HINTING
+
+    JS_FN_HELP("wasmParsedNameSection", WasmParsedNameSection, 1, 0,
+"wasmParsedNameSection(module)",
+"  Returns a boolean indicating whether a given module has successfully parsed a\n"
+"  custom name section."),
 
     JS_FN_HELP("largeArrayBufferSupported", LargeArrayBufferSupported, 0, 0,
 "largeArrayBufferSupported()",

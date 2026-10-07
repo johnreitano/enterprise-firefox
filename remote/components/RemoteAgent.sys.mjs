@@ -28,8 +28,11 @@ const PREVENT_SYSTEM_ACCESS =
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = 9222;
 
-// Adds various command-line arguments as environment variables to preserve
-// their values when the application is restarted internally.
+// Environment variables used to configure the Remote Agent. Using environment
+// variables ensures that their values are preserved when the application is
+// restarted internally.
+//
+// Set to "1" to grant the remote agent access to privileged processes.
 const ENV_ALLOW_SYSTEM_ACCESS = "MOZ_REMOTE_ALLOW_SYSTEM_ACCESS";
 
 const SHARED_DATA_ACTIVE_KEY = "RemoteAgent:Active";
@@ -117,25 +120,6 @@ class RemoteAgentParentProcess {
 
   get allowSystemAccess() {
     return this.#allowSystemAccess;
-  }
-
-  set allowSystemAccess(value) {
-    // Return early if system access is already marked being allowed.
-    // There is also no possibility to disallow once it got allowed except
-    // quitting Firefox and starting it again.
-    if (this.#allowSystemAccess || !value) {
-      return;
-    }
-
-    if (PREVENT_SYSTEM_ACCESS) {
-      lazy.logger.warn(
-        "Ignoring request for system access: not available on this build."
-      );
-      return;
-    }
-
-    this.#allowSystemAccess = true;
-    Services.env.set(ENV_ALLOW_SYSTEM_ACCESS, "1");
   }
 
   /**
@@ -259,14 +243,6 @@ class RemoteAgentParentProcess {
       return origins.split(",");
     } catch (e) {
       return null;
-    }
-  }
-
-  #handleAllowSystemAccessFlag(cmdLine) {
-    try {
-      return cmdLine.handleFlag("remote-allow-system-access", false);
-    } catch (e) {
-      return false;
     }
   }
 
@@ -469,7 +445,6 @@ class RemoteAgentParentProcess {
       cmdLine.handleFlag("remote-debugging-port", false);
     }
 
-    cmdLine.handleFlag("remote-allow-system-access", false);
     cmdLine.handleFlagWithParam("remote-allow-hosts", false);
     cmdLine.handleFlagWithParam("remote-allow-origins", false);
   }
@@ -496,7 +471,6 @@ class RemoteAgentParentProcess {
 
         this.#allowHosts = this.#handleAllowHostsFlag(subject);
         this.#allowOrigins = this.#handleAllowOriginsFlag(subject);
-        this.allowSystemAccess = this.#handleAllowSystemAccessFlag(subject);
 
         this.#enabled = this.#handleRemoteDebuggingPortFlag(subject);
 
@@ -686,8 +660,7 @@ class RemoteAgentParentProcess {
   --remote-allow-hosts <hosts> Values of the Host header to allow for incoming requests.
                      Please read security guidelines at https://firefox-source-docs.mozilla.org/remote/Security.html
   --remote-allow-origins <origins> Values of the Origin header to allow for incoming requests.
-                     Please read security guidelines at https://firefox-source-docs.mozilla.org/remote/Security.html
-  --remote-allow-system-access Enable privileged access to the application's parent process\n`;
+                     Please read security guidelines at https://firefox-source-docs.mozilla.org/remote/Security.html\n`;
 
   QueryInterface = ChromeUtils.generateQI([
     "nsICommandLineHandler",

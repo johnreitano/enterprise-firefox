@@ -117,6 +117,7 @@ class MediaQueryList;
 class OwningExternalOrWindowProxy;
 class Promise;
 class PostMessageEvent;
+class PushManager;
 struct RequestInit;
 class RequestOrUTF8String;
 class SharedWorker;
@@ -468,6 +469,11 @@ class nsGlobalWindowInner final : public mozilla::dom::EventTarget,
   static void ShutDown();
   static bool IsCallerChrome();
 
+  // Called on a trusted mouseup or dragend, and when a drag session ends, as
+  // the mouse button is up even if no dragend was dispatched. Lifts the drag
+  // service suppression that CanMoveResizeWindows added while it was down.
+  static void MouseButtonReleased();
+
   friend class WindowStateHolder;
 
   NS_DECL_CYCLE_COLLECTION_SKIPPABLE_SCRIPT_HOLDER_CLASS_AMBIGUOUS(
@@ -672,6 +678,8 @@ class nsGlobalWindowInner final : public mozilla::dom::EventTarget,
   }
 
   mozilla::dom::DocumentPictureInPicture* DocumentPictureInPicture();
+  mozilla::dom::PushManager* GetPushManager(JSContext* aCx,
+                                            mozilla::ErrorResult& aRv);
 
   // https://w3c.github.io/webappsec-secure-contexts/#dom-window-issecurecontext
   bool IsSecureContext() const;
@@ -1414,6 +1422,7 @@ class nsGlobalWindowInner final : public mozilla::dom::EventTarget,
   RefPtr<mozilla::dom::DocumentPictureInPicture> mDocumentPiP;
   RefPtr<mozilla::dom::Worklet> mPaintWorklet;
   RefPtr<mozilla::dom::External> mExternal;
+  RefPtr<mozilla::dom::PushManager> mPushManager;
 
   RefPtr<mozilla::dom::Storage> mLocalStorage;
   RefPtr<mozilla::dom::Storage> mSessionStorage;

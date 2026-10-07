@@ -8,7 +8,6 @@ support-files = [
 prefs = [
   "browser.bookmarks.testing.skipDefaultBookmarksImport=true",
   "browser.urlbar.trending.featureGate=false",
-  "layout.css.attr.enabled=true",
 ]
 
 ["browser_acknowledgeFeedbackAndDismissal.js"]

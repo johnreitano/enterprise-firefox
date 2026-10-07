@@ -343,7 +343,8 @@ add_task(async function test_update_hash_mismatch_does_not_install() {
   await AddonTestUtils.promiseShutdownManager();
 });
 
-// An update_url the URL parser rejects is an error, not a fallback to AMO.
+// An update_url the URL parser rejects fails validation, which drops the whole
+// entry, so the add-on is not installed from AMO either.
 add_task(
   {
     pref_set: [
@@ -357,7 +358,7 @@ add_task(
 
     const errorLogged = TestUtils.consoleMessageObserved(msg =>
       msg.wrappedJSObject.arguments[0]?.includes(
-        `update_url for ${id} is not a valid URL`
+        'update_url: String does not match format "moz-url"'
       )
     );
 
@@ -471,8 +472,8 @@ add_task(
 );
 
 // The "%...%" placeholders normal update checks substitute are an add-on manager
-// implementation detail, not policy syntax: "%" must be followed by two hex
-// digits to pass the schema's "format": "uri" check. The whole ExtensionSettings
+// implementation detail, not policy syntax: the schema's update_url pattern
+// requires "%" to be followed by two hex digits. The whole ExtensionSettings
 // entry is dropped when one property fails validation, so installation_mode goes
 // with it and the add-on is never installed by any path.
 add_task(async function test_update_url_with_placeholders_fails_validation() {
@@ -482,7 +483,7 @@ add_task(async function test_update_url_with_placeholders_fails_validation() {
 
   const schemaErrorLogged = TestUtils.consoleMessageObserved(msg =>
     msg.wrappedJSObject.arguments[0]?.includes(
-      'update_url: String does not match format "uri"'
+      "update_url: String does not match pattern."
     )
   );
 

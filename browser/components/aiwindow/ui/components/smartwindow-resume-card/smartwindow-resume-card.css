@@ -25,6 +25,7 @@
   border: var(--border-width) solid var(--resume-card-border-color);
   border-radius: var(--border-radius-large);
   background-color: var(--background-color-box);
+  cursor: pointer;
 
   &:hover,
   &:focus-within {

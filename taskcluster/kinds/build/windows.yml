@@ -27,6 +27,9 @@ win32/debug:
         max-run-time: 7200
         env:
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+    mozconfig:
+        variant: debug
+        platform: win32
     run:
         options: [append-env-variables-from-configs]
         actions: [get-secrets, build]
@@ -36,9 +39,6 @@ win32/debug:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
             - builds/taskcluster_sub_win32/debug.py
-        mozconfig-variant: debug
-        extra-config:
-            mozconfig_platform: win32
     use-sccache: true
     fetches:
         toolchain:
@@ -77,6 +77,8 @@ win32/opt:
         max-run-time: 7200
         env:
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+    mozconfig:
+        platform: win32
     run:
         options: [append-env-variables-from-configs]
         actions: [get-secrets, build]
@@ -85,8 +87,6 @@ win32/opt:
         config:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
-        extra-config:
-            mozconfig_platform: win32
     run-on-projects: ['integration']
     use-sccache: true
     use-python: "3.11"
@@ -126,6 +126,9 @@ win32-fuzzing/debug:
         max-run-time: 7200
         env:
             PERFHERDER_EXTRA_OPTIONS: fuzzing
+    mozconfig:
+        variant: debug-fuzzing
+        platform: win32
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -135,9 +138,6 @@ win32-fuzzing/debug:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
             - builds/taskcluster_sub_win32/debug.py
-        extra-config:
-            mozconfig_platform: win32
-        mozconfig-variant: debug-fuzzing
     run-on-projects: ['trunk']
     use-sccache: true
     fetches:
@@ -179,6 +179,9 @@ win64/debug:
         max-run-time: 7200
         env:
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+    mozconfig:
+        variant: debug
+        platform: win64
     run:
         options: [append-env-variables-from-configs]
         actions: [get-secrets, build]
@@ -188,9 +191,6 @@ win64/debug:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
             - builds/taskcluster_sub_win64/debug.py
-        mozconfig-variant: debug
-        extra-config:
-            mozconfig_platform: win64
     use-sccache: true
     use-python: "3.11"
     fetches:
@@ -234,6 +234,9 @@ win64-enterprise/debug:
         env:
             PERFHERDER_EXTRA_OPTIONS: enterprise
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+    mozconfig:
+        variant: debug-enterprise
+        platform: win64
     run:
         options: [append-env-variables-from-configs]
         actions: [get-secrets, build]
@@ -243,9 +246,6 @@ win64-enterprise/debug:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
             - builds/taskcluster_sub_win64/debug.py
-        mozconfig-variant: debug-enterprise
-        extra-config:
-            mozconfig_platform: win64
     run-on-projects: ["enterprise-firefox"]
     run-on-repo-type: ["git"]
     use-sccache: true
@@ -287,6 +287,9 @@ win64-non-unified/plain:
         env:
             MOZ_AUTOMATION_BUILD_SYMBOLS: '0'
             PERFHERDER_EXTRA_OPTIONS: non-unified
+    mozconfig:
+        variant: non-unified
+        platform: win64
     run:
         options: [append-env-variables-from-configs]
         actions: [get-secrets, build]
@@ -295,11 +298,6 @@ win64-non-unified/plain:
         config:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
-        mozconfig-variant: nightly
-        extra-config:
-            mozconfig_platform: win64
-            extra_mozconfig_content:
-                - ac_add_options --disable-unified-build
     use-sccache: true
     run-on-projects: ['integration']
     fetches:
@@ -339,6 +337,9 @@ win64-fuzzing/debug:
         max-run-time: 7200
         env:
             PERFHERDER_EXTRA_OPTIONS: fuzzing
+    mozconfig:
+        variant: debug-fuzzing
+        platform: win64
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -348,9 +349,6 @@ win64-fuzzing/debug:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
             - builds/taskcluster_sub_win64/debug.py
-        extra-config:
-            mozconfig_platform: win64
-        mozconfig-variant: debug-fuzzing
     run-on-projects: ['trunk']
     use-sccache: true
     fetches:
@@ -391,6 +389,8 @@ win64-plain/debug:
         max-run-time: 7200
         env:
             PERFHERDER_EXTRA_OPTIONS: plain
+    mozconfig:
+        variant: plain-debug
     run:
         actions: [build]
         options: [append-env-variables-from-configs]
@@ -401,7 +401,6 @@ win64-plain/debug:
             - builds/taskcluster_base_win64.py
         extra-config:
             disable_package_metrics: true
-        mozconfig-variant: plain-debug
     run-on-projects: ['trunk', 'enterprise-firefox']
     run-on-repo-type: ['git']
     fetches:
@@ -431,6 +430,7 @@ win64/opt:
     attributes:
         enable-build-signing: true
         enable-full-crashsymbols: true
+        code-review-build-test: true
     treeherder:
         platform: windows2012-64/opt
         symbol: B
@@ -439,6 +439,55 @@ win64/opt:
         max-run-time: 7200
         env:
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+    mozconfig:
+        platform: win64
+    run:
+        options: [append-env-variables-from-configs]
+        actions: [get-secrets, build]
+        script: mozharness/scripts/fx_desktop_build.py
+        secrets: true
+        config:
+            - builds/releng_base_firefox.py
+            - builds/releng_base_linux_64_builds.py
+    run-on-projects: ['integration']
+    use-sccache: true
+    fetches:
+        toolchain:
+            - linux64-7zz
+            - linux64-clang
+            - linux64-rust-cross
+            - linux64-rust-size
+            - linux64-nasm
+            - linux64-node
+            - linux64-cbindgen
+            - linux64-dump_syms
+            - linux64-sccache
+            - linux64-upx
+            - linux64-winchecksec
+            - linux64-wine
+            - nsis
+            - sysroot-x86_64-linux-gnu
+            - sysroot-wasm32-wasi
+            - vs
+            - dxc-x86_64-pc-windows-msvc
+            - onnxruntime-x86_64-windows-msvc
+            - winappsdk-x86_64-pc-windows-msvc
+
+win64-appservices/opt:
+    description: "Win64 Opt with an in-tree app-services"
+    index:
+        product: firefox
+        job-name: win64-appservices-opt
+    treeherder:
+        platform: windows2012-64/opt
+        symbol: B-as
+        tier: 3
+    worker:
+        max-run-time: 7200
+        env:
+            MOZ_APPSERVICES_IN_TREE: "1"
+            PERFHERDER_EXTRA_OPTIONS: appservices
+            MOZ_LIBMEGAZORD_ARTIFACTS: "1"
     run:
         options: [append-env-variables-from-configs]
         actions: [get-secrets, build]
@@ -448,8 +497,8 @@ win64/opt:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
         extra-config:
-            mozconfig_platform: win64
-    run-on-projects: ['integration']
+            stage_platform: win64
+    run-on-projects: []
     use-sccache: true
     fetches:
         toolchain:
@@ -497,6 +546,8 @@ win64-enterprise-shippable/opt:
             PERFHERDER_EXTRA_OPTIONS: enterprise
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
             MOZ_GENERATE_SBOM: "1"
+    mozconfig:
+        platform: win64
     run:
         options: [append-env-variables-from-configs]
         actions: [get-secrets, build]
@@ -508,7 +559,6 @@ win64-enterprise-shippable/opt:
             - taskcluster_nightly.py
         extra-config:
             stage_platform: win64
-            mozconfig_platform: win64
     run-on-projects: ["enterprise-firefox"]
     run-on-repo-type: ["git"]
     use-sccache: false
@@ -554,6 +604,8 @@ win64-enterprise/opt:
         env:
             PERFHERDER_EXTRA_OPTIONS: enterprise
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+    mozconfig:
+        platform: win64
     run:
         options: [append-env-variables-from-configs]
         actions: [get-secrets, build]
@@ -564,7 +616,6 @@ win64-enterprise/opt:
             - builds/releng_base_linux_64_builds.py
         extra-config:
             stage_platform: win64
-            mozconfig_platform: win64
     run-on-projects: ["enterprise-firefox"]
     run-on-repo-type: ["git"]
     use-sccache: true
@@ -611,6 +662,8 @@ win64-aarch64-enterprise/opt:
         env:
             PERFHERDER_EXTRA_OPTIONS: enterprise
             # MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+    mozconfig:
+        platform: win64-aarch64
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -621,7 +674,6 @@ win64-aarch64-enterprise/opt:
             - builds/releng_base_linux_64_builds.py
         extra-config:
             stage_platform: win64-aarch64
-            mozconfig_platform: win64-aarch64
             max_build_output_timeout: 3600
     use-sccache: true
     fetches:
@@ -666,6 +718,9 @@ win64-aarch64-enterprise/debug:
         env:
             PERFHERDER_EXTRA_OPTIONS: enterprise
             # MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+    mozconfig:
+        variant: debug-enterprise
+        platform: win64-aarch64
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -674,10 +729,8 @@ win64-aarch64-enterprise/debug:
         config:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
-        mozconfig-variant: debug-enterprise
         extra-config:
             stage_platform: win64-aarch64
-            mozconfig_platform: win64-aarch64
             max_build_output_timeout: 3600
     use-sccache: true
     fetches:
@@ -727,6 +780,8 @@ win64-aarch64-enterprise-shippable/opt:
             PERFHERDER_EXTRA_OPTIONS: enterprise
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
             MOZ_GENERATE_SBOM: "1"
+    mozconfig:
+        platform: win64-aarch64
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -737,7 +792,6 @@ win64-aarch64-enterprise-shippable/opt:
             - builds/releng_base_linux_64_builds.py
         extra-config:
             stage_platform: win64-aarch64
-            mozconfig_platform: win64-aarch64
             max_build_output_timeout: 3600
     use-sccache: false
     fetches:
@@ -774,6 +828,8 @@ win64-plain/opt:
         max-run-time: 7200
         env:
             PERFHERDER_EXTRA_OPTIONS: plain
+    mozconfig:
+        variant: plain-opt
     run:
         actions: [build]
         options: [append-env-variables-from-configs]
@@ -784,7 +840,6 @@ win64-plain/opt:
             - builds/taskcluster_base_win64.py
         extra-config:
             disable_package_metrics: true
-        mozconfig-variant: plain-opt
     run-on-projects: ['mozilla-central', 'enterprise-firefox']
     run-on-repo-type: ['git']
     fetches:
@@ -839,6 +894,8 @@ win32-shippable/opt:
         env:
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
             MOZ_GENERATE_SBOM: "1"
+    mozconfig:
+        platform: win32
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -848,8 +905,6 @@ win32-shippable/opt:
             - builds/releng_base_firefox.py
               builds/releng_base_linux_64_builds.py
             - taskcluster_nightly.py
-        extra-config:
-            mozconfig_platform: win32
     fetches:
         toolchain:
             - linux64-7zz
@@ -893,6 +948,8 @@ win64-shippable/opt:
         env:
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
             MOZ_GENERATE_SBOM: "1"
+    mozconfig:
+        platform: win64
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -903,7 +960,6 @@ win64-shippable/opt:
             - builds/releng_base_linux_64_builds.py
             - taskcluster_nightly.py
         extra-config:
-            mozconfig_platform: win64
             max_build_output_timeout: 3600
     fetches:
         toolchain:
@@ -943,6 +999,9 @@ win64-nightlyasrelease/opt:
         env:
             PERFHERDER_EXTRA_OPTIONS: "nightly-as-release"
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+    mozconfig:
+        variant: nightly-as-release
+        platform: win64
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -953,9 +1012,7 @@ win64-nightlyasrelease/opt:
             - builds/releng_base_linux_64_builds.py
             - taskcluster_nightly.py
         extra-config:
-            mozconfig_platform: win64
             max_build_output_timeout: 3600
-        mozconfig-variant: nightly-as-release
     run-on-projects: [trunk-only]
     fetches:
         toolchain:
@@ -989,6 +1046,9 @@ win32-add-on-devel/opt:
         tier: 2
     worker:
         max-run-time: 10800
+    mozconfig:
+        variant: add-on-devel
+        platform: win32
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -997,9 +1057,6 @@ win32-add-on-devel/opt:
         config:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
-        extra-config:
-            mozconfig_platform: win32
-        mozconfig-variant: add-on-devel
     run-on-projects: ['mozilla-beta', 'mozilla-release']
     use-sccache: true
     fetches:
@@ -1034,6 +1091,9 @@ win64-add-on-devel/opt:
         tier: 2
     worker:
         max-run-time: 10800
+    mozconfig:
+        variant: add-on-devel
+        platform: win64
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1042,9 +1102,6 @@ win64-add-on-devel/opt:
         config:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
-        extra-config:
-            mozconfig_platform: win64
-        mozconfig-variant: add-on-devel
     run-on-projects: ['mozilla-beta', 'mozilla-release']
     use-sccache: true
     fetches:
@@ -1080,6 +1137,9 @@ win64-noopt/debug:
         tier: 2
     worker:
         max-run-time: 7200
+    mozconfig:
+        variant: noopt-debug
+        platform: win64
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1089,9 +1149,6 @@ win64-noopt/debug:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
             - builds/taskcluster_sub_win64/noopt_debug.py
-        mozconfig-variant: noopt-debug
-        extra-config:
-            mozconfig_platform: win64
     run-on-projects: ['mozilla-central']
     use-sccache: true
     fetches:
@@ -1127,6 +1184,9 @@ win32-noopt/debug:
         tier: 2
     worker:
         max-run-time: 7200
+    mozconfig:
+        variant: noopt-debug
+        platform: win32
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1136,9 +1196,6 @@ win32-noopt/debug:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
             - builds/taskcluster_sub_win32/noopt_debug.py
-        mozconfig-variant: noopt-debug
-        extra-config:
-            mozconfig_platform: win32
     run-on-projects: ['mozilla-central']
     use-sccache: true
     fetches:
@@ -1176,6 +1233,9 @@ win32-rusttests/opt:
         max-run-time: 5400
         env:
             PERFHERDER_EXTRA_OPTIONS: rusttests
+    mozconfig:
+        variant: rusttests
+        app: tools/rusttests
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1186,9 +1246,7 @@ win32-rusttests/opt:
             - builds/taskcluster_base_windows.py
             - builds/taskcluster_base_win32.py
         extra-config:
-            app_name: tools/rusttests
             disable_package_metrics: true
-        mozconfig-variant: rusttests
     run-on-projects: ['mozilla-central']
     fetches:
         toolchain:
@@ -1219,6 +1277,9 @@ win32-rusttests/debug:
         max-run-time: 5400
         env:
             PERFHERDER_EXTRA_OPTIONS: rusttests
+    mozconfig:
+        variant: rusttests-debug
+        app: tools/rusttests
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1229,9 +1290,7 @@ win32-rusttests/debug:
             - builds/taskcluster_base_windows.py
             - builds/taskcluster_base_win32.py
         extra-config:
-            app_name: tools/rusttests
             disable_package_metrics: true
-        mozconfig-variant: rusttests-debug
     run-on-projects: ['mozilla-central']
     fetches:
         toolchain:
@@ -1262,6 +1321,9 @@ win64-rusttests/opt:
         max-run-time: 5400
         env:
             PERFHERDER_EXTRA_OPTIONS: rusttests
+    mozconfig:
+        variant: rusttests
+        app: tools/rusttests
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1272,7 +1334,6 @@ win64-rusttests/opt:
             - builds/taskcluster_base_windows.py
             - builds/taskcluster_base_win64.py
             - builds/taskcluster_sub_win64/rusttests_opt.py
-        mozconfig-variant: rusttests
     run-on-projects: ['mozilla-central']
     fetches:
         toolchain:
@@ -1304,6 +1365,9 @@ win64-rusttests/debug:
         max-run-time: 5400
         env:
             PERFHERDER_EXTRA_OPTIONS: rusttests
+    mozconfig:
+        variant: rusttests-debug
+        app: tools/rusttests
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1314,7 +1378,6 @@ win64-rusttests/debug:
             - builds/taskcluster_base_windows.py
             - builds/taskcluster_base_win64.py
             - builds/taskcluster_sub_win64/rusttests_opt.py
-        mozconfig-variant: rusttests-debug
     run-on-projects: ['trunk']
     fetches:
         toolchain:
@@ -1353,6 +1416,8 @@ win64-ccov/opt:
         env:
             RUSTC_BOOTSTRAP: '1'
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+    mozconfig:
+        variant: code-coverage
     run:
         options: [append-env-variables-from-configs]
         script: mozharness/scripts/fx_desktop_build.py
@@ -1362,7 +1427,6 @@ win64-ccov/opt:
             - builds/taskcluster_base_windows.py
             - builds/taskcluster_base_win64.py
             - builds/taskcluster_sub_win64/ccov_opt.py
-        mozconfig-variant: code-coverage
     run-on-projects: ['mozilla-central']
     use-sccache: false
     fetches:
@@ -1405,6 +1469,8 @@ win64-fuzzing-ccov/opt:
         env:
             RUSTC_BOOTSTRAP: '1'
             PERFHERDER_EXTRA_OPTIONS: "fuzzing-ccov"
+    mozconfig:
+        variant: fuzzing-ccov
     run:
         using: mozharness
         actions: [get-secrets, build]
@@ -1416,7 +1482,6 @@ win64-fuzzing-ccov/opt:
             - builds/taskcluster_sub_win64/ccov_opt.py
         script: mozharness/scripts/fx_desktop_build.py
         secrets: true
-        mozconfig-variant: fuzzing-ccov
         tooltool-downloads: public
     run-on-projects: ['mozilla-central']
     use-sccache: false
@@ -1455,6 +1520,9 @@ win64-asan/debug:
         max-run-time: 7200
         env:
             PERFHERDER_EXTRA_OPTIONS: "debug asan"
+    mozconfig:
+        variant: debug-asan
+        platform: win64
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1464,9 +1532,6 @@ win64-asan/debug:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
             - builds/taskcluster_sub_win64/asan_debug.py
-        extra-config:
-            mozconfig_platform: win64
-        mozconfig-variant: debug-asan
     use-sccache: true
     fetches:
         toolchain:
@@ -1507,6 +1572,9 @@ win64-asan/opt:
         env:
             PERFHERDER_EXTRA_OPTIONS: "opt asan"
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+    mozconfig:
+        variant: nightly-asan
+        platform: win64
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1515,9 +1583,6 @@ win64-asan/opt:
         config:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
-        extra-config:
-            mozconfig_platform: win64
-        mozconfig-variant: nightly-asan
     use-sccache: true
     fetches:
         toolchain:
@@ -1554,6 +1619,9 @@ win64-asan-fuzzing/opt:
         max-run-time: 7200
         env:
             PERFHERDER_EXTRA_OPTIONS: fuzzing-asan
+    mozconfig:
+        variant: nightly-fuzzing-asan
+        platform: win64
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1562,9 +1630,6 @@ win64-asan-fuzzing/opt:
         config:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
-        extra-config:
-            mozconfig_platform: win64
-        mozconfig-variant: nightly-fuzzing-asan
     use-sccache: true
     fetches:
         toolchain:
@@ -1622,6 +1687,9 @@ win32-devedition/opt:
         env:
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
             MOZ_GENERATE_SBOM: "1"
+    mozconfig:
+        variant: devedition
+        platform: win32
     run:
         actions: [get-secrets, build]
         script: mozharness/scripts/fx_desktop_build.py
@@ -1631,9 +1699,6 @@ win32-devedition/opt:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
             - taskcluster_nightly.py
-        extra-config:
-            mozconfig_platform: win32
-        mozconfig-variant: devedition
     run-on-projects: ['mozilla-beta']
     fetches:
         toolchain:
@@ -1677,6 +1742,9 @@ win64-devedition/opt:
         env:
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
             MOZ_GENERATE_SBOM: "1"
+    mozconfig:
+        variant: devedition
+        platform: win64
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1687,9 +1755,7 @@ win64-devedition/opt:
             - builds/releng_base_linux_64_builds.py
             - taskcluster_nightly.py
         extra-config:
-            mozconfig_platform: win64
             max_build_output_timeout: 3600
-        mozconfig-variant: devedition
     run-on-projects: ['mozilla-beta']
     fetches:
         toolchain:
@@ -1728,6 +1794,9 @@ win64-aarch64/debug:
         env:
             PERFHERDER_EXTRA_OPTIONS: aarch64
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+    mozconfig:
+        variant: debug
+        platform: win64-aarch64
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1737,9 +1806,6 @@ win64-aarch64/debug:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
             - builds/taskcluster_sub_win64/debug.py
-        extra-config:
-            mozconfig_platform: win64-aarch64
-        mozconfig-variant: debug
     use-sccache: true
     fetches:
         toolchain:
@@ -1781,6 +1847,8 @@ win64-aarch64/opt:
         env:
             PERFHERDER_EXTRA_OPTIONS: aarch64
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
+    mozconfig:
+        platform: win64-aarch64
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1789,8 +1857,6 @@ win64-aarch64/opt:
         config:
             - builds/releng_base_firefox.py
             - builds/releng_base_linux_64_builds.py
-        extra-config:
-            mozconfig_platform: win64-aarch64
     run-on-projects: ['integration']
     use-sccache: true
     fetches:
@@ -1839,6 +1905,8 @@ win64-aarch64-shippable/opt:
         env:
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
             MOZ_GENERATE_SBOM: "1"
+    mozconfig:
+        platform: win64-aarch64
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1849,7 +1917,6 @@ win64-aarch64-shippable/opt:
             - builds/releng_base_linux_64_builds.py
             - taskcluster_nightly.py
         extra-config:
-            mozconfig_platform: win64-aarch64
             max_build_output_timeout: 3600
     fetches:
         toolchain:
@@ -1893,6 +1960,9 @@ win64-aarch64-devedition/opt:
         env:
             MOZ_AUTOMATION_PACKAGE_TESTS: "1"
             MOZ_GENERATE_SBOM: "1"
+    mozconfig:
+        variant: devedition
+        platform: win64-aarch64
     run:
         actions: [get-secrets, build]
         options: [append-env-variables-from-configs]
@@ -1903,9 +1973,7 @@ win64-aarch64-devedition/opt:
             - builds/releng_base_linux_64_builds.py
             - taskcluster_nightly.py
         extra-config:
-            mozconfig_platform: win64-aarch64
             max_build_output_timeout: 3600
-        mozconfig-variant: devedition
     run-on-projects: ['mozilla-beta']
     fetches:
         toolchain:

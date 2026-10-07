@@ -237,6 +237,11 @@ export class Felt {
       // SSO callback's DOMContentLoaded event and prevent token extraction.
       Services.prefs.setBoolPref("threads.use_low_power.enabled", false);
       await lazy.FeltStorage.init();
+      if (await lazy.FeltStorage.recoverInterruptedSession()) {
+        lazy.log.warn(
+          "Previous FELT session ended unexpectedly; requiring sign-in"
+        );
+      }
       this.showWindow();
       this.addFeltMessageListeners();
       if (!lazy.isBuildAppBrowser()) {
@@ -388,15 +393,26 @@ export class Felt {
    *
    * @param {number} quitMode nsIAppStartup quit flags.
    */
-  #signOutAndQuit(quitMode) {
-    lazy.ConsoleClient.performServerSignout()
-      .catch(err => {
-        lazy.log.error(`Failed to post signout on exit: ${err}`);
-      })
-      .finally(() => {
-        lazy.FeltLocking.clearLockAndTokens();
-        this.#quitOrHoldForShutdown(quitMode);
-      });
+  async #signOutAndQuit(quitMode) {
+    let signedOut = false;
+    try {
+      await lazy.ConsoleClient.performServerSignout();
+      signedOut = true;
+    } catch (err) {
+      lazy.log.error(`Failed to post signout on exit: ${err}`);
+    } finally {
+      lazy.FeltLocking.clearLockAndTokens();
+      try {
+        if (signedOut) {
+          await lazy.FeltStorage.endSession();
+        } else {
+          await lazy.FeltStorage.flush();
+        }
+      } catch (err) {
+        lazy.log.error(`Failed to persist signout state: ${err}`);
+      }
+      this.#quitOrHoldForShutdown(quitMode);
+    }
   }
 
   windowObserver(subject, topic) {

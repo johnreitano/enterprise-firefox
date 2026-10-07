@@ -639,9 +639,6 @@ skip-if = [
 support-files = ["window_empty_document.html"]
 
 ["test_moz_mouse_pixel_scroll_event.html"]
-skip-if = [
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64' && debug", # Bug 2034604
-]
 
 ["test_offsetxy.html"]
 
@@ -663,7 +660,6 @@ tags = "os_integration"
 ["test_slotted_mouse_event.html"]
 skip-if = [
   "os == 'android'", # timeout
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64'", # Bug 2023967
 ]
 
 ["test_slotted_text_click.html"]
@@ -704,5 +700,4 @@ run-if = [
 ]
 skip-if = [
   "verify-standalone",
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64' && debug", # Bug 2034604
 ]

@@ -8,6 +8,7 @@ import {
   repeat,
 } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
+import { isTabGroupMember } from "chrome://browser/content/urlbar/SmartbarMentionUtils.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/assistant-message-footer.mjs";
 // eslint-disable-next-line import/no-unassigned-import
@@ -1172,8 +1173,9 @@ export class AIChatContent extends MozLitElement {
   }
 
   /**
-   * Returns the chips to display for a message, suppressing the current-tab
-   * chip when the page context hasn't changed since the previous user message.
+   * Returns the chips to display for a message, hiding the tabs expanded from
+   * a tab group and suppressing the current-tab chip when the page context
+   * hasn't changed since the previous user message.
    *
    * @param {object} msg - A conversationState entry.
    * @param {string|null} lastContextPageUrl - The page URL of the preceding
@@ -1186,15 +1188,14 @@ export class AIChatContent extends MozLitElement {
     if (!msg || msg.role !== "user" || !msg.contextMentions?.length) {
       return [];
     }
+    const chips = msg.contextMentions.filter(chip => !isTabGroupMember(chip));
     const currentPageUrl = msg.pageUrl;
     const shouldHideDuplicatePageChip =
       currentPageUrl && currentPageUrl === lastContextPageUrl;
     if (shouldHideDuplicatePageChip) {
-      return msg.contextMentions.filter(
-        chip => URL.parse(chip.url)?.href !== currentPageUrl
-      );
+      return chips.filter(chip => URL.parse(chip.url)?.href !== currentPageUrl);
     }
-    return msg.contextMentions;
+    return chips;
   }
 
   openAccountSignInAfterError() {

@@ -16,7 +16,7 @@ We produce partner repacks for some beta builds, and for release builds, as part
 automation. We don't produce any files to update these builds as they are handled automatically
 (see [updates]).
 
-We also produce {ref}`partner attribution` builds, which are Firefox Windows installers with a cohort identifier
+We also produce {doc}`partner-attribution` builds, which are Firefox Windows installers with a cohort identifier
 added.
 
 ## Parameters & Scheduling

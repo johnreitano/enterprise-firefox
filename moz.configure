@@ -101,18 +101,6 @@ set_config("ENABLE_TESTS", enable_tests)
 set_define("ENABLE_TESTS", enable_tests)
 
 
-option(
-    "--enable-makefile-installer-build",
-    env="MOZ_USE_MAKEFILE_INSTALLER_BUILD",
-    help="Enable the Windows installer build driven by Make",
-)
-
-
-set_config(
-    "MOZ_USE_MAKEFILE_INSTALLER_BUILD", True, when="--enable-makefile-installer-build"
-)
-
-
 @depends(enable_tests)
 def gtest_has_rtti(value):
     if value:

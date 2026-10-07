@@ -16,7 +16,6 @@ EXPORTS += [
     "GPUVideoImage.h",
     "ImageContainer.h",
     "ImageTypes.h",
-    "IMFYCbCrImage.h",
     "LayersTypes.h",
     "LayerUserData.h",
     "opengl/OGLShaderConfig.h",
@@ -31,6 +30,9 @@ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "windows":
     ]
     UNIFIED_SOURCES += [
         "IMFYCbCrImage.cpp",
+    ]
+    EXPORTS += [
+        "IMFYCbCrImage.h",
     ]
     EXPORTS.mozilla.layers += [
         "d3d11/CompositorD3D11.h",

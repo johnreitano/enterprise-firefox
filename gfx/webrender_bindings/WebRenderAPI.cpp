@@ -111,10 +111,11 @@ void TransactionBuilder::RemovePipeline(PipelineId aPipelineId) {
 void TransactionBuilder::SetDisplayList(
     Epoch aEpoch, wr::IdNamespace aIdNamespace, wr::WrPipelineId pipeline_id,
     wr::BuiltDisplayListDescriptor dl_descriptor,
-    wr::Vec<uint8_t>& dl_items_data, wr::Vec<uint8_t>& dl_spatial_tree) {
-  wr_transaction_set_display_list(mTxn, aEpoch, aIdNamespace, pipeline_id,
-                                  dl_descriptor, &dl_items_data.inner,
-                                  &dl_spatial_tree.inner);
+    wr::Vec<uint8_t>& dl_items_data, wr::Vec<uint8_t>& dl_spatial_tree,
+    wr::Vec<uint8_t>& dl_interner_delta) {
+  wr_transaction_set_display_list(
+      mTxn, aEpoch, aIdNamespace, pipeline_id, dl_descriptor,
+      &dl_items_data.inner, &dl_spatial_tree.inner, &dl_interner_delta.inner);
 }
 
 void TransactionBuilder::ClearDisplayList(Epoch aEpoch,
@@ -279,6 +280,13 @@ RefPtr<WebRenderAPI::CreatePromise> WebRenderAPI::Create(
               "Failed to make GL context current"_ns, __func__);
         }
 
+        bool limitSdrYuvExternalComposites = false;
+#ifdef XP_WIN
+        // Limit SDR YUV external compositing on non-Intel hardware adapters.
+        limitSdrYuvExternalComposites =
+            !swgl && !gfx::gfxVars::AdapterVendorID().EqualsLiteral("0x8086");
+#endif
+
         if (!wr_window_new(
                 aWindowId, aSize.width, aSize.height,
                 aWindowKind == WindowKind::MAIN, supportLowPriorityTransactions,
@@ -302,7 +310,8 @@ RefPtr<WebRenderAPI::CreatePromise> WebRenderAPI::Create(
                 StaticPrefs::gfx_webrender_low_quality_pinch_zoom_AtStartup(),
                 StaticPrefs::gfx_webrender_max_shared_surface_size_AtStartup(),
                 StaticPrefs::gfx_webrender_enable_subpixel_aa_AtStartup(),
-                compositor->ShouldUseLayerCompositor())) {
+                compositor->ShouldUseLayerCompositor(),
+                limitSdrYuvExternalComposites)) {
           // wr_window_new puts a message into gfxCriticalNote if it returns
           // false
           MOZ_ASSERT(errorMessage);
@@ -1245,22 +1254,28 @@ void DisplayListBuilder::Begin(int32_t aAppUnitsPerDevPixel) {
 void DisplayListBuilder::End(BuiltDisplayList& aOutDisplayList) {
   wr_api_end_builder(mWrState, &aOutDisplayList.dl_desc,
                      &aOutDisplayList.dl_items.inner,
-                     &aOutDisplayList.dl_spatial_tree.inner);
+                     &aOutDisplayList.dl_spatial_tree.inner,
+                     &aOutDisplayList.dl_interner_delta.inner);
 }
 
 void DisplayListBuilder::End(layers::DisplayListData& aOutTransaction) {
-  wr::VecU8 dlItems, dlSpatialTree;
+  wr::VecU8 dlItems, dlSpatialTree, dlInternerDelta;
   wr_api_end_builder(mWrState, &aOutTransaction.mDLDesc, &dlItems.inner,
-                     &dlSpatialTree.inner);
+                     &dlSpatialTree.inner, &dlInternerDelta.inner);
   aOutTransaction.mDLItems.emplace(dlItems.inner.data, dlItems.inner.length,
                                    dlItems.inner.capacity);
   aOutTransaction.mDLSpatialTree.emplace(dlSpatialTree.inner.data,
                                          dlSpatialTree.inner.length,
                                          dlSpatialTree.inner.capacity);
+  aOutTransaction.mDLInternerDelta.emplace(dlInternerDelta.inner.data,
+                                           dlInternerDelta.inner.length,
+                                           dlInternerDelta.inner.capacity);
   dlItems.inner.capacity = 0;
   dlItems.inner.data = nullptr;
   dlSpatialTree.inner.capacity = 0;
   dlSpatialTree.inner.data = nullptr;
+  dlInternerDelta.inner.capacity = 0;
+  dlInternerDelta.inner.data = nullptr;
 }
 
 Maybe<wr::WrSpatialId> DisplayListBuilder::PushStackingContext(

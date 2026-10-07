@@ -1390,7 +1390,7 @@ tab-group > tab-split-view-wrapper {
         inset-block-end: calc(var(--space-xsmall) * -1);
       }
 
-      &:last-child {
+      :root:not([sidebar-expand-on-hover]) &:last-child {
         .tab-group-line {
           display: none;
 
@@ -1544,6 +1544,10 @@ tab-group > tab-split-view-wrapper {
     outline: 1px solid var(--tab-dragover-outline-color);
   }
 
+  :root[uidensity="compact"] & {
+    --tab-margin-inline-inner: 13px;
+  }
+
   /* show outline when split view wrapper is about to be grouped */
   #tabbrowser-tabs[movingtab-group] &[dragover-groupTarget] {
     background-color: light-dark(var(--dragover-tab-group-color-pale), var(--dragover-tab-group-color));
@@ -1561,6 +1565,7 @@ tab-group > tab-split-view-wrapper {
   .tabbrowser-tab {
     :root[uidensity="compact"] & {
       --tab-collapsed-background-width: 24px;
+      --tab-min-height: 24px;
     }
 
     .tab-background {
@@ -1737,31 +1742,13 @@ tab-group > tab-split-view-wrapper {
     border-radius: var(--border-radius-large);
   }
 
-  &:not([hasactivetab]) .tabbrowser-tab {
-    &:first-child > .tab-stack {
-      border-block-end: 1px solid var(--toolbarbutton-icon-fill);
-      border-inline-end: transparent;
-    }
-
-    &:last-child > .tab-stack {
-      border-inline-start: transparent !important;
-    }
+  &:not([hasactivetab]) .tabbrowser-tab:first-child > .tab-stack {
+    border-block-end: 1px solid var(--toolbarbutton-icon-fill);
+    border-inline-end: none;
   }
-}
 
-/* When expand-on-hover is enabled, always stack split-view tabs in a single column */
-:root[sidebar-expand-on-hover] #tabbrowser-tabs[orient="vertical"][expanded] tab-split-view-wrapper {
-  grid-template-columns: 1fr;
-
-  &:not([hasactivetab]) .tabbrowser-tab {
-    &:first-child > .tab-stack {
-      border-block-end: 1px solid var(--toolbarbutton-icon-fill);
-      border-inline-end: transparent;
-    }
-
-    &:last-child > .tab-stack {
-      border-inline-start: transparent !important;
-    }
+  .tabbrowser-tab:last-child > .tab-stack {
+    border-inline-start: none !important;
   }
 }
 
@@ -1785,6 +1772,10 @@ tab-group > tab-split-view-wrapper {
 
   .tabbrowser-tab:last-child > .tab-stack {
     border-inline-start-width: 0;
+  }
+
+  :root[uidensity="compact"] & {
+    --tab-collapsed-split-pill-offset: 0px;
   }
 
   /* Allow close button to overflow the split view wrapper */
@@ -3166,7 +3157,7 @@ toolbar:not(#TabsToolbar) #firefox-view-button {
 #alltabs-button {
   list-style-image: url("chrome://browser/skin/search-tabs.svg");
 
-  @media not (-moz-platform: linux) {
+  @media (-moz-platform: windows) {
     #TabsToolbar & {
       list-style-image: url("chrome://global/skin/icons/arrow-down.svg");
     }

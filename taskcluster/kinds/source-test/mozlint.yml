@@ -264,6 +264,8 @@ typescript:
             - 'browser/components/urlbar/**/*.ts'
             - 'browser/extensions/newtab/**/*.*js'
             - 'browser/extensions/newtab/**/*.ts'
+            - 'devtools/client/settings/**/*.*js'
+            - 'devtools/client/settings/**/*.ts'
             - 'toolkit/components/extensions/**/*.*js'
             - 'toolkit/components/extensions/**/*.ts'
             - 'toolkit/components/places/**/*.*js'

@@ -5,6 +5,8 @@ run-if = [
   "os != 'android'",
 ]
 
+["test_A2UI.js"]
+
 ["test_AITabDate.js"]
 
 ["test_AITabDelete.js"]

@@ -5,12 +5,16 @@ permalink: /changelog/
 ---
 
 # 159.0 (In Development)
+* **feature-readerview**
+    * 🆕 Added `ReaderViewFeature.colorSchemeOverride`, which forces reader view to be displayed with a given `ColorScheme` without overwriting the one the user configured. [Bug 2069110](https://bugzilla.mozilla.org/show_bug.cgi?id=2069110)
 
 # 158.0
 * **feature-accounts-push**
     * 🆕 Added a `SendTabUseCases.SendToDeviceUseCase` overload that takes a list of devices, sending every tab to every device. [Bug 2056922](https://bugzilla.mozilla.org/show_bug.cgi?id=2056922)
 * **service-pocket**
     * ⚠️ **Breaking change**: Removed `useMerinoClient` from `ContentRecommendationsRequestConfig`. The content recommendations are always fetched with the Merino client. [Bug 2069992](https://bugzilla.mozilla.org/show_bug.cgi?id=2069992)
+* **support-base**
+    * 🆕 Added `PowerManagerInfoProvider.isPowerSaveMode`, which reports whether the device is in power save (battery saver) mode. [Bug 2068693](https://bugzilla.mozilla.org/show_bug.cgi?id=2068693)
 
 # 157.0
 

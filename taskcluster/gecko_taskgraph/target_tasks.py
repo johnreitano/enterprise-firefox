@@ -1012,13 +1012,6 @@ def target_tasks_general_perf_testing(full_task_graph, parameters, graph_config)
                 if "safari" in try_name and "video-playback-latency" in try_name:
                     return True
                 if "safari" and "benchmark" in try_name:
-                    # JetStream 3 fails with Safari 18.3 but not Safari-TP.
-                    # See bug 1996277.
-                    if (
-                        "safari-jetstream3" in try_name
-                        and "macosx1500-aarch64" in platform
-                    ):
-                        return False
                     return True
         # Android selection
         elif accept_raptor_android_build(platform):
@@ -1284,6 +1277,31 @@ def target_tasks_nightly_all(full_task_graph, parameters, graph_config):
     )
 
 
+@register_target_task("appservices")
+def target_tasks_appservices(full_task_graph, parameters, graph_config):
+    """Select the tasks that build app-services in tree and their tests"""
+
+    def counterpart_runs(task):
+        source = task.attributes.get("duplicate-of")
+        if source is None and "-appservices/" in task.label:
+            source = task.label.replace("-appservices/", "/")
+        counterpart = full_task_graph.tasks.get(source)
+        if counterpart is None:
+            return True
+        return bool(counterpart.attributes.get("run_on_projects"))
+
+    return [
+        l
+        for l, t in full_task_graph.tasks.items()
+        if (
+            t.attributes.get("build_platform", "").endswith("-appservices")
+            or "-appservices/" in t.attributes.get("test_platform", "")
+            or t.kind.endswith("-appservices")
+        )
+        and counterpart_runs(t)
+    ]
+
+
 # Run Searchfox analysis once daily.
 @register_target_task("searchfox_index")
 def target_tasks_searchfox(full_task_graph, parameters, graph_config):
@@ -1517,6 +1535,19 @@ def target_tasks_codereview(full_task_graph, parameters, graph_config):
 
         # Analyzer tasks
         if task.attributes.get("code-review") is True:
+            return True
+
+        return False
+
+    return [l for l, t in full_task_graph.tasks.items() if filter(t)]
+
+
+@register_target_task("codereview-build-test")
+def target_tasks_codereview_build_test(full_task_graph, parameters, graph_config):
+    """Select all build and test tasks that should run as part of code review pushes."""
+
+    def filter(task):
+        if task.attributes.get("code-review-build-test") is True:
             return True
 
         return False

@@ -230,6 +230,7 @@ CodeRange::CodeRange(Kind kind, CallableOffsets offsets)
     case BuiltinThunk:
     case RequestTierUpStub:
     case UpdateCallRefMetricsStub:
+    case ReturnCallTrampoline:
       break;
     default:
       MOZ_CRASH("should use more specific constructor");

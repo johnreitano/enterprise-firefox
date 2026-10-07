@@ -380,7 +380,7 @@ export const NimbusTestUtils = {
      * @param {string | undefined} options.featureId
      * The feature ID for the feature used by the branch.
      *
-     * Requires `value`. Mutually exclusive with `value`.
+     * Requires `value`. Mutually exclusive with `features`.
      *
      * @param {object | undefined} options.value
      * The feature value for the feature used by the branch.
@@ -731,13 +731,35 @@ export const NimbusTestUtils = {
       });
     },
 
+    get GRADUATED_FIREFOX_LABS_JPEG_XL_ALL_CHANNELS() {
+      const { Phase } = lazy.NimbusMigrations;
+
+      return NimbusTestUtils.makeMigrationState({
+        [Phase.INIT_STARTED]: "separate-rollout-opt-out",
+        [Phase.AFTER_STORE_INITIALIZED]:
+          "graduate-firefox-labs-jpeg-xl-all-channels",
+        [Phase.AFTER_REMOTE_SETTINGS_UPDATE]: "firefox-labs-enrollments",
+      });
+    },
+
+    get REMOVED_NORMANDY_DATABASES() {
+      const { Phase } = lazy.NimbusMigrations;
+
+      return NimbusTestUtils.makeMigrationState({
+        [Phase.INIT_STARTED]: "remove-normandy-databases",
+        [Phase.AFTER_STORE_INITIALIZED]:
+          "graduate-firefox-labs-jpeg-xl-all-channels",
+        [Phase.AFTER_REMOTE_SETTINGS_UPDATE]: "firefox-labs-enrollments",
+      });
+    },
+
     /**
      * A migration state that represents all migrations applied.
      *
      * @type {Record<Phase, number>}
      */
     get LATEST() {
-      return NimbusTestUtils.migrationState.PREFFLIPS_RESTORED;
+      return NimbusTestUtils.migrationState.REMOVED_NORMANDY_DATABASES;
     },
   },
 

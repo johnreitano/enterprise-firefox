@@ -675,10 +675,10 @@ void WebGPUChild::ClearActorState() {
 }
 
 void WebGPUChild::QueueSubmit(
-    RawId aSelfId, RawId aDeviceId, nsTArray<RawId>& aCommandBuffers,
+    RawId aSelfId, nsTArray<RawId>& aCommandBuffers,
     const nsTArray<RawId>& aUsedExternalTextureSources) {
   ffi::wgpu_client_queue_submit(
-      GetClient(), aDeviceId, aSelfId,
+      GetClient(), aSelfId,
       {aCommandBuffers.Elements(), aCommandBuffers.Length()},
       {mSwapChainTexturesWaitingForSubmit.Elements(),
        mSwapChainTexturesWaitingForSubmit.Length()},

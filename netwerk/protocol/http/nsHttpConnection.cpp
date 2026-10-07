@@ -2639,9 +2639,11 @@ void nsHttpConnection::HandshakeDoneInternal() {
 
   int16_t tlsVersion;
   tlsSocketControl->GetSSLVersionUsed(&tlsVersion);
-  mConnInfo->SetLessThanTls13(
-      (tlsVersion < nsITLSSocketControl::TLS_VERSION_1_3) &&
-      (tlsVersion != nsITLSSocketControl::SSL_VERSION_UNKNOWN));
+  mConnInfo = mConnInfo->Mutate()
+                  .SetLessThanTls13(
+                      (tlsVersion < nsITLSSocketControl::TLS_VERSION_1_3) &&
+                      (tlsVersion != nsITLSSocketControl::SSL_VERSION_UNKNOWN))
+                  .Finalize();
 #ifndef ANDROID
   mTlsHandshaker->EarlyDataTelemetry(tlsVersion, earlyDataAccepted,
                                      mContentBytesWritten0RTT);

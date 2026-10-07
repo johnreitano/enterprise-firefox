@@ -35,6 +35,7 @@
 #include "nsCOMPtr.h"
 #include "nsFrameLoader.h"
 #include "nsFrameLoaderOwner.h"
+#include "nsGlobalWindowInner.h"
 #include "nsIContent.h"
 #include "nsIContentInlines.h"
 #include "nsIFrame.h"
@@ -684,6 +685,7 @@ NS_IMETHODIMP nsBaseDragService::StartDragSessionForTests(
     nsISupports* aWidgetProvider, uint32_t aAllowedEffect) {
   // This method must set mSessionIsSynthesizedForTests
   MOZ_ASSERT(!mNeverAllowSessionIsSynthesizedForTests);
+  NS_ENSURE_TRUE(mSuppressLevel == 0, NS_ERROR_NOT_AVAILABLE);
 
   RefPtr<nsIDragSession> session = StartDragSession(aWidgetProvider);
   MOZ_ASSERT(session);
@@ -755,6 +757,8 @@ nsresult nsBaseDragSession::EndDragSessionImpl(bool aDoneDrag,
   if (aDoneDrag && !GetSuppressLevel()) {
     FireDragEventAtSource(eDragEnd, aKeyModifiers);
   }
+
+  nsGlobalWindowInner::MouseButtonReleased();
 
   if (mDragPopup) {
     nsXULPopupManager* pm = nsXULPopupManager::GetInstance();

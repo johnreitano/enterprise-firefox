@@ -455,6 +455,7 @@ def set_defaults(config, tasks):
         task.setdefault("run-as-administrator", False)
         task.setdefault("chunks", 1)
         task.setdefault("run-on-projects", "built-projects")
+        task.setdefault("run-on-repo-type", ["git", "hg"])
         task.setdefault("built-projects-only", False)
         task.setdefault("instance-size", "default")
         task.setdefault("max-run-time", 3600)

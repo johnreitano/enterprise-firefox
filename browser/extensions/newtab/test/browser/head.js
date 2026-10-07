@@ -46,7 +46,7 @@ async function refreshTopSites(url) {
 const DEFAULT_TOP_SITES = [
   "https://www.youtube.com/",
   "https://www.facebook.com/",
-  "https://www.amazon.com/",
+  "https://www.baidu.com/",
   "https://www.reddit.com/",
   "https://www.wikipedia.org/",
   "https://twitter.com/",
@@ -65,6 +65,12 @@ async function setDefaultTopSites() {
   await pushPrefs([
     "browser.newtabpage.activity-stream.improvesearch.topSiteSearchShortcuts",
     true,
+  ]);
+  // The shortcuts to pin are region-derived, and Baidu is only listed for CN,
+  // so ask for it explicitly rather than depending on the test's region.
+  await pushPrefs([
+    "browser.newtabpage.activity-stream.improvesearch.topSiteSearchShortcuts.searchEngines",
+    "baidu",
   ]);
   await refreshTopSites(DEFAULT_TOP_SITES[0]);
   return DEFAULT_TOP_SITES;

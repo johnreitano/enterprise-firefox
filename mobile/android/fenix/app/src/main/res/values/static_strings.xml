@@ -213,6 +213,10 @@
     <string name="preferences_debug_settings_isolated_process" translatable="false">Enable Isolated Content Process (requires restart)</string>
     <string name="preferences_debug_settings_app_zygote" translatable="false">Enable Isolated Processes with Zygote Preloading (requires restart)</string>
 
+    <!-- Labels for the Power Saving Mode options in secret settings. -->
+    <string name="preferences_debug_settings_power_saving_mode_auto" translatable="false">Enable Power Saving Mode automatically (follows OS battery saver)</string>
+    <string name="preferences_debug_settings_power_saving_mode_manual" translatable="false">Enable Power Saving Mode manually</string>
+
     <!-- Label for enabling uninstall survey in secret settings. -->
     <string name="preferences_debug_settings_uninstall_survey">Enable Uninstall Survey</string>
 

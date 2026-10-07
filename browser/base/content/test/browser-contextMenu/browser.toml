@@ -1,6 +1,6 @@
 [DEFAULT]
+head = "head.js"
 support-files = [
-  "head.js",
   "subtst_contextmenu_webext.html",
   "test_contextmenu_links.html",
   "subtst_contextmenu.html",
@@ -8,7 +8,6 @@ support-files = [
   "subtst_contextmenu_add_search_engine.html",
   "subtst_contextmenu_xul.xhtml",
   "ctxmenu-image.png",
-  "../browser-general/head.js",
   "../browser-general/audio.ogg",
   "../../../../../toolkit/components/pdfjs/test/file_pdfjs_test.pdf",
   "contextmenu_common.js",
@@ -149,6 +148,8 @@ skip-if = [
 ["browser_copy_link_to_highlight.js"]
 
 ["browser_copy_link_to_highlight_viewsource.js"]
+
+["browser_right_click_select.js"]
 
 ["browser_save_image.js"]
 

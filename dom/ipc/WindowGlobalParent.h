@@ -120,11 +120,11 @@ class WindowGlobalParent final : public WindowContext,
   already_AddRefed<JSWindowActorParent> GetExistingActor(
       const nsACString& aName);
 
-  // Get this actor's manager if it is not an in-process actor. Returns
-  // |nullptr| if the actor has been torn down, or is in-process.
+  // Get this actor's manager if it is not an in-process actor.
+  // Returns |nullptr| if the actor is in-process.
   BrowserParent* GetBrowserParent() const;
 
-  ContentParent* GetContentParent();
+  ContentParent* GetContentParent() const;
 
   // The principal of this WindowGlobal. This value will not change over the
   // lifetime of the WindowGlobal object, even to reflect changes in
@@ -215,6 +215,14 @@ class WindowGlobalParent final : public WindowContext,
   // Initialize the mFrameLoader fields for a created WindowGlobalParent. Must
   // be called after setting the Manager actor.
   void Init() final;
+
+  // `Init` for a WindowGlobalParent whose initializer `aSource` authored. The
+  // object must have been constructed with the fields this process derived
+  // (see `ComputeInitialFields`); `aRequested` are the fields `aSource` sent.
+  // Reconciles the two and corrects `aSource` where its values were refused.
+  // Must be called after binding to `aSource`.
+  void InitFromContentProcess(const FieldValues& aRequested,
+                              ContentParent* aSource);
 
   nsIGlobalObject* GetParentObject();
   JSObject* WrapObject(JSContext* aCx,

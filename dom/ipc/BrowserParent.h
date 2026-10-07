@@ -12,6 +12,7 @@
 #include "mozilla/ContentCache.h"
 #include "mozilla/EventForwards.h"
 #include "mozilla/RefPtr.h"
+#include "mozilla/StaticPtr.h"
 #include "mozilla/WeakPtr.h"
 #include "mozilla/dom/BrowserBridgeParent.h"
 #include "mozilla/dom/PBrowserParent.h"
@@ -811,7 +812,7 @@ class BrowserParent final : public PBrowserParent,
   // layer to dispatch events.
   typedef nsTHashMap<nsUint64HashKey, WeakPtr<BrowserParent>>
       LayerToBrowserParentTable;
-  static LayerToBrowserParentTable* sLayerToBrowserParentTable;
+  static StaticAutoPtr<LayerToBrowserParentTable> sLayerToBrowserParentTable;
 
   static void AddBrowserParentToTable(layers::LayersId aLayersId,
                                       BrowserParent* aBrowserParent);
@@ -821,29 +822,29 @@ class BrowserParent final : public PBrowserParent,
   // Keeps track of which BrowserParent has keyboard focus.
   // If nullptr, the parent process has focus.
   // Use UpdateFocus() to manage.
-  static BrowserParent* sFocus;
+  static WeakPtr<BrowserParent>& FocusSlot();
 
   // Keeps track of which top-level BrowserParent the keyboard focus is under.
   // If nullptr, the parent process has focus.
   // Use SetTopLevelWebFocus and UnsetTopLevelWebFocus to manage.
-  static BrowserParent* sTopLevelWebFocus;
+  static WeakPtr<BrowserParent>& TopLevelWebFocusSlot();
 
-  // Setter for sTopLevelWebFocus
+  // Setter for TopLevelWebFocusSlot()
   static void SetTopLevelWebFocus(BrowserParent* aBrowserParent);
 
-  // Unsetter for sTopLevelWebFocus; only unsets if argument matches
-  // current sTopLevelWebFocus. Use UnsetTopLevelWebFocusAll() to
+  // Unsetter for TopLevelWebFocusSlot(); only unsets if argument matches
+  // current TopLevelWebFocusSlot(). Use UnsetTopLevelWebFocusAll() to
   // unset regardless of current value.
   static void UnsetTopLevelWebFocus(BrowserParent* aBrowserParent);
 
-  // Recomputes sFocus and returns it.
+  // Recomputes FocusSlot() and returns it.
   static BrowserParent* UpdateFocus();
 
   // Keeps track of which BrowserParent the real mouse event is sent to.
-  static BrowserParent* sLastMouseRemoteTarget;
+  static WeakPtr<BrowserParent>& LastMouseRemoteTargetSlot();
 
   // Unsetter for LastMouseRemoteTarget; only unsets if argument matches
-  // current sLastMouseRemoteTarget.
+  // current LastMouseRemoteTargetSlot().
   static void UnsetLastMouseRemoteTarget(BrowserParent* aBrowserParent);
 
   struct APZData {
@@ -864,11 +865,11 @@ class BrowserParent final : public PBrowserParent,
   void UpdateVsyncParentVsyncDispatcher();
 
  public:
-  // Unsets sTopLevelWebFocus regardless of its current value.
+  // Unsets TopLevelWebFocusSlot() regardless of its current value.
   static void UnsetTopLevelWebFocusAll();
 
   // Recomputes focus when the BrowsingContext tree changes in a
-  // way that potentially invalidates the sFocus.
+  // way that potentially invalidates FocusSlot().
   static void UpdateFocusFromBrowsingContext();
 
   mozilla::ipc::IPCResult RecvPerformHapticFeedback(

@@ -63,7 +63,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   AttributionCode:
     "moz-src:///browser/components/attribution/AttributionCode.sys.mjs",
   BackupService: "moz-src:///browser/components/backup/BackupService.sys.mjs",
-  BrowserInitState: "resource:///modules/BrowserGlue.sys.mjs",
+  BrowserInitState: "moz-src:///browser/components/BrowserGlue.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
   ClientEnvironment: "resource://normandy/lib/ClientEnvironment.sys.mjs",
   CustomizableUI:
@@ -91,7 +91,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/tabbrowser/SmartTabGrouping.sys.mjs",
   TargetingContext: "resource://messaging-system/targeting/Targeting.sys.mjs",
   TabNotes: "moz-src:///browser/components/tabnotes/TabNotes.sys.mjs",
-  TaskbarTabs: "resource:///modules/taskbartabs/TaskbarTabs.sys.mjs",
+  TaskbarTabs: "moz-src:///browser/components/taskbartabs/TaskbarTabs.sys.mjs",
   TelemetryEnvironment: "resource://gre/modules/TelemetryEnvironment.sys.mjs",
   TelemetrySession: "resource://gre/modules/TelemetrySession.sys.mjs",
   LaunchOnLogin: "resource://gre/modules/LaunchOnLogin.sys.mjs",

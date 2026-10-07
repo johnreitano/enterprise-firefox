@@ -1259,6 +1259,7 @@ export class FeltProcessParent extends JSProcessActorParent {
    */
   async _signOutSession() {
     this.logoutReported = true;
+    let signedOut = false;
     try {
       try {
         await this._drainPendingRefresh();
@@ -1267,11 +1268,21 @@ export class FeltProcessParent extends JSProcessActorParent {
       }
       try {
         await lazy.ConsoleClient.performServerSignout();
+        signedOut = true;
       } catch (err) {
         lazy.log.error(`Server signout failed: ${err}`);
       }
     } finally {
       lazy.FeltLocking.clearLockAndTokens();
+      try {
+        if (signedOut) {
+          await lazy.FeltStorage.endSession();
+        } else {
+          await lazy.FeltStorage.flush();
+        }
+      } catch (err) {
+        lazy.log.error(`Failed to persist signout state: ${err}`);
+      }
     }
   }
 
@@ -1327,6 +1338,7 @@ export class FeltProcessParent extends JSProcessActorParent {
         Services.felt.getRefreshToken(),
         this.loggedInUserInfo?.id
       );
+      await lazy.FeltStorage.endSession();
     } catch (err) {
       lazy.log.error(`Locking failed: ${err}`);
       return false;
@@ -1455,6 +1467,7 @@ export class FeltProcessParent extends JSProcessActorParent {
             ));
           } else {
             try {
+              await lazy.FeltStorage.beginSession(email);
               ({ posture, measuredAt } = await this._redeemLoginTokens(
                 message.data
               ));

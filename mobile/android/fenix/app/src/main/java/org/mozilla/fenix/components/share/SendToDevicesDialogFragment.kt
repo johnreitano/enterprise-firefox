@@ -52,6 +52,7 @@ import org.mozilla.fenix.snackbar.FenixSnackbarDelegate
 class SendToDevicesDialogFragment : BottomSheetDialogFragment() {
 
     private lateinit var shareUiStore: ShareUiStore
+    private lateinit var deviceObserver: ShareUiDevicesObserver
 
     private val sendTabUseCases by lazy {
         SendTabUseCases(requireComponents.backgroundServices.accountManager)
@@ -87,6 +88,7 @@ class SendToDevicesDialogFragment : BottomSheetDialogFragment() {
                 onSignOutClicked = {
                     removeAccountFromSync()
                 },
+                onRetryClicked = { deviceObserver.refreshDevices(null) },
             )
         }
     }
@@ -94,14 +96,14 @@ class SendToDevicesDialogFragment : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         val app = requireContext().applicationContext
-        viewLifecycleOwner.lifecycle.addObserver(
+        deviceObserver =
             ShareUiDevicesObserver(
                 store = shareUiStore,
                 fxaAccountManager = requireComponents.backgroundServices.accountManager,
                 connectivityManager = app.getSystemService<ConnectivityManager>(),
                 scope = storeProvider.viewModelScope,
             )
-        )
+        viewLifecycleOwner.lifecycle.addObserver(deviceObserver)
     }
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {

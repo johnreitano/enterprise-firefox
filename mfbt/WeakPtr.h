@@ -308,7 +308,7 @@ class WeakPtr {
       return aLhs.mRef == aRhs.mRef;
     }
     bool LessThan(const WeakPtr& aLhs, const WeakPtr& aRhs) const {
-      return std::less<WeakReference*>()(aLhs.mRef.get(), aRhs.mRef.get());
+      return std::less<>()(aLhs.mRef.get(), aRhs.mRef.get());
     }
   };
 

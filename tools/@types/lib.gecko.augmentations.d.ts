@@ -49,6 +49,7 @@ declare global {
   class MozTab extends MozXULElement {
     readonly selected: boolean;
     linkedPanel: string;
+    label: string;
   }
 
   type MozBrowser =

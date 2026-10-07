@@ -35,6 +35,7 @@
 #include "js/friend/WindowProxy.h"    // js::IsWindowProxy
 #include "js/Printer.h"
 #include "proxy/DeadObjectProxy.h"
+#include "util/Denormals.h"
 #include "util/StringBuilder.h"
 #include "vm/AsyncFunction.h"
 #include "vm/AsyncIteration.h"
@@ -441,6 +442,9 @@ bool js::RunScript(JSContext* cx, RunState& state) {
 
   MOZ_ASSERT_IF(cx->runtime()->hasJitRuntime(),
                 !cx->runtime()->jitRuntime()->disallowArbitraryCode());
+  MOZ_ASSERT_IF(cx->runtime()->hasJitRuntime(),
+                !cx->runtime()->jitRuntime()->inPureCall());
+  MOZ_ASSERT(!DenormalsDisabled());
 
   // Since any script can conceivably GC, make sure it's safe to do so.
   cx->verifyIsSafeToGC();

@@ -512,6 +512,10 @@ pref("browser.urlbar.loglevel", "Error");
 // The maximum number of mentions to show.
 pref("browser.urlbar.mentions.maxResults", 5);
 
+// The maximum number of tab groups to show in the mentions panel. Capped
+// separately from maxResults so groups and tabs are limited independently.
+pref("browser.urlbar.mentions.maxGroupResults", 5);
+
 // the maximum number of results to show in autocomplete when doing richResults
 pref("browser.urlbar.maxRichResults", 10);
 
@@ -2079,6 +2083,42 @@ pref("browser.newtabpage.activity-stream.discoverystream.region-weather-config",
 // List of locales that weather widget supports.
 pref("browser.newtabpage.activity-stream.discoverystream.locale-weather-config", "bg,cs,da,de,el,en-CA,en-GB,en-US,es-ES,et,fi,fr,hr,hu,is,it,lv,nb-NO,nl,pl,pt-PT,ro,sk,sl,sv-SE,tr");
 
+// Regions with no widgets at all. Everywhere else the container is available
+// and on, and each widget's own prefs decide what appears. Blank means no
+// restriction, so there is no allow list here. Nightly ignores every list
+// below -- see marketGate in ActivityStream.sys.mjs. Every list below is
+// ignored unless widgets.marketGate.enabled is true.
+pref("browser.newtabpage.activity-stream.widgets.system.region-block", "");
+
+// Lists is available everywhere the container is except PL, where only the
+// current Nimbus experiment reveals it. Off by default in the US, DE and FR,
+// where the engaged cohort is turned on through Nimbus instead.
+pref("browser.newtabpage.activity-stream.widgets.system.lists.region-block", "PL");
+pref("browser.newtabpage.activity-stream.widgets.lists.region-block", "DE,FR,PL,US");
+
+// Focus timer is available everywhere the container is except PL, where only
+// the current Nimbus experiment reveals it. Off by default in the US, DE and
+// FR, where the engaged cohort is turned on through Nimbus instead.
+pref("browser.newtabpage.activity-stream.widgets.system.focusTimer.region-block", "PL");
+pref("browser.newtabpage.activity-stream.widgets.focusTimer.region-block", "DE,FR,PL,US");
+
+// Clocks is available everywhere the container is except PL, where only the
+// current Nimbus experiment reveals it. Off by default in the US, DE and FR,
+// where the engaged cohort is turned on through Nimbus instead.
+pref("browser.newtabpage.activity-stream.widgets.system.clocks.region-block", "PL");
+pref("browser.newtabpage.activity-stream.widgets.clocks.region-block", "DE,FR,PL,US");
+
+// Picture of the day is available everywhere the container is except PL, where
+// only the current Nimbus experiment reveals it. Off by default in the US, DE
+// and FR, where the engaged cohort is turned on through Nimbus instead.
+pref("browser.newtabpage.activity-stream.widgets.system.pictureOfTheDay.region-block", "PL");
+pref("browser.newtabpage.activity-stream.widgets.pictureOfTheDay.region-block", "DE,FR,PL,US");
+
+// Crossword is English-only, available in every region except PL and off by
+// default.
+pref("browser.newtabpage.activity-stream.widgets.system.crossword.locale-config", "en-CA,en-GB,en-US");
+pref("browser.newtabpage.activity-stream.widgets.system.crossword.region-block", "PL");
+
 // Promo card visibility
 pref("browser.newtabpage.activity-stream.discoverystream.promoCard.visible", true);
 
@@ -2473,6 +2513,8 @@ pref("browser.smartwindow.memories.generateFromHistory", true);
 pref("browser.smartwindow.memories.generateFromConversation", true);
 pref("browser.smartwindow.memories.hasSeenMemories", false);
 pref("browser.smartwindow.memoriesLogLevel", "Warn");
+// Gates resume-activity ("pick up where you left off") starter generation.
+pref("browser.smartwindow.resumeActivity.enabled", true);
 // TODO Bug 2067871: remove once journey store is available.
 pref("browser.smartwindow.resumeCards.enabled", false);
 pref("browser.smartwindow.firstrun.autoAdvanceMS", 3000);
@@ -2490,9 +2532,6 @@ pref("places.semanticHistory.smartwindow.distanceThreshold", "0.6");
 
 // Smart Window: AITab
 pref("browser.smartwindow.aitab.enabled", false);
-// Base URL of the external AITab viewer used for development prototyping.
-// The generate_aitab tool returns a link to this viewer with the page config in the URL hash.
-pref("browser.smartwindow.aitab.viewerURL", "");
 
 // Smart Window: Auto Tab Grouping (bug 2054500).
 pref("browser.smartwindow.autoTabGrouping.enabled", true);
@@ -2538,6 +2577,11 @@ pref("browser.smartwindow.searchQuery.apiKey", "");
 // Smart Window: when true, search_the_web returns Exa snippets straight to the
 // main assistant instead of generating an answer from background page reads.
 pref("browser.smartwindow.searchTheWebFast", true);
+
+// Smart Window: when true, search_the_web asks Exa's /answers service for a
+// written answer and its citations in one call. Takes precedence over
+// browser.smartwindow.searchTheWebFast.
+pref("browser.smartwindow.searchTheWebAnswers", false);
 
 // Smart Window Logging
 pref("browser.smartwindow.aiTabHistory.logLevel", "Error");
@@ -3170,6 +3214,12 @@ pref("browser.screenshots.dir", "");
 // Enable/disable opening a tab into a mini window.
 pref("browser.mini-window.enabled", false);
 pref("browser.mini-window.log", false);
+// How long the toolbar stays up before idling away.
+pref("browser.mini-window.toolbar.hide-delay-ms", 2000);
+// Depth of the top-edge strip that reveals the toolbar on hover.
+pref("browser.mini-window.toolbar.edge-zone-px", 12);
+// Dwell before a hover on the top edge reveals the toolbar.
+pref("browser.mini-window.toolbar.hover-reveal-delay-ms", 50);
 
 // DoH Rollout: whether to clear the mode value at shutdown.
 pref("doh-rollout.clearModeOnShutdown", false);
@@ -3213,7 +3263,7 @@ pref("app.normandy.onsync_skew_sec", 600);
 //  *.aboutWelcome.languageMismatchEnabled - Enables an onboarding menu in about:welcome
 //      to allow a user to change their language when there is a language mismatch between
 //      the app and browser.
-#if defined(RELEASE_OR_BETA) && !defined(MOZ_DEV_EDITION)
+#if defined(RELEASE_OR_BETA) && !defined(MOZ_DEV_EDITION) && !defined(MOZ_ENTERPRISE)
   pref("intl.multilingual.enabled", true);
   pref("intl.multilingual.downloadEnabled", true);
   pref("intl.multilingual.liveReload", true);
@@ -3225,14 +3275,6 @@ pref("app.normandy.onsync_skew_sec", 600);
   pref("intl.multilingual.liveReload", false);
   pref("intl.multilingual.liveReloadBidirectional", false);
   pref("intl.multilingual.aboutWelcome.languageMismatchEnabled", false);
-#endif
-
-// Coverage ping is disabled by default.
-pref("toolkit.coverage.enabled", false);
-#ifdef MOZ_ENTERPRISE
-pref("toolkit.coverage.endpoint.base", "");
-#else
-pref("toolkit.coverage.endpoint.base", "https://coverage.mozilla.org");
 #endif
 
 // Enable personalized extension recommendations
@@ -3705,6 +3747,9 @@ pref("devtools.popup.disable_autohide", false);
 #else
   pref("devtools.high-contrast-mode-support", false);
 #endif
+
+// Enable the in-progress devtools settings redesign/rewrite
+pref("devtools.settings.redesign-enabled", false);
 
 // FirstStartup service time-out in ms
 pref("first-startup.timeout", 30000);

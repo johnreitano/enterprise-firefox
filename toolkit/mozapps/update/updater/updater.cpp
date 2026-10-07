@@ -1174,18 +1174,24 @@ static int remove_recursive_on_reboot(const NS_tchar* path,
 
 //-----------------------------------------------------------------------------
 
-// Create a backup of the specified file by renaming it.
-static int backup_create(const NS_tchar* path) {
+// Create a backup of the specified file by renaming it. Sets created on
+// success.
+static int backup_create(const NS_tchar* path, bool& created) {
   NS_tchar backup[MAXPATHLEN];
   NS_tsnprintf(backup, sizeof(backup) / sizeof(backup[0]),
                NS_T("%s") BACKUP_EXT, path);
 
-  return rename_file(path, backup);
+  int rv = rename_file(path, backup);
+  if (rv == OK) {
+    created = true;
+  }
+  return rv;
 }
 
 // Rename the backup of the specified file that was created by renaming it back
 // to the original file.
-static int backup_restore(const NS_tchar* path, const NS_tchar* relPath) {
+static int backup_restore(const NS_tchar* path, const NS_tchar* relPath,
+                          bool created) {
   NS_tchar backup[MAXPATHLEN];
   NS_tsnprintf(backup, sizeof(backup) / sizeof(backup[0]),
                NS_T("%s") BACKUP_EXT, path);
@@ -1196,6 +1202,14 @@ static int backup_restore(const NS_tchar* path, const NS_tchar* relPath) {
 
   if (NS_taccess(backup, F_OK)) {
     LOG(("backup_restore: backup file doesn't exist: " LOG_S, relBackup));
+    return OK;
+  }
+
+  if (!created) {
+    LOG(
+        ("backup_restore: not restoring a backup that this action did not "
+         "create: " LOG_S,
+         relBackup));
     return OK;
   }
 
@@ -1283,11 +1297,11 @@ static int draft_commit(const NS_tchar* path) {
 
 // Helper function for post-processing a temporary backup.
 static void backup_finish(const NS_tchar* path, const NS_tchar* relPath,
-                          int status) {
+                          int status, bool created) {
   if (status == OK) {
     backup_discard(path, relPath);
   } else {
-    backup_restore(path, relPath);
+    backup_restore(path, relPath, created);
   }
 }
 
@@ -1351,6 +1365,11 @@ class Action {
   virtual void Finish(int status) = 0;
 
   int mProgressCost;
+
+ protected:
+  // Whether this action created the backup of its file. Only such backups are
+  // restored: one left behind by an earlier updater run can be outdated.
+  bool mBackupCreated = false;
 
  private:
   Action* mNext;
@@ -1460,7 +1479,7 @@ int RemoveFile::Execute() {
     }
   } else {
     // Rename the old file. It will be removed in Finish.
-    rv = backup_create(mFile.get());
+    rv = backup_create(mFile.get(), mBackupCreated);
     if (rv) {
       LOG(("backup_create failed: %d", rv));
       return rv;
@@ -1479,7 +1498,7 @@ void RemoveFile::Finish(int status) {
 
   // Staged updates don't create backup files.
   if (!sStagedUpdate) {
-    backup_finish(mFile.get(), mRelPath.get(), status);
+    backup_finish(mFile.get(), mRelPath.get(), status, mBackupCreated);
   }
 }
 
@@ -1678,7 +1697,7 @@ int AddFile::Execute() {
         return WRITE_ERROR_DELETE_FILE;
       }
     } else {
-      rv = backup_create(mFile.get());
+      rv = backup_create(mFile.get(), mBackupCreated);
       if (rv) {
         return rv;
       }
@@ -1726,7 +1745,7 @@ void AddFile::Finish(int status) {
 #endif
       }
     }
-    backup_finish(mFile.get(), mRelPath.get(), status);
+    backup_finish(mFile.get(), mRelPath.get(), status, mBackupCreated);
   }
 }
 
@@ -2155,7 +2174,7 @@ int PatchFile::Execute() {
     // The new contents have already been written during the Draft phase. Rename
     // the destination file so that it can be used to restore the file to its
     // original state if there is an error, then move the new contents in place.
-    int rv = backup_create(mFile.get());
+    int rv = backup_create(mFile.get(), mBackupCreated);
     if (rv) {
       return rv;
     }
@@ -2355,7 +2374,7 @@ void PatchFile::Finish(int status) {
     // happens when the update failed before or during the Execute phase.
     draft_discard(mFile.get(), mFileRelPath.get());
 
-    backup_finish(mFile.get(), mFileRelPath.get(), status);
+    backup_finish(mFile.get(), mFileRelPath.get(), status, mBackupCreated);
   }
 }
 

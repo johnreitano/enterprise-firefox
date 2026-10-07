@@ -268,9 +268,7 @@ add_task(async function test_tabGroupPreventScrollOnUncollapse() {
   // create some more tabs after the group
   createManyTabs(4, win);
 
-  await TestUtils.waitForCondition(() => {
-    return Array.from(win.gBrowser.tabs).every(tab => tab._fullyOpen);
-  });
+  await BrowserTestUtils.allTabOpenAnimationsFinished(win);
 
   info("selecting the last tab");
   let tabSelected = BrowserTestUtils.waitForEvent(win, "TabSelect");
@@ -619,7 +617,7 @@ add_task(async function test_tabGroupMoveToNewWindow() {
     tabGroupCreate,
   ]);
   Assert.ok(
-    tabGroupCreateEvent.detail.isAdoptingGroup,
+    tabGroupCreateEvent.detail.adopting,
     "TabGroupCreate event should report that this tab group was creating by adoption"
   );
 
@@ -678,7 +676,7 @@ add_task(async function test_TabGroupEvents() {
     "TabGroupCreate"
   ).then(event => {
     Assert.ok(
-      !event.detail.isAdoptingGroup,
+      !event.detail.adopting,
       "a tab group being created from scratch should not be treated like it was adopted from another window"
     );
     createdGroupId = event.target.id;

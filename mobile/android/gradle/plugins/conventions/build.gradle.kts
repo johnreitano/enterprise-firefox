@@ -45,6 +45,7 @@ dependencies {
     implementation(libs.kaml)
     compileOnly(libs.android.gradle.plugin)
     implementation(libs.spotless.plugin)
+    implementation(libs.tomlj)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.mockito)

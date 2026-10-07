@@ -67,9 +67,6 @@ support-files = ["../browser-webrtc/get_user_media.html"]
 ["browser_temporary_permissions_expiry.js"]
 
 ["browser_temporary_permissions_navigation.js"]
-skip-if = [
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64'", # Bug 1898701
-]
 
 ["browser_temporary_permissions_tabs.js"]
 

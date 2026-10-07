@@ -143,7 +143,8 @@ class TransactionBuilder final {
                       wr::WrPipelineId pipeline_id,
                       wr::BuiltDisplayListDescriptor dl_descriptor,
                       wr::Vec<uint8_t>& dl_items_data,
-                      wr::Vec<uint8_t>& dl_spatial_tree);
+                      wr::Vec<uint8_t>& dl_spatial_tree,
+                      wr::Vec<uint8_t>& dl_interner_delta);
 
   void ClearDisplayList(Epoch aEpoch, wr::IdNamespace aIdNamespace,
                         wr::WrPipelineId aPipeline);

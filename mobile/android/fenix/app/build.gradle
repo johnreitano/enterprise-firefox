@@ -2,6 +2,8 @@ import com.android.build.api.variant.FilterConfiguration
 
 import java.time.format.DateTimeFormatter
 
+import org.mozilla.conventions.WriteRuntimeDependencies
+
 import static org.mozilla.conventions.BuildConfigKt.getBuildId
 
 plugins {
@@ -305,6 +307,16 @@ androidComponents {
             variant.outputs.each { output ->
                 output.versionName.set(versionName)
             }
+        }
+    }
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        tasks.register("writeRuntimeDependencies${variant.name.capitalize()}", WriteRuntimeDependencies) {
+            classpath(configurations.named("${variant.name}RuntimeClasspath"))
+            versionName = variant.outputs.first().versionName
+            outputFile = layout.buildDirectory.file("sbom/${variant.name}-runtime-dependencies.json")
         }
     }
 }
@@ -670,7 +682,6 @@ dependencies {
     androidTestImplementation libs.kotlin.test
     androidTestImplementation libs.androidx.room.testing
     androidTestImplementation libs.leakcanary.instrumentation
-    androidTestImplementation libs.mockk.android
     androidTestImplementation libs.mockwebserver
     androidTestImplementation libs.okhttp
     androidTestRuntimeOnly libs.okio

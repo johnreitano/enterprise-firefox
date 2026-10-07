@@ -151,7 +151,7 @@ public final class RemoteManager implements IBinder.DeathRecipient {
         // later, unrelated unbind and kill its own process.
         try {
           mRemote.endRequest();
-        } catch (final RemoteException e) {
+        } catch (final RemoteException | NullPointerException e) {
           Log.e(LOGTAG, "fail to report remote codec creation failure", e);
         }
         return null;

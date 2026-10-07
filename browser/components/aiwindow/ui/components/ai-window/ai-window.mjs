@@ -26,6 +26,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   Chat: "moz-src:///browser/components/aiwindow/models/Chat.sys.mjs",
   GET_PAGE_CONTENT:
     "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs",
+  MAX_TAB_GROUP_MEMBERS:
+    "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs",
   MODEL_FEATURES: "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
   openAIEngine:
     "moz-src:///browser/components/aiwindow/models/openAIEngine.sys.mjs",
@@ -84,10 +86,20 @@ ChromeUtils.defineESModuleGetters(lazy, {
   UI_UPDATE_TYPES:
     "moz-src:///browser/components/aiwindow/ui/modules/ToolUI.sys.mjs",
   UrlbarShared: "chrome://browser/content/urlbar/UrlbarShared.mjs",
+  CONTEXT_MENTION_TYPE:
+    "chrome://browser/content/urlbar/SmartbarMentionUtils.mjs",
+  getContextMentionKey:
+    "chrome://browser/content/urlbar/SmartbarMentionUtils.mjs",
+  parseTabGroupMentionId:
+    "chrome://browser/content/urlbar/SmartbarMentionUtils.mjs",
   SmartWindowTelemetry:
     "moz-src:///browser/components/aiwindow/ui/modules/SmartWindowTelemetry.sys.mjs",
   ResumeActivity:
     "moz-src:///browser/components/aiwindow/ui/modules/ResumeActivity.sys.mjs",
+  NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
+  isTabGroupMember: "chrome://browser/content/urlbar/SmartbarMentionUtils.mjs",
+  tabManagementService:
+    "moz-src:///browser/components/aiwindow/ui/modules/TabManagementService.sys.mjs",
 });
 
 ChromeUtils.defineLazyGetter(lazy, "log", function () {
@@ -99,6 +111,7 @@ ChromeUtils.defineLazyGetter(lazy, "log", function () {
 
 /**
  * @import { SmartbarAction } from "chrome://browser/content/aiwindow/components/input-cta/input-cta.mjs"
+ * @import { TabGroupColor } from "chrome://browser/content/tabbrowser/tabgroup.mjs"
  */
 
 /**
@@ -171,6 +184,8 @@ const PREF_TOPSITES_FEED_ENABLED =
   "browser.newtabpage.activity-stream.feeds.topsites";
 const PREF_AGENT_ENABLED = "browser.smartwindow.agent.enabled";
 const PREF_RESUME_CARDS = "browser.smartwindow.resumeCards.enabled";
+const NIMBUS_FEATURE_SMART_WINDOW = "smartWindow";
+const NIMBUS_VARIABLE_RESUME_ACTIVITY = "resumeActivity";
 const MAX_INTERACTION_COUNT = 1000;
 const HISTORY_MENU_MAX_RECENT_CHATS = 6;
 
@@ -193,6 +208,12 @@ const MAX_RESUME_CARDS_DISPLAYED = 4;
 // TEMP: English-only workaround. Remove once resume headlines support
 // localization - see Bug 2066263.
 const RESUME_HEADLINE_PREFIX_RE = /^\s*pick\s+up\b[\s:;,.—-]*/iu;
+
+function formatResumeTabGroupLabel(headline) {
+  const stripped =
+    headline.replace(RESUME_HEADLINE_PREFIX_RE, "").trim() || headline.trim();
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+}
 
 // 1-6 are MLPA spec codes; 7 is set locally for Fastly-blocked 406s.
 const ERROR_TELEMETRY_NAME_BY_CODE = {
@@ -291,6 +312,16 @@ export class AIWindow extends MozLitElement {
       this.memoriesConversationPref ||
       this.memoriesHistoryPref ||
       this.#hasMemories
+    );
+  }
+
+  // Falls back to the pref when there is no enrollment, which includes the
+  // window or two before the enrollment store finishes loading at startup.
+  get #resumeActivityEnabled() {
+    return (
+      lazy.NimbusFeatures[NIMBUS_FEATURE_SMART_WINDOW].getVariable(
+        NIMBUS_VARIABLE_RESUME_ACTIVITY
+      ) ?? true
     );
   }
 
@@ -1362,7 +1393,9 @@ export class AIWindow extends MozLitElement {
 
       let resumeStartersPromise = null;
       const shouldLoadResumeStarters =
-        this.mode === MODE.FULLPAGE && this.#canLoadResumeStarters;
+        this.mode === MODE.FULLPAGE &&
+        this.#canLoadResumeStarters &&
+        this.#resumeActivityEnabled;
 
       if (shouldLoadResumeStarters) {
         this.#canLoadResumeStarters = false;
@@ -1641,26 +1674,53 @@ export class AIWindow extends MozLitElement {
 
   /**
    * Handles a resume card's "More" menu selection. Snoozing dismisses the
-   * card for the rest of the session; the X button is left unwired until
-   * hard delete is available in the journey store.
+   * card for the rest of the session.
    *
    * @param {CustomEvent} event - The menu-item-selected event
    * @private
    */
   #handleResumeCardMenuItemSelected = event => {
     const { journeyId, itemId } = event.detail;
-    if (itemId !== "snooze") {
+    switch (itemId) {
+      case "open-tabs":
+        this.#handleResumeCardOpenTabs(journeyId).catch(e =>
+          lazy.log.error("[ResumeCard] Failed to open tabs:", e)
+        );
+        break;
+
+      case "snooze":
+        lazy.ResumeActivity.dismissMemory(journeyId);
+        this.resumeCards = this.resumeCards.filter(
+          ({ memory }) => memory.id !== journeyId
+        );
+        if (!this.resumeCards.length) {
+          this.resumeCardsEmptyReason =
+            RESUME_SECTION_EMPTY_REASON.ALL_DISMISSED;
+        }
+        break;
+    }
+  };
+
+  /**
+   * Opens a resume card's preview tabs as a group without the current
+   * Smart Window tab, or switches to the preview tab if there's only one.
+   *
+   * @param {string} journeyId - The resume card's journey/memory id
+   */
+  async #handleResumeCardOpenTabs(journeyId) {
+    const card = this.resumeCards.find(({ memory }) => memory.id === journeyId);
+    const previewTabs = card?.content.previewTabs;
+    const win = this.#topChromeWindow;
+    if (!previewTabs?.length || !win) {
       return;
     }
 
-    lazy.ResumeActivity.dismissMemory(journeyId);
-    this.resumeCards = this.resumeCards.filter(
-      ({ memory }) => memory.id !== journeyId
-    );
-    if (!this.resumeCards.length) {
-      this.resumeCardsEmptyReason = RESUME_SECTION_EMPTY_REASON.ALL_DISMISSED;
-    }
-  };
+    await lazy.ToolUI.openOrGroupTabs({
+      tabs: previewTabs,
+      window: win,
+      label: formatResumeTabGroupLabel(card.content.headline),
+    });
+  }
 
   /**
    * Helper method to get or create the smartbar element
@@ -1894,6 +1954,12 @@ export class AIWindow extends MozLitElement {
         ? this.#calculateCurrentMentions(contextMentions)
         : null;
     this.#smartbar.clearSmartbarInput();
+    // clearSmartbarInput() doesn't fire an input event, so explicitly clear the
+    // persisted draft to prevent committed text from reappearing on navigation.
+    this.#dispatchChromeEvent(
+      "ai-window:smartbar-input",
+      this.#getAIWindowEventOptions(lazy.EMPTY_SMARTBAR_INPUT_STATE, true)
+    );
 
     if (action === ACTION.CHAT) {
       if (
@@ -1925,7 +1991,7 @@ export class AIWindow extends MozLitElement {
       }
       this.submitChatMessage({
         text: value,
-        contextMentions: mergedMentions,
+        contextMentions: this.#withTabGroupMembers(mergedMentions),
         contextPageUrl,
         detectedIntent,
         submitType,
@@ -1968,36 +2034,148 @@ export class AIWindow extends MozLitElement {
 
   /**
    * Merges "+" button chip mentions with inline "@" mentions, deduplicating
-   * by URL, and returns the combined list plus the full set of URLs.
+   * by mention key and returns the combined list as well as the
+   * mentioned URLs.
    *
    * @param {ContextWebsite[]} contextMentions - Chip mentions from the smartbar
    * @returns {{mergedMentions: ContextWebsite[], allUrls: Set<string>, inlineMentions: Array}}
    */
   #calculateCurrentMentions(contextMentions) {
-    const contextUrls = new Set();
+    const seenKeys = new Set();
+    const allUrls = new Set();
     for (const mention of contextMentions) {
+      const key = lazy.getContextMentionKey(mention);
+      if (key) {
+        seenKeys.add(key);
+      }
       if (mention.url) {
-        contextUrls.add(mention.url);
+        allUrls.add(mention.url);
       }
     }
 
     const inlineMentions = this.#getInlineMentions();
     const atMentions = [];
     for (const mention of inlineMentions) {
-      if (mention.id && !contextUrls.has(mention.id)) {
-        atMentions.push({
-          type: mention.type,
-          url: mention.id,
-          label: mention.label,
-          iconSrc: lazy.UrlbarShared.getIconForUrl(mention.id),
-        });
-        contextUrls.add(mention.id);
+      if (!mention.id || seenKeys.has(mention.id)) {
+        continue;
       }
+      seenKeys.add(mention.id);
+
+      const groupId = lazy.parseTabGroupMentionId(mention.id);
+      if (groupId) {
+        atMentions.push({
+          type: lazy.CONTEXT_MENTION_TYPE.TAB_GROUP,
+          groupId,
+          label: mention.label,
+          color: this.#getTabGroupColor(groupId),
+        });
+        continue;
+      }
+
+      atMentions.push({
+        type: mention.type,
+        url: mention.id,
+        label: mention.label,
+        iconSrc: lazy.UrlbarShared.getIconForUrl(mention.id),
+      });
+      allUrls.add(mention.id);
     }
 
     const mergedMentions = [...contextMentions, ...atMentions];
 
-    return { mergedMentions, allUrls: contextUrls, inlineMentions };
+    return { mergedMentions, allUrls, inlineMentions };
+  }
+
+  /**
+   * Expands the mentioned tab groups and records the members as seen.
+   *
+   * @param {ContextWebsite[]} mentions
+   * @returns {ContextWebsite[]} The mentions with members appended.
+   */
+  #withTabGroupMembers(mentions) {
+    const tabGroupMembers = this.#expandTabGroupMentions(mentions);
+    if (tabGroupMembers.length) {
+      this.#conversation?.addSeenUrls(tabGroupMembers.map(({ url }) => url));
+    }
+    return [...mentions, ...tabGroupMembers];
+  }
+
+  /**
+   * @param {ContextWebsite[]} mentions
+   * @returns {ContextWebsite[]} The members of the mentioned tab group.
+   */
+  #expandTabGroupMentions(mentions) {
+    const seen = new Set(mentions.map(lazy.getContextMentionKey));
+    const tabGroupMembers = [];
+    for (const mention of mentions) {
+      if (mention.type != lazy.CONTEXT_MENTION_TYPE.TAB_GROUP) {
+        continue;
+      }
+      const tabsRemaining = lazy.MAX_TAB_GROUP_MEMBERS - tabGroupMembers.length;
+      if (!tabsRemaining) {
+        break;
+      }
+      for (const tabGroupMember of this.#getTabGroupMembers(
+        mention.groupId,
+        tabsRemaining
+      )) {
+        const key = lazy.getContextMentionKey(tabGroupMember);
+        if (!seen.has(key)) {
+          seen.add(key);
+          tabGroupMembers.push(tabGroupMember);
+        }
+      }
+    }
+    return tabGroupMembers;
+  }
+
+  /**
+   * Get tab groups of the current window.
+   *
+   * @param {string} groupId
+   * @returns {MozTabbrowserTabGroup|undefined} The open tab group
+   */
+  #getTabGroup(groupId) {
+    return this.#topChromeWindow.gBrowser.tabGroups.find(
+      group => group.id === groupId
+    );
+  }
+
+  /**
+   * @param {string} groupId
+   * @returns {TabGroupColor|undefined} Color of the open tab group
+   */
+  #getTabGroupColor(groupId) {
+    return this.#getTabGroup(groupId)?.color;
+  }
+
+  /**
+   * @param {string} groupId
+   * @param {number} limit - Max number of members to return
+   * @returns {ContextWebsite[]} The members of the tab group the model may see.
+   */
+  #getTabGroupMembers(groupId, limit) {
+    const group = this.#getTabGroup(groupId);
+    const visibleGroup =
+      group &&
+      lazy.tabManagementService.getTabGroupById({
+        groupId,
+        window: this.#topChromeWindow,
+      });
+    if (!visibleGroup) {
+      return [];
+    }
+    const tabGroupLabels = new Map(
+      group.tabs.map(tab => [tab.linkedBrowser?.currentURI?.spec, tab.label])
+    );
+    return visibleGroup.tabs.slice(0, limit).map(({ url }) => ({
+      type: lazy.CONTEXT_MENTION_TYPE.TAB,
+      url,
+      label: tabGroupLabels.get(url) || url,
+      iconSrc: lazy.UrlbarShared.getIconForUrl(url),
+      groupId: visibleGroup.id,
+      groupLabel: visibleGroup.label,
+    }));
   }
 
   /**
@@ -2065,7 +2243,8 @@ export class AIWindow extends MozLitElement {
       message_seq: this.conversationMessageCount,
       model: this.modelName,
       submit_type: submitType,
-      tabs: contextMentions.length,
+      tabs: contextMentions.filter(member => !lazy.isTabGroupMember(member))
+        .length,
     });
 
     if (this.#conversation) {
@@ -2080,10 +2259,6 @@ export class AIWindow extends MozLitElement {
       skipSystemPromptRefresh,
       assistantToolUIData,
     });
-    this.#dispatchChromeEvent(
-      "ai-window:smartbar-input",
-      this.#getAIWindowEventOptions(lazy.EMPTY_SMARTBAR_INPUT_STATE, true)
-    );
   }
 
   #handleMemoriesToggle = async event => {
@@ -2150,6 +2325,28 @@ export class AIWindow extends MozLitElement {
       lazy.log.error("[Prompts] Resume-activity generation failed:", e)
     );
   }
+
+  /**
+   * Handles a resume card's click (whether on the card itself or its
+   * Resume button): resumes the chat conversation the card belongs to and
+   * attaches an open-tabs confirmation card built from its preview tabs.
+   *
+   * @param {CustomEvent} event - The resume event
+   * @private
+   */
+  #handleResumeCardResume = event => {
+    const { journeyId } = event.detail;
+    const card = this.resumeCards.find(({ memory }) => memory.id === journeyId);
+    if (!card) {
+      return;
+    }
+
+    this.#handleResumePromptSelected({
+      memory: card.memory,
+      content: card.content,
+      text: card.content.headline,
+    });
+  };
 
   /**
    * Dismisses the memory for the session and removes its pill from this tab.
@@ -2243,10 +2440,6 @@ export class AIWindow extends MozLitElement {
         checked: false,
       })
     );
-    const strippedHeadline =
-      resumePrompt.text.replace(RESUME_HEADLINE_PREFIX_RE, "").trim() ||
-      resumePrompt.text.trim();
-
     // The conversation was built with its user turn already appended, so the
     // request only needs real-time context injected before it goes out.
     const userMessage = conversation.messages.at(-1);
@@ -2263,9 +2456,7 @@ export class AIWindow extends MozLitElement {
         isResumeActivity: true,
         properties: {
           actionType: "open_tabs",
-          tabGroupLabel:
-            strippedHeadline.charAt(0).toUpperCase() +
-            strippedHeadline.slice(1),
+          tabGroupLabel: formatResumeTabGroupLabel(resumePrompt.text),
           tabs,
         },
       },
@@ -2358,10 +2549,11 @@ export class AIWindow extends MozLitElement {
     const { pageUrl: contextPageUrl, contextWebsites } =
       this.#smartbar.getCurrentContextData();
 
+    const mentions = contextMentionsOverride ?? contextWebsites;
     const submitType = starter ? "starter" : "follow-up";
     this.submitChatMessage({
       text,
-      contextMentions: contextMentionsOverride ?? contextWebsites,
+      contextMentions: this.#withTabGroupMembers(mentions),
       contextPageUrl,
       submitType,
     });
@@ -3733,6 +3925,8 @@ export class AIWindow extends MozLitElement {
                     .cards=${this.resumeCards}
                     .emptyReason=${this.resumeCardsEmptyReason}
                     .loading=${this.resumeCardsLoading}
+                    @smartwindow-resume-card:resume=${this
+                      .#handleResumeCardResume}
                     @smartwindow-resume-card:menu-item-selected=${this
                       .#handleResumeCardMenuItemSelected}
                     @smartwindow-resume-section:hide=${this

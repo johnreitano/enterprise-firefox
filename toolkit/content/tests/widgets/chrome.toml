@@ -134,11 +134,15 @@ support-files = [
 
 ["test_panel_item_mouseup_click.html"]
 
+["test_panel_item_shortcut.html"]
+
 ["test_panel_list_accessibility.html"]
 
 ["test_panel_list_accesskey_conflicts.html"]
 
 ["test_panel_list_anchoring.html"]
+
+["test_panel_list_shadow_node_anchor.html"]
 
 ["test_panel_list_contextmenu.html"]
 

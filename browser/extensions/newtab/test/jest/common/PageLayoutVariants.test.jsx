@@ -375,6 +375,31 @@ describe("resolvePopulatedSpaces", () => {
     );
     expect(resolvePopulatedSpaces({})).toEqual([]);
   });
+
+  describe("pageLayouts.spacesOrder", () => {
+    const all = { ...spaces, "feeds.section.highlights": true };
+
+    it("follows the pref", () => {
+      expect(
+        resolvePopulatedSpaces({
+          ...all,
+          "pageLayouts.spacesOrder": "activity,stories,widgets",
+        })
+      ).toEqual(["activity", "stories", "widgets"]);
+    });
+
+    it("prefers the trainhop array over the pref", () => {
+      expect(
+        resolvePopulatedSpaces({
+          ...all,
+          "pageLayouts.spacesOrder": "widgets,stories,activity",
+          trainhopConfig: {
+            pageLayouts: { spacesOrder: ["activity", "stories", "widgets"] },
+          },
+        })
+      ).toEqual(["activity", "stories", "widgets"]);
+    });
+  });
 });
 
 describe("the experiment override", () => {

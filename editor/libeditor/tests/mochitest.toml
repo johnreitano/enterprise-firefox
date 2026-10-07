@@ -654,6 +654,8 @@ skip-if = [
 
 ["test_pasteImgTextarea.html"]
 
+["test_pasteTransferable_data_in_paste_event.html"]
+
 ["test_pasteURLFromTransferable.html"]
 
 ["test_paste_as_quote_in_text_control.html"]

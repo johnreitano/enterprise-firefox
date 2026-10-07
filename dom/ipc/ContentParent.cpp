@@ -153,6 +153,7 @@
 #include "mozilla/hal_sandbox/PHalParent.h"
 #ifndef ANDROID
 #  include "mozilla/hwinference/HWInferenceParent.h"
+#  include "mozilla/hwinference/HWInferenceProcess.h"
 #  include "mozilla/hwinference/PSpeechRecognitionChild.h"
 #endif  // !ANDROID
 #include "mozilla/intl/L10nRegistry.h"
@@ -581,7 +582,8 @@ ContentParentsMemoryReporter::CollectReports(
 // processes that are in the Preallocator cache (which would be type
 // 'prealloc'), and recycled processes ('web' and in the future
 // eTLD+1-locked) processes).
-nsClassHashtable<nsGenericHashKey<RemoteType>, nsTArray<ContentParent*>>*
+StaticAutoPtr<
+    nsClassHashtable<nsGenericHashKey<RemoteType>, nsTArray<ContentParent*>>>
     ContentParent::sBrowserContentParents;
 
 namespace {
@@ -841,39 +843,43 @@ already_AddRefed<ContentParent> ContentParent::MinTabSelect(
 
 /*static*/
 UniqueContentParentKeepAlive ContentParent::GetUsedBrowserProcess(
-    const RemoteType& aRemoteType, nsTArray<ContentParent*>& aContentParents,
-    uint32_t aMaxContentParents, bool aPreferUsed, ProcessPriority aPriority,
-    uint64_t aBrowserId) {
+    const RemoteType& aRemoteType, bool aPreferUsed, uint64_t aBrowserId) {
 #ifdef MOZ_DIAGNOSTIC_ASSERT_ENABLED
   AutoRestore ar(sInProcessSelector);
   sInProcessSelector = true;
 #endif
 
-  uint32_t numberOfParents = aContentParents.Length();
-  if (aPreferUsed && numberOfParents) {
-    // If we prefer re-using existing content processes, we don't want to create
-    // a new process, and instead re-use an existing one, so pretend the process
-    // limit is at the current number of processes.
-    aMaxContentParents = numberOfParents;
-  }
-
   // Use MinTabSelect to choose a content process unless content process re-use
   // has been disabled.
-  RefPtr<ContentParent> selected;
-  if (!StaticPrefs::dom_ipc_disableContentProcessReuse() &&
-      (selected =
-           MinTabSelect(aContentParents, aMaxContentParents, aBrowserId))) {
-    if (profiler_thread_is_being_profiled_for_markers()) {
-      nsPrintfCString marker("Reused process %u",
-                             (unsigned int)selected->ChildID());
-      PROFILER_MARKER_TEXT("Process", DOM, {}, marker);
+  if (!StaticPrefs::dom_ipc_disableContentProcessReuse()) {
+    nsTArray<ContentParent*>& contentParents = GetOrCreatePool(aRemoteType);
+
+    uint32_t maxContentParents;
+    uint32_t numberOfParents = contentParents.Length();
+    if (aPreferUsed && numberOfParents) {
+      // If we prefer re-using existing content processes, we don't want to
+      // create a new process, and instead re-use an existing one, so pretend
+      // the process limit is at the current number of processes.
+      maxContentParents = numberOfParents;
+    } else {
+      maxContentParents = GetMaxProcessCount(aRemoteType);
     }
-    MOZ_LOG(ContentParent::GetLog(), LogLevel::Debug,
-            ("GetUsedProcess: Reused process id=%p childID=%" PRIu64 " for %s",
-             selected.get(), (uint64_t)selected->ChildID(),
-             aRemoteType.Stringify().get()));
-    selected->AssertAlive();
-    return selected->AddKeepAlive(aBrowserId);
+
+    if (RefPtr<ContentParent> selected =
+            MinTabSelect(contentParents, maxContentParents, aBrowserId)) {
+      if (profiler_thread_is_being_profiled_for_markers()) {
+        nsPrintfCString marker("Reused process %u",
+                               (unsigned int)selected->ChildID());
+        PROFILER_MARKER_TEXT("Process", DOM, {}, marker);
+      }
+      MOZ_LOG(
+          ContentParent::GetLog(), LogLevel::Debug,
+          ("GetUsedProcess: Reused process id=%p childID=%" PRIu64 " for %s",
+           selected.get(), (uint64_t)selected->ChildID(),
+           aRemoteType.Stringify().get()));
+      selected->AssertAlive();
+      return selected->AddKeepAlive(aBrowserId);
+    }
   }
 
   // Try to take a preallocated process except for certain remote types.
@@ -907,7 +913,7 @@ UniqueContentParentKeepAlive ContentParent::GetUsedBrowserProcess(
     // it finishes starting
     preallocated->mRemoteType = aRemoteType;
     preallocated->LoadedOrigins()->SetRemoteType(preallocated->mRemoteType);
-    preallocated->AddToPool(aContentParents);
+    preallocated->AddToPool();
 
     // rare, but will happen
     if (!preallocated->IsLaunching()) {
@@ -966,15 +972,9 @@ UniqueContentParentKeepAlive ContentParent::GetNewOrUsedLaunchingBrowserProcess(
     }
   }
 
-  nsTArray<ContentParent*>& contentParents = GetOrCreatePool(aRemoteType);
-
   if (!contentParent) {
     // No host process. Let's try to re-use an existing process.
-    uint32_t maxContentParents = GetMaxProcessCount(aRemoteType);
-
-    contentParent =
-        GetUsedBrowserProcess(aRemoteType, contentParents, maxContentParents,
-                              aPreferUsed, aPriority, aBrowserId);
+    contentParent = GetUsedBrowserProcess(aRemoteType, aPreferUsed, aBrowserId);
     MOZ_DIAGNOSTIC_ASSERT_IF(contentParent, !contentParent->IsShuttingDown());
   }
 
@@ -1000,7 +1000,7 @@ UniqueContentParentKeepAlive ContentParent::GetNewOrUsedLaunchingBrowserProcess(
     PreallocatedProcessManager::AddBlocker(aRemoteType, contentParent.get());
 
     // Store this process for future reuse.
-    contentParent->AddToPool(contentParents);
+    contentParent->AddToPool();
 
     MOZ_LOG(
         ContentParent::GetLog(), LogLevel::Debug,
@@ -1740,11 +1740,11 @@ void ContentParent::ShutDownMessageManager() {
   mMessageManager = nullptr;
 }
 
-void ContentParent::AddToPool(nsTArray<ContentParent*>& aPool) {
+void ContentParent::AddToPool() {
   MOZ_DIAGNOSTIC_ASSERT(!mIsInPool);
   AssertAlive();
   MOZ_DIAGNOSTIC_ASSERT(!mCalledKillHard);
-  aPool.AppendElement(this);
+  GetOrCreatePool(mRemoteType).AppendElement(this);
   mIsInPool = true;
 }
 
@@ -1796,7 +1796,6 @@ void ContentParent::RemoveFromList() {
       }
     }
     if (sBrowserContentParents->IsEmpty()) {
-      delete sBrowserContentParents;
       sBrowserContentParents = nullptr;
     }
   }
@@ -4295,8 +4294,13 @@ mozilla::ipc::IPCResult ContentParent::RecvConstructPopupBrowser(
   MaybeInvalidTabContext tc(aContext);
   MOZ_ASSERT(tc.IsValid());
 
+  // Construct from the fields derived here; the fields the content process
+  // sent are reconciled in InitFromContentProcess.
+  WindowGlobalInit derivedWindowInit(aInitialWindowInit);
+  derivedWindowInit.context().mFields =
+      WindowGlobalActor::ComputeInitialFields(browsingContext);
   RefPtr<WindowGlobalParent> initialWindow =
-      WindowGlobalParent::CreateDisconnected(aInitialWindowInit, this);
+      WindowGlobalParent::CreateDisconnected(derivedWindowInit, this);
   if (!initialWindow) {
     return IPC_FAIL(this, "Failed to create WindowGlobalParent");
   }
@@ -4326,7 +4330,8 @@ mozilla::ipc::IPCResult ContentParent::RecvConstructPopupBrowser(
 
   browsingContext->SetCurrentBrowserParent(parent);
 
-  initialWindow->Init();
+  initialWindow->InitFromContentProcess(aInitialWindowInit.context().mFields,
+                                        this);
 
   // When enabling input event prioritization, input events may preempt other
   // normal priority IPC messages. To prevent the input events preempt
@@ -4354,7 +4359,7 @@ bool ContentParent::DeallocPRemoteSpellcheckEngineParent(
 /* static */
 void ContentParent::SendShutdownTimerCallback(nsITimer* aTimer,
                                               void* aClosure) {
-  auto* self = static_cast<ContentParent*>(aClosure);
+  RefPtr self = static_cast<ContentParent*>(aClosure);
   self->AsyncSendShutDownMessage();
 }
 
@@ -4366,7 +4371,7 @@ void ContentParent::ForceKillTimerCallback(nsITimer* aTimer, void* aClosure) {
     return;
   }
 
-  auto* self = static_cast<ContentParent*>(aClosure);
+  RefPtr self = static_cast<ContentParent*>(aClosure);
   self->KillHard("ShutDownKill");
 }
 
@@ -5055,7 +5060,7 @@ mozilla::ipc::IPCResult ContentParent::RecvFindImageText(
 
 bool ContentParent::ShouldContinueFromReplyTimeout() {
   RefPtr<ProcessHangMonitor> monitor = ProcessHangMonitor::Get();
-  return !monitor || !monitor->ShouldTimeOutCPOWs();
+  return !monitor || !monitor->ShouldTimeOutReplies();
 }
 
 mozilla::ipc::IPCResult ContentParent::RecvAddIdleObserver(
@@ -5193,8 +5198,7 @@ mozilla::ipc::IPCResult ContentParent::RecvCreateAudioIPCConnection(
 void ContentParent::EnsureHWInferenceConnection() {
   // Re-acquiring unconditionally: a no-op when the process and its actor are
   // up, and what recovers when either went away under us.
-  mHWInferenceKeepAlive =
-      UtilityProcessManager::GetSingleton()->AcquireContentHWInferenceProcess();
+  mHWInferenceKeepAlive = hwinference::HWInferenceProcess::Content().Acquire();
 }
 
 mozilla::ipc::IPCResult ContentParent::RecvAcquireHWInferenceProcess() {
@@ -5217,8 +5221,9 @@ mozilla::ipc::IPCResult ContentParent::RecvCreateSpeechRecognition(
     return IPC_OK();
   }
 
-  hwinference::HWInferenceParent::StartContentSpeechRecognition(
-      std::move(aEndpoint), mChildID);
+  hwinference::HWInferenceProcess::Content()
+      .Actor()
+      ->StartContentSpeechRecognition(std::move(aEndpoint), mChildID);
   return IPC_OK();
 }
 

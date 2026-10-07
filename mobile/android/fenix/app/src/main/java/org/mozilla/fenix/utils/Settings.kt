@@ -22,6 +22,7 @@ import java.security.InvalidParameterException
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import mozilla.components.concept.engine.Engine
 import mozilla.components.concept.engine.Engine.HttpsOnlyMode
+import mozilla.components.feature.automotive.isAndroidAutomotiveAvailable
 import mozilla.components.feature.sitepermissions.SitePermissionsRules
 import mozilla.components.feature.sitepermissions.SitePermissionsRules.Action
 import mozilla.components.feature.sitepermissions.SitePermissionsRules.AutoplayAction
@@ -1528,6 +1529,25 @@ class Settings(
             field = value
         }
 
+    /**
+     * The state of the OS power saving (battery saver) mode the last time it was observed, or `null` if it has never
+     * been observed. Persisted so that a change made while the app process was not running is still detected the next
+     * time the app starts.
+     */
+    var lastKnownPowerSaveMode: Boolean?
+        get() {
+            val key = appContext.getPreferenceKey(R.string.pref_key_last_known_power_save_mode)
+
+            return if (preferences.contains(key)) preferences.getBoolean(key, false) else null
+        }
+        set(value) {
+            val key = appContext.getPreferenceKey(R.string.pref_key_last_known_power_save_mode)
+
+            preferences.edit {
+                if (value == null) remove(key) else putBoolean(key, value)
+            }
+        }
+
     var shouldDeleteBrowsingDataOnQuit by
         booleanPreference(
             appContext.getPreferenceKey(R.string.pref_key_delete_browsing_data_on_quit),
@@ -1958,16 +1978,23 @@ class Settings(
             default = true,
         )
 
+    /**
+     * Whether this device supports the application's own autofill and password management. Both are disabled on Android
+     * Automotive OS for now until we meet specific Google requirements around protecting passwords and credit card
+     * information in cars.
+     */
+    val isAutofillSupported: Boolean by lazy { !appContext.isAndroidAutomotiveAvailable() }
+
     var shouldPromptToSaveLogins by
         booleanPreference(
             appContext.getPreferenceKey(R.string.pref_key_save_logins),
-            default = true,
+            default = { isAutofillSupported },
         )
 
     var shouldAutofillLogins by
         booleanPreference(
             appContext.getPreferenceKey(R.string.pref_key_autofill_logins),
-            default = true,
+            default = { isAutofillSupported },
         )
 
     /**
@@ -2323,7 +2350,7 @@ class Settings(
     var shouldAutofillCreditCardDetails by
         booleanPreference(
             appContext.getPreferenceKey(R.string.pref_key_credit_cards_save_and_autofill_cards),
-            default = true,
+            default = { isAutofillSupported },
         )
 
     /**
@@ -2334,7 +2361,7 @@ class Settings(
     var shouldAutofillAddressDetails by
         booleanPreference(
             appContext.getPreferenceKey(R.string.pref_key_addresses_save_and_autofill_addresses),
-            default = true,
+            default = { isAutofillSupported },
         )
 
     /** Indicates if the Contile functionality should be visible. */
@@ -2449,6 +2476,10 @@ class Settings(
             key = appContext.getPreferenceKey(R.string.pref_key_continuous_onboarding_day_seven_completed_timestamp),
             default = -1L,
         )
+
+    /** Indicates if continuous onboarding has been completed, meaning its final day-7 stage has finished. */
+    val continuousOnboardingCompleted: Boolean
+        get() = seventhDayOnboardingCompletedTimestamp != -1L
 
     /** Indicates if the marketing onboarding card should be shown to the user. */
     var shouldShowMarketingOnboarding by
@@ -2881,17 +2912,6 @@ class Settings(
         get() = FxNimbus.features.ipProtection.value().enabled || isIPProtectionEnabled
 
     /**
-     * Persists IPProtection locations state set through Secret Settings.
-     *
-     * `true` makes the IPProtection location UI elements interactable.
-     */
-    var isIPProtectionLocationsEnabled by
-        booleanPreference(
-            key = appContext.getPreferenceKey(R.string.pref_key_enable_ip_protection_locations),
-            default = Config.channel.isDebug,
-        )
-
-    /**
      * Tracks how many times the summarize menu item has been shown. Used to control highlight/badge visibility for
      * feature discovery.
      */
@@ -2990,6 +3010,8 @@ class Settings(
         nimbusFeature: DefaultBrowserPrompt = FxNimbus.features.defaultBrowserPrompt.value()
     ): Boolean {
         if (!nimbusFeature.enabled) return false
+
+        if (continuousOnboardingFeatureEnabled && !continuousOnboardingCompleted) return false
 
         val now = currentTimeMillis()
 
@@ -3460,4 +3482,43 @@ class Settings(
             key = appContext.getPreferenceKey(R.string.pref_key_enable_account_settings_new_ui),
             default = { FxNimbus.features.accountSyncDecoupleM1.value().enabled },
         )
+
+    private var powerSavingModeAutoPreference by
+        booleanPreference(
+            key = appContext.getPreferenceKey(R.string.pref_key_power_saving_mode_auto_enabled),
+            default = false,
+        )
+
+    private var powerSavingModeManuallyPreference by
+        booleanPreference(
+            key = appContext.getPreferenceKey(R.string.pref_key_power_saving_mode_manually_enabled),
+            default = false,
+        )
+
+    /**
+     * Indicates if Power Saving Mode should turn on automatically whenever the OS reports that power save (battery
+     * saver) mode is active. Mutually exclusive with [powerSavingModeManuallyEnabled], which is turned off whenever
+     * this is turned on.
+     */
+    var powerSavingModeAutoEnabled: Boolean
+        get() = powerSavingModeAutoPreference
+        set(value) {
+            powerSavingModeAutoPreference = value
+            if (value) {
+                powerSavingModeManuallyPreference = false
+            }
+        }
+
+    /**
+     * Indicates if Power Saving Mode is enabled manually, regardless of the OS power save (battery saver) mode.
+     * Mutually exclusive with [powerSavingModeAutoEnabled], which is turned off whenever this is turned on.
+     */
+    var powerSavingModeManuallyEnabled: Boolean
+        get() = powerSavingModeManuallyPreference
+        set(value) {
+            powerSavingModeManuallyPreference = value
+            if (value) {
+                powerSavingModeAutoPreference = false
+            }
+        }
 }

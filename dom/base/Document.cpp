@@ -180,6 +180,7 @@
 #include "mozilla/dom/FromParser.h"
 #include "mozilla/dom/HTMLAllCollection.h"
 #include "mozilla/dom/HTMLBodyElement.h"
+#include "mozilla/dom/HTMLCanvasElement.h"
 #include "mozilla/dom/HTMLCollectionBinding.h"
 #include "mozilla/dom/HTMLDialogElement.h"
 #include "mozilla/dom/HTMLEmbedElement.h"
@@ -2076,8 +2077,8 @@ void Document::ConstructUbiNode(void* storage) {
 }
 
 void Document::LoadEventFired() {
-  // Collect page load timings. The pageload event itself is now submitted from
-  // Document::Destroy() so it can include the final LCP value and any other
+  // Collect page load timings. The pageload telemetry itself is submitted once
+  // the page is hidden so it can include the final LCP value and any other
   // metrics that aren't stable at load time.
   AccumulatePageLoadTelemetry();
 
@@ -2088,10 +2089,26 @@ void Document::LoadEventFired() {
   }
 }
 
+void Document::ReportPageLoadTelemetry() {
+  // Page hide can fire more than once per document, but the sampling roll in
+  // ReportPageLoadEvent must only happen once.
+  if (mPageLoadTelemetryReported) {
+    return;
+  }
+  mPageLoadTelemetryReported = true;
+
+  // Catches documents never collected from: those whose load event never
+  // fired, and those hidden before LoadEventFired ran.
+  AccumulatePageLoadTelemetry();
+
+  ReportPageLoadEvent();
+  ReportLCP();
+}
+
 void Document::ReportPageLoadEvent() {
-  // If the page load time is empty, then the content wasn't something we want
-  // to report (i.e. not a top level document, or load never completed).
-  if (!mPageloadEventData.HasLoadTime()) {
+  // If we never collected any metrics, the content wasn't something we want to
+  // report (i.e. not a top level document).
+  if (!mPageLoadMetricsAccumulated) {
     return;
   }
   MOZ_ASSERT(IsTopLevelContentDocument());
@@ -2122,11 +2139,15 @@ void Document::ReportPageLoadEvent() {
     return;
   }
 
-  // Refresh metrics that can change between the load event and document
-  // destruction. LCP in particular keeps updating until first user interaction
-  // or page teardown, so the value captured in AccumulatePageLoadTelemetry is
+  // Refresh metrics that can change between the load event and the page being
+  // hidden. LCP in particular keeps updating until first user interaction or
+  // the page is hidden, so the value captured in AccumulatePageLoadTelemetry is
   // not necessarily final.
-  if (const nsDOMNavigationTiming* timing = GetNavigationTiming()) {
+  //
+  // A document replaced before its load event fired has an LCP that reads low,
+  // so report none for those.
+  if (const nsDOMNavigationTiming* timing =
+          mPageLoadCompleted ? GetNavigationTiming() : nullptr) {
     if (TimeStamp navigationStart = timing->GetNavigationStartTimeStamp()) {
       if (TimeStamp lcpTime = timing->GetLargestContentfulRenderTimeStamp()) {
         mPageloadEventData.set_lcpTime(static_cast<uint32_t>(
@@ -2265,11 +2286,15 @@ void Document::ReportPageLoadEvent() {
 }
 
 void Document::AccumulatePageLoadTelemetry() {
-  // Interested only in top level documents for real websites that are in the
-  // foreground.
+  // Runs from the load event, and again at page hide for documents whose load
+  // event never fired. Only collect once.
+  if (mPageLoadMetricsAccumulated) {
+    return;
+  }
+
+  // Interested only in top level documents for real websites.
   if (!ShouldIncludeInTelemetry() || !IsTopLevelContentDocument() ||
-      !GetNavigationTiming() ||
-      !GetNavigationTiming()->DocShellHasBeenActiveSinceNavigationStart()) {
+      !GetNavigationTiming()) {
     return;
   }
 
@@ -2281,6 +2306,19 @@ void Document::AccumulatePageLoadTelemetry() {
   if (!timedChannel) {
     return;
   }
+
+  mPageLoadMetricsAccumulated = true;
+
+  // Whether the tab was foreground when the load event started. A background
+  // load is still reported, but its timings are inflated by throttling and
+  // deferred painting, so the histograms skip it and the event records the
+  // flag. A load that never reached its load event leaves the flag off the
+  // event, rather than claiming either way.
+  Maybe<bool> loadedInForeground = GetNavigationTiming()->LoadedInForeground();
+  if (loadedInForeground) {
+    mPageloadEventData.set_loadedInForeground(*loadedInForeground);
+  }
+  mPageLoadWasForeground = loadedInForeground.valueOr(false);
 
   bool isCacheHit = false;
   if (nsCOMPtr<nsICacheInfoChannel> cacheInfoChannel =
@@ -2395,22 +2433,9 @@ void Document::AccumulatePageLoadTelemetry() {
     }
   }
 
-  TimeStamp asyncOpen;
-  timedChannel->GetAsyncOpen(&asyncOpen);
-  if (asyncOpen) {
-    glean::perf::dns_first_byte.Get(dnsKey).AccumulateRawDuration(
-        responseStart - asyncOpen);
-  }
-
   // First Contentful Composite
   if (TimeStamp firstContentfulComposite =
           GetNavigationTiming()->GetFirstContentfulCompositeTimeStamp()) {
-    glean::performance_pageload::fcp.AccumulateRawDuration(
-        firstContentfulComposite - navigationStart);
-
-    glean::performance_pageload::fcp_responsestart.AccumulateRawDuration(
-        firstContentfulComposite - responseStart);
-
     TimeDuration fcpTime = firstContentfulComposite - navigationStart;
     if (fcpTime > zeroDuration) {
       mPageloadEventData.set_fcpTime(
@@ -2418,7 +2443,77 @@ void Document::AccumulatePageLoadTelemetry() {
     }
   }
 
-  // Load event
+  // These need only the response, so they remain valid for a document replaced
+  // before its load event fired.
+  if (responseStart) {
+    TimeDuration responseTime = responseStart - navigationStart;
+    if (responseTime > zeroDuration) {
+      mPageloadEventData.set_responseTime(
+          static_cast<uint32_t>(responseTime.ToMilliseconds()));
+    }
+  }
+
+  TimeStamp requestStart;
+  timedChannel->GetRequestStart(&requestStart);
+  if (requestStart) {
+    TimeDuration timeToRequestStart = requestStart - navigationStart;
+    if (timeToRequestStart > zeroDuration) {
+      mPageloadEventData.set_timeToRequestStart(
+          static_cast<uint32_t>(timeToRequestStart.ToMilliseconds()));
+    } else {
+      // Speculative and pre-established connections may yield zero or
+      // slightly negative timeToRequestStart timings. We record these as zero
+      // to maintain consistent, non-negative timing data, while still
+      // capturing the impact of early connection establishment.
+      mPageloadEventData.set_timeToRequestStart(0);
+    }
+  }
+
+  TimeStamp secureConnectStart;
+  TimeStamp connectEnd;
+  timedChannel->GetSecureConnectionStart(&secureConnectStart);
+  timedChannel->GetConnectEnd(&connectEnd);
+  if (secureConnectStart && connectEnd) {
+    TimeDuration tlsHandshakeTime = connectEnd - secureConnectStart;
+    if (tlsHandshakeTime > zeroDuration) {
+      mPageloadEventData.set_tlsHandshakeTime(
+          static_cast<uint32_t>(tlsHandshakeTime.ToMilliseconds()));
+    }
+  }
+
+  // Load event. Absent when the document was replaced before it fired.
+  if (TimeStamp loadEventStart =
+          GetNavigationTiming()->GetLoadEventStartTimeStamp()) {
+    mPageLoadCompleted = true;
+
+    TimeDuration loadTime = loadEventStart - navigationStart;
+    if (loadTime > zeroDuration) {
+      mPageloadEventData.set_loadTime(
+          static_cast<uint32_t>(loadTime.ToMilliseconds()));
+    }
+  }
+
+  // Our histograms remain gated on the page having loaded in the foreground.
+  if (!mPageLoadWasForeground) {
+    return;
+  }
+
+  TimeStamp asyncOpen;
+  timedChannel->GetAsyncOpen(&asyncOpen);
+  if (asyncOpen) {
+    glean::perf::dns_first_byte.Get(dnsKey).AccumulateRawDuration(
+        responseStart - asyncOpen);
+  }
+
+  if (TimeStamp firstContentfulComposite =
+          GetNavigationTiming()->GetFirstContentfulCompositeTimeStamp()) {
+    glean::performance_pageload::fcp.AccumulateRawDuration(
+        firstContentfulComposite - navigationStart);
+
+    glean::performance_pageload::fcp_responsestart.AccumulateRawDuration(
+        firstContentfulComposite - responseStart);
+  }
+
   if (TimeStamp loadEventStart =
           GetNavigationTiming()->GetLoadEventStartTimeStamp()) {
     glean::performance_pageload::load_time.AccumulateRawDuration(
@@ -2426,46 +2521,6 @@ void Document::AccumulatePageLoadTelemetry() {
 
     glean::performance_pageload::load_time_responsestart.AccumulateRawDuration(
         loadEventStart - responseStart);
-
-    TimeDuration responseTime = responseStart - navigationStart;
-    if (responseTime > zeroDuration) {
-      mPageloadEventData.set_responseTime(
-          static_cast<uint32_t>(responseTime.ToMilliseconds()));
-    }
-
-    TimeDuration loadTime = loadEventStart - navigationStart;
-    if (loadTime > zeroDuration) {
-      mPageloadEventData.set_loadTime(
-          static_cast<uint32_t>(loadTime.ToMilliseconds()));
-    }
-
-    TimeStamp requestStart;
-    timedChannel->GetRequestStart(&requestStart);
-    if (requestStart) {
-      TimeDuration timeToRequestStart = requestStart - navigationStart;
-      if (timeToRequestStart > zeroDuration) {
-        mPageloadEventData.set_timeToRequestStart(
-            static_cast<uint32_t>(timeToRequestStart.ToMilliseconds()));
-      } else {
-        // Speculative and pre-established connections may yield zero or
-        // slightly negative timeToRequestStart timings. We record these as zero
-        // to maintain consistent, non-negative timing data, while still
-        // capturing the impact of early connection establishment.
-        mPageloadEventData.set_timeToRequestStart(0);
-      }
-    }
-
-    TimeStamp secureConnectStart;
-    TimeStamp connectEnd;
-    timedChannel->GetSecureConnectionStart(&secureConnectStart);
-    timedChannel->GetConnectEnd(&connectEnd);
-    if (secureConnectStart && connectEnd) {
-      TimeDuration tlsHandshakeTime = connectEnd - secureConnectStart;
-      if (tlsHandshakeTime > zeroDuration) {
-        mPageloadEventData.set_tlsHandshakeTime(
-            static_cast<uint32_t>(tlsHandshakeTime.ToMilliseconds()));
-      }
-    }
   }
 }
 
@@ -8452,6 +8507,9 @@ static void NotifyActivityChangedCallback(nsISupports* aSupports) {
   if (auto* mediaElem = HTMLMediaElement::FromNodeOrNull(content)) {
     mediaElem->NotifyOwnerDocumentActivityChanged();
   }
+  if (auto* canvasElem = HTMLCanvasElement::FromNodeOrNull(content)) {
+    canvasElem->NotifyOwnerDocumentActivityChanged();
+  }
   nsCOMPtr<nsIDocumentActivity> objectDocumentActivity(
       do_QueryInterface(aSupports));
   if (objectDocumentActivity) {
@@ -11935,15 +11993,15 @@ void Document::FlushPendingNotifications(mozilla::ChangesToFlush aFlush) {
 
   RefPtr<Document> documentOnStack = this;
 
-  // We need to flush the sink for non-HTML documents (because the XML
-  // parser still does insertion with deferred notifications).  We
-  // also need to flush the sink if this is a layout-related flush, to
-  // make sure that layout is started as needed.  But we can skip that
-  // part if we have no presshell or if it's already done an initial
-  // reflow.
-  if ((!IsHTMLDocument() || (flushType > FlushType::ContentAndNotify &&
-                             mPresShell && !mPresShell->DidInitialize())) &&
-      (mParser || mWeakSink)) {
+  if (flushType < FlushType::Style) {
+    // Nothing to do here
+    return;
+  }
+
+  // We need to flush the sink if this is a layout-related flush, to make sure
+  // that layout is started as needed.  But we can skip that part if we have no
+  // presshell or if it's already done an initial reflow.
+  if (mPresShell && !mPresShell->DidInitialize() && (mParser || mWeakSink)) {
     nsCOMPtr<nsIContentSink> sink;
     if (mParser) {
       sink = mParser->GetContentSink();
@@ -11955,17 +12013,12 @@ void Document::FlushPendingNotifications(mozilla::ChangesToFlush aFlush) {
     }
     // Determine if it is safe to flush the sink notifications
     // by determining if it safe to flush all the presshells.
-    if (sink && (flushType == FlushType::Content || IsSafeToFlush())) {
+    if (sink && IsSafeToFlush()) {
       sink->FlushPendingNotifications(flushType);
     }
   }
 
   // Should we be flushing pending binding constructors in here?
-
-  if (flushType <= FlushType::ContentAndNotify) {
-    // Nothing to do here
-    return;
-  }
 
   // If we have a parent we must flush the parent too to ensure that our
   // container is reflowed if its size was changed.
@@ -12315,7 +12368,7 @@ void Document::Sanitize() {
 
   nsAutoString value;
 
-  uint32_t length = nodes->Length(true);
+  uint32_t length = nodes->Length();
   for (uint32_t i = 0; i < length; ++i) {
     NS_ASSERTION(nodes->Item(i), "null item in node list!");
 
@@ -12332,7 +12385,7 @@ void Document::Sanitize() {
   // Now locate all _form_ elements that have autocomplete=off and reset them
   nodes = GetElementsByTagName(u"form"_ns);
 
-  length = nodes->Length(true);
+  length = nodes->Length();
   for (uint32_t i = 0; i < length; ++i) {
     // Reset() may change the list dynamically.
     RefPtr<HTMLFormElement> form =
@@ -12633,11 +12686,9 @@ void Document::Destroy() {
   RemoveCustomContentContainer();
 
   ReportDocumentUseCounters();
-  // ReportPageLoadEvent must run before ReportLCP: ReportLCP skips submitting
-  // its histogram when mPageloadEventData.HasDomain() is true, and HasDomain()
-  // is set inside ReportPageLoadEvent.
-  ReportPageLoadEvent();
-  ReportLCP();
+  // Normally already done from OnPageHide; covers documents destroyed without
+  // ever being hidden.
+  ReportPageLoadTelemetry();
   SetDevToolsWatchingDOMMutations(false);
 
   mIsGoingAway = true;
@@ -12936,9 +12987,9 @@ void Document::OnPageShow(bool aPersisted, EventTarget* aDispatchStartTarget,
     RefPtr<ContentList> links =
         NS_GetContentList(root, kNameSpaceID_XHTML, u"link"_ns);
 
-    uint32_t linkCount = links->Length(true);
+    uint32_t linkCount = links->Length();
     for (uint32_t i = 0; i < linkCount; ++i) {
-      static_cast<HTMLLinkElement*>(links->Item(i, false))->LinkAdded();
+      static_cast<HTMLLinkElement*>(links->Item(i))->LinkAdded();
     }
   }
 
@@ -13076,6 +13127,12 @@ void Document::OnPageHide(bool aPersisted, EventTarget* aDispatchStartTarget,
 
   if (!inFrameLoaderSwap) {
     UpdateVisibilityState();
+
+    // Submitted here rather than from Destroy(): by teardown the parent process
+    // often sees this document's BrowsingContext as discarded and cannot
+    // resolve is_first_daily_load. Being hidden is also where LCP stops
+    // updating.
+    ReportPageLoadTelemetry();
   }
 
   EnumerateExternalResources([aPersisted](Document& aExternalResource)
@@ -14872,7 +14929,12 @@ void Document::WarnOnceAbout(
   mDocWarningWarnedAbout[aWarning] = true;
   uint32_t flags =
       asError ? nsIScriptError::errorFlag : nsIScriptError::warningFlag;
-  nsContentUtils::ReportToConsole(flags, "DOM Core"_ns, this,
+
+  // Give SafePromiseResolve it's own category to power the LEARN_MORE link.
+  const auto& category = aWarning == eSafePromiseResolveReordering
+                             ? "SafePromiseResolve"_ns
+                             : "DOM Core"_ns;
+  nsContentUtils::ReportToConsole(flags, category, this,
                                   PropertiesFile::DOM_PROPERTIES,
                                   kDocumentWarnings[aWarning], aParams);
 }
@@ -18173,10 +18235,16 @@ void Document::ReportLCP() {
     return;
   }
 
-  const nsDOMNavigationTiming* timing = GetNavigationTiming();
+  // These histograms cover foreground loads only, matching the ones recorded in
+  // AccumulatePageLoadTelemetry, which is where that was determined. A load
+  // that never finished is left out too, since its LCP reads low.
+  if (!mPageLoadMetricsAccumulated || !mPageLoadWasForeground ||
+      !mPageLoadCompleted) {
+    return;
+  }
 
-  if (!ShouldIncludeInTelemetry() || !IsTopLevelContentDocument() || !timing ||
-      !timing->DocShellHasBeenActiveSinceNavigationStart()) {
+  const nsDOMNavigationTiming* timing = GetNavigationTiming();
+  if (!timing) {
     return;
   }
 
@@ -21574,11 +21642,11 @@ already_AddRefed<Document> Document::ParseHTMLUnsafe(
 
   // Step 5. Parse HTML from a string given document, compliantHTML,
   // sanitizerConfig and false.
-  // TODO(bug 1960845): Investigate the behavior around <noscript> with
-  // parseHTML
+  // The document has no browsing context, so scripting is disabled and
+  // <noscript> content is parsed as markup.
   aError = nsContentUtils::ParseDocumentHTML(
       *compliantString, doc,
-      /* aScriptingEnabledForNoscriptParsing */ sanitize,
+      /* aScriptingEnabledForNoscriptParsing */ false,
       sanitizeWhileParsing ? sanitizer.get() : nullptr, /* aSafe */ false);
   if (aError.Failed()) {
     return nullptr;
@@ -21625,10 +21693,10 @@ already_AddRefed<Document> Document::ParseHTML(GlobalObject& aGlobal,
 
   // Step 4. Parse HTML from a string given document, html, sanitizerConfig
   // and true.
-  // TODO(bug 1960845): Investigate the behavior around <noscript> with
-  // parseHTML
+  // The document has no browsing context, so scripting is disabled and
+  // <noscript> content is parsed as markup.
   aError = nsContentUtils::ParseDocumentHTML(
-      aHTML, doc, /* aScriptingEnabledForNoscriptParsing */ true,
+      aHTML, doc, /* aScriptingEnabledForNoscriptParsing */ false,
       sanitizeWhileParsing ? sanitizer.get() : nullptr, /* aSafe */ true);
   if (aError.Failed()) {
     return nullptr;

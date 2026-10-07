@@ -613,7 +613,7 @@ TEST_F(APZCPanningTesterMock, HoldGesture_SubframeTargeting) {
   rootApzc->GetFrameMetrics().SetIsRootContent(true);
 
   // Mark the subframe as overscroll-behavior:none. This is important to
-  // trigger the codepath in FindFirstScrollable() that exposes the bug.
+  // trigger the codepath in FindScrollTarget() that exposes the bug.
   subframeApzc->GetScrollMetadata().SetOverscrollBehavior(
       OverscrollBehaviorInfo::FromStyleConstants(
           StyleOverscrollBehavior::None, StyleOverscrollBehavior::None));

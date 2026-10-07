@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import UrlbarPrefs from "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs";
-import * as UrlbarContentUtils from "chrome://browser/content/urlbar/UrlbarContentUtils.mjs";
+import { UrlbarContentUtils } from "chrome://browser/content/urlbar/UrlbarContentUtils.mjs";
 import { UrlbarResult } from "chrome://browser/content/urlbar/UrlbarResult.mjs";
 import { UrlbarShared } from "chrome://browser/content/urlbar/UrlbarShared.mjs";
 import { L10nCache } from "chrome://browser/content/urlbar/L10nCache.mjs";
@@ -26,6 +26,7 @@ const RESULT_MENU_COMMANDS = {
   DISMISS: "dismiss",
   HELP: "help",
   MANAGE: "manage",
+  TOGGLE_KEYBOARD_ACCESSIBLE: "toggle-keyboard-accessible",
 };
 
 // The entry point the container menu items report to telemetry.
@@ -743,6 +744,7 @@ export class UrlbarView {
     let ns = "http://www.w3.org/1999/xhtml";
     let overlay = doc.createElementNS(ns, "div");
     overlay.className = "urlbarView-tail150-overlay";
+    overlay.setAttribute("popover", "manual");
 
     let closeBtn = doc.createElementNS(ns, "div");
     closeBtn.className = "close-button";
@@ -758,6 +760,7 @@ export class UrlbarView {
     overlay.append(closeBtn, canvas);
 
     this.input.appendChild(overlay);
+    overlay.showPopover();
     this.#tail150 = { overlay, keyHandler: null };
     this.#runTail150(canvas);
   }
@@ -918,6 +921,13 @@ export class UrlbarView {
   }
 
   // UrlbarChildController listener methods.
+
+  /**
+   * Called when a query starts.
+   *
+   * @param {UrlbarQueryContext} queryContext
+   *   The context of the query.
+   */
   onQueryStarted(queryContext) {
     this.#queryWasCancelled = false;
     this.#queryUpdatedResults = false;
@@ -935,11 +945,20 @@ export class UrlbarView {
     this.#cacheL10nStrings();
   }
 
+  /**
+   * Called when a query is canceled. `onQueryFinished` still follows.
+   */
   onQueryCancelled() {
     this.#queryWasCancelled = true;
     this.#cancelRemoveStaleRowsTimer();
   }
 
+  /**
+   * Called when a query is done, including when it was canceled.
+   *
+   * @param {UrlbarQueryContext} queryContext
+   *   The context of the query.
+   */
   onQueryFinished(queryContext) {
     this.#cancelRemoveStaleRowsTimer();
     if (this.#queryWasCancelled) {
@@ -990,6 +1009,12 @@ export class UrlbarView {
     });
   }
 
+  /**
+   * Called when a query has new results.
+   *
+   * @param {UrlbarQueryContext} queryContext
+   *   The context of the query, with all of its results so far in `results`.
+   */
   onQueryResults(queryContext) {
     this.queryContextCache.put(queryContext);
     this.#queryContext = queryContext;
@@ -4188,6 +4213,20 @@ export class UrlbarView {
   }
 
   /**
+   * Applies the current value of `resultMenu.keyboardAccessible` to the menu
+   * buttons of the rows that are already built, which would otherwise keep the
+   * attribute they got when they were created.
+   */
+  #updateMenuButtonKeyboardAccessibility() {
+    let inaccessible = !UrlbarPrefs.get("resultMenu.keyboardAccessible");
+    for (let button of this.#rows.querySelectorAll(
+      ".urlbarView-button-result-menu"
+    )) {
+      button.toggleAttribute("keyboard-inaccessible", inaccessible);
+    }
+  }
+
+  /**
    * @param {UrlbarResult} result
    *   The result to check.
    * @returns {boolean}
@@ -4209,17 +4248,30 @@ export class UrlbarView {
    *   Everything the result's menu shows, null if it has nothing to show. The
    *   three-dot button and a right-click both open this menu, so it combines
    *   the result's own commands with the ones that open it in a new tab or
-   *   window.
+   *   window, and closes with the checkbox that skips the menu button when
+   *   tabbing through the results.
    */
   #getMenuCommands(result) {
     let commands = this.#getResultMenuCommands(result);
-    if (!this.#canOpenInNewTarget(result)) {
-      return commands;
+    if (this.#canOpenInNewTarget(result)) {
+      let openInCommands = this.#openInCommands;
+      commands = commands
+        ? [...openInCommands, { name: "separator" }, ...commands]
+        : openInCommands;
     }
-    let openInCommands = this.#openInCommands;
-    return commands
-      ? [...openInCommands, { name: "separator" }, ...commands]
-      : openInCommands;
+    if (!commands) {
+      return null;
+    }
+    return [
+      ...commands,
+      { name: "separator" },
+      {
+        name: RESULT_MENU_COMMANDS.TOGGLE_KEYBOARD_ACCESSIBLE,
+        type: "checkbox",
+        checked: !UrlbarPrefs.get("resultMenu.keyboardAccessible"),
+        l10n: { id: "urlbar-view-context-menu-skip-menu-with-tab" },
+      },
+    ];
   }
 
   /**
@@ -4313,6 +4365,10 @@ export class UrlbarView {
         menuitem.appendChild(submenu);
       } else {
         this.#l10nCache.setElementL10n(menuitem, data.l10n);
+      }
+      if (data.type == "checkbox") {
+        menuitem.type = "checkbox";
+        menuitem.checked = data.checked;
       }
       panel.appendChild(menuitem);
     }
@@ -4669,6 +4725,14 @@ export class UrlbarView {
         menuitem.dataset.usercontextid
       )
     ) {
+      return;
+    }
+    if (
+      menuitem.dataset.command ==
+      RESULT_MENU_COMMANDS.TOGGLE_KEYBOARD_ACCESSIBLE
+    ) {
+      UrlbarPrefs.toggleResultMenuKeyboardAccessible();
+      this.#updateMenuButtonKeyboardAccessibility();
       return;
     }
     let result = this.#resultMenuResult;

@@ -36,12 +36,17 @@ const MESSAGES = () => [
             tiles: {
               type: "single-select",
               selected: "vertical-tabs",
+              pill_nav_label: { raw: "Feature highlights" },
               data: [
                 {
                   id: "split-view",
                   inert: true,
                   targeting: "firefoxVersion >= 150",
                   type: "carousel-card",
+                  pill: {
+                    label: { raw: "Split View" },
+                    icon: "chrome://browser/skin/split-view-left-16.svg",
+                  },
                   icon: {
                     background:
                       "url('chrome://activity-stream/content/data/content/assets/mr-kit-smart-window.svg') center / cover no-repeat light-dark(rgb(240, 240, 244), rgb(43, 42, 51))",
@@ -71,6 +76,10 @@ const MESSAGES = () => [
                   inert: true,
                   type: "carousel-card",
                   targeting: "firefoxVersion <= 140",
+                  pill: {
+                    label: { raw: "Vertical Tabs" },
+                    icon: "chrome://browser/skin/tabs.svg",
+                  },
                   icon: {
                     background:
                       "url('chrome://activity-stream/content/data/content/assets/nuo-taborientation.svg') center / cover no-repeat light-dark(rgb(240, 240, 244), rgb(43, 42, 51))",
@@ -84,6 +93,10 @@ const MESSAGES = () => [
                   id: "tab-groups",
                   inert: true,
                   type: "carousel-card",
+                  pill: {
+                    label: { raw: "Tab Groups" },
+                    icon: "chrome://browser/skin/tabbrowser/tab-groups.svg",
+                  },
                   icon: {
                     background:
                       "url('chrome://activity-stream/content/data/content/assets/euo-tab-orientation.svg') center / cover no-repeat light-dark(rgb(240, 240, 244), rgb(43, 42, 51))",
@@ -2906,7 +2919,7 @@ const MESSAGES = () => [
     content: {
       messageType: "ASRouterMultistageMessage",
       id: "TEST_HNT_CARD_STACK",
-      transitions: false,
+      transitions: true,
       backdrop: "transparent",
       screens: [
         {
@@ -2945,11 +2958,28 @@ const MESSAGES = () => [
             },
             primary_button: {
               label: { raw: "Primary action" },
-              action: { dismiss: true },
+              action: { navigate: true },
             },
             secondary_button: {
               label: { raw: "Dismiss" },
               action: { dismiss: true },
+            },
+          },
+        },
+        // The unique "last card" layout (bug 2069997).
+        {
+          id: "CARD_STACK_SCREEN_3",
+          force_hide_steps_indicator: true,
+          content: {
+            position: "card-stack",
+            layout: "last-card",
+            title: { raw: "Tracking protection is on." },
+            subtitle: { raw: "Say hello to a better web." },
+            center_image: {
+              imageURL:
+                "https://firefox-settings-attachments.cdn.mozilla.net/main-workspace/ms-images/20260923193621--fox-peeking--a7cb53ba-228f-4b81-a92f-6ad34474872b.svg",
+              alt: "",
+              marginBlock: "40px 0",
             },
           },
         },

@@ -4,6 +4,8 @@
 
 import { html, ifDefined } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
+// eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/tab-group-icon.mjs";
 
 /**
  * A website chip component for tagging and displaying websites.
@@ -25,6 +27,11 @@ import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
  * @property {string} href - URL for the link (used with context-chip type)
  * @property {boolean} removable - Whether the chip shows a remove button on hover (default false)
  * @property {string} itemRole - ARIA role for the inner element
+ * @property {string} openLinkEvent - Event dispatched when a linked chip is
+ *   clicked. Each host opens links itself, so it names the event it listens for.
+ * @property {boolean} isTabGroup - Whether the chip stands for a tab group,
+ *   which has no page and so shows a tab-group-icon instead of a favicon
+ * @property {string} tabGroupColor - Tab group color name, tinting that icon
  */
 export class AIWebsiteChip extends MozLitElement {
   // Forward focus to the inner element for keyboard navigation.
@@ -43,6 +50,8 @@ export class AIWebsiteChip extends MozLitElement {
     itemRole: { type: String },
     // Each host opens links itself, so it names the event it listens for.
     openLinkEvent: { type: String },
+    isTabGroup: { type: Boolean },
+    tabGroupColor: { type: String },
   };
 
   #parentHost = null;
@@ -57,6 +66,8 @@ export class AIWebsiteChip extends MozLitElement {
     this.removable = false;
     this.itemRole = "";
     this.openLinkEvent = "AIChatContent:OpenLink";
+    this.isTabGroup = false;
+    this.tabGroupColor = "";
   }
 
   connectedCallback() {
@@ -145,6 +156,11 @@ export class AIWebsiteChip extends MozLitElement {
     let iconTemplate;
     if (isEmpty) {
       iconTemplate = html`<span class="chip-at">@</span>`;
+    } else if (this.isTabGroup) {
+      iconTemplate = html`<tab-group-icon
+        .label=${this.label}
+        .color=${this.tabGroupColor}
+      ></tab-group-icon>`;
     } else {
       iconTemplate = html`<img
         class="chip-icon"

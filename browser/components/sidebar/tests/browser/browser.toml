@@ -23,9 +23,15 @@ skip-if = [
   "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && opt && a11y_checks", # Bug 2041753
 ]
 
+["browser_bookmarks_sidebar_drag_and_drop.js"]
+
 ["browser_bookmarks_sidebar_glean.js"]
 
 ["browser_bookmarks_sidebar_root_folders.js"]
+
+["browser_bookmarks_sidebar_smart_bookmarks.js"]
+
+["browser_bookmarks_sidebar_truncation.js"]
 
 ["browser_customize_sidebar.js"]
 skip-if = [
@@ -37,9 +43,6 @@ skip-if = [
 ["browser_domfullscreen_sidebar.js"]
 
 ["browser_extensions_sidebar.js"]
-skip-if = [
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64'", # Bug 1894409
-]
 
 ["browser_f11_fullscreen_sidebar.js"]
 

@@ -32,11 +32,14 @@ class DisplaySVGItem : public nsPaintedDisplayItem {
 
   void Paint(nsDisplayListBuilder* aBuilder, gfxContext* aCtx) override;
 
-  // We need to include the ink overflow rect to deal with invisible strokes etc
-  // for hit testing.
   nsRect GetBounds(nsDisplayListBuilder* aBuilder, bool* aSnap) const override {
-    *aSnap = false;
-    return mFrame->InkOverflowRectRelativeToSelf() + ToReferenceFrame();
+    if (aBuilder->IsForEventDelivery()) {
+      // We need to include the ink overflow rect to deal with invisible strokes
+      // etc for hit testing.
+      *aSnap = false;
+      return mFrame->InkOverflowRectRelativeToSelf() + ToReferenceFrame();
+    }
+    return nsPaintedDisplayItem::GetBounds(aBuilder, aSnap);
   }
 };
 

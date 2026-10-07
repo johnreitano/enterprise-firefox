@@ -11,6 +11,10 @@ skip-if = [
   "opt", # Bug 1993222
 ]
 
+["browser_EventUtils_drag_and_drop.js"]
+
+["browser_EventUtils_drag_suppressed.js"]
+
 ["browser_SpecialPowersForProcessSpawn.js"]
 support-files = ["../Harness_sanity/file_xorigin_frames.html"]
 
@@ -59,6 +63,11 @@ fail-if = [
 fail-if = [
   "true",
 ]
+
+["browser_fail_mouse_left_down.js"]
+fail-if = ["true"]
+
+["browser_fail_mouse_left_down_next.js"]
 
 ["browser_fail_throw.js"]
 fail-if = [
