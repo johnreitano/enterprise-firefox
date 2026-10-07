@@ -16,10 +16,14 @@ import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.StandardMenuItem
+import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.compose.menu.ui.MenuItemState
+import mozilla.components.feature.session.SessionUseCases
 import mozilla.components.ui.icons.R as iconsR
+import org.mozilla.fenix.NavGraphDirections
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
 import org.mozilla.fenix.components.menu.store.MenuAction
 
@@ -27,10 +31,12 @@ import org.mozilla.fenix.components.menu.store.MenuAction
  * [MenuItemProvider] for the menu item allowing to navigate forward.
  *
  * @param browserStore [BrowserStore] used to know if the current page can navigate forward.
+ * @param goForward [SessionUseCases.GoForwardUseCase] for navigating forward in the current tab.
  * @param scope [CoroutineScope] used to keep the item up to date for as long as it can be shown.
  */
 class ForwardMenuItemProvider(
-    browserStore: BrowserStore,
+    private val browserStore: BrowserStore,
+    private val goForward: SessionUseCases.GoForwardUseCase,
     scope: CoroutineScope,
 ) : MenuItemProvider {
     override val itemFlow: StateFlow<MenuItem?> =
@@ -42,6 +48,20 @@ class ForwardMenuItemProvider(
                 started = SharingStarted.Eagerly,
                 initialValue = browserStore.state.forwardItem(),
             )
+
+    override fun handles(event: MenuEvent) = event is MenuAction.Navigate.Forward
+
+    override fun onEvent(event: MenuEvent, menu: MenuHost) {
+        if (event !is MenuAction.Navigate.Forward) return
+        val tabId = browserStore.state.selectedTab?.id ?: return
+
+        if (event.viewHistory) {
+            menu.navigate(NavGraphDirections.actionGlobalTabHistoryDialogFragment(activeSessionId = null))
+        } else {
+            menu.dismiss()
+            goForward(tabId = tabId)
+        }
+    }
 }
 
 private fun BrowserState.forwardItem(): MenuItem {

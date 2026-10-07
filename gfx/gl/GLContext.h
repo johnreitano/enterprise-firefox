@@ -80,6 +80,7 @@ enum class GLFeature {
   bind_buffer_offset,
   blend_minmax,
   clear_buffers,
+  clip_control,
   copy_buffer,
   copy_image,
   debug,
@@ -404,6 +405,7 @@ class GLContext : public GenericAtomicRefCounted, public SupportsWeakPtr {
     APPLE_vertex_array_object,
     ARB_ES2_compatibility,
     ARB_ES3_compatibility,
+    ARB_clip_control,
     ARB_color_buffer_float,
     ARB_compatibility,
     ARB_copy_buffer,
@@ -447,6 +449,7 @@ class GLContext : public GenericAtomicRefCounted, public SupportsWeakPtr {
     CHROMIUM_color_buffer_float_rgba,
     EXT_bgra,
     EXT_blend_minmax,
+    EXT_clip_control,
     EXT_color_buffer_float,
     EXT_color_buffer_half_float,
     EXT_copy_texture,
@@ -1619,6 +1622,13 @@ class GLContext : public GenericAtomicRefCounted, public SupportsWeakPtr {
     BEFORE_GL_CALL;
     ASSERT_SYMBOL_PRESENT(fPolygonOffsetClamp);
     mSymbols.fPolygonOffsetClamp(factor, units, clamp);
+    AFTER_GL_CALL;
+  }
+
+  void fClipControl(GLenum origin, GLenum depth) {
+    BEFORE_GL_CALL;
+    ASSERT_SYMBOL_PRESENT(fClipControl);
+    mSymbols.fClipControl(origin, depth);
     AFTER_GL_CALL;
   }
 

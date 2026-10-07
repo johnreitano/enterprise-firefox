@@ -169,7 +169,7 @@ PER_PROJECT_PARAMETERS = {
         "release_type": "nightly",
     },
     "staging-firefox": {
-        "target_tasks_method": "default",
+        "target_tasks_method": "firefox_pull_request_tasks",
     },
     # Firefox Enterprise, will be improved later.
     "enterprise-firefox": {

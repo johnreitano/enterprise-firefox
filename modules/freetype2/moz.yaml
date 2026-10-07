@@ -10,16 +10,25 @@ origin:
 
   url: https://gitlab.freedesktop.org/freetype/freetype
 
-  release: d1f916a65eb13d5cd44b711cfd24cf8d5949b2d2 (2026-10-03T09:41:48.000+02:00).
-  revision: d1f916a65eb13d5cd44b711cfd24cf8d5949b2d2
+  release: 25167984d2435930f9178e8d9d2ca3bdfa71a4e7 (2026-10-04T16:09:18.000-04:00).
+  revision: 25167984d2435930f9178e8d9d2ca3bdfa71a4e7
 
   license: FTL
   license-file: LICENSE.TXT
 
+updatebot:
+  maintainer-phab: jfkthame
+  maintainer-bz: jfkthame@gmail.com
+  try-preset: freetype
+  tasks:
+    - type: vendoring
+      enabled: true
+      frequency: 1 week
+
 vendoring:
   url: https://gitlab.freedesktop.org/freetype/freetype
   source-hosting: gitlab
-  tracking: tag
+  tracking: commit
 
   exclude:
     - ".**"
@@ -42,6 +51,3 @@ vendoring:
 
   keep:
     - moz.build
-
-  patches:
-    - patches/0001-Bug-2032039-colr-blend-layer-mono-source.patch

@@ -38,6 +38,7 @@ import {
 } from "chrome://global/content/ml/NLPUtils.sys.mjs";
 import { EmbeddingsGenerator } from "chrome://global/content/ml/EmbeddingsGenerator.sys.mjs";
 import { SmartTabGroupingManager } from "moz-src:///browser/components/tabbrowser/SmartTabGrouping.sys.mjs";
+import { UI_TYPES } from "moz-src:///browser/components/aiwindow/ui/modules/ToolUI.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -1524,9 +1525,13 @@ async function persistAITabPage({ metadata, surface }, conversation) {
  * @param {string} [toolParams.focus]
  * @param {ChatConversation} conversation
  * @param {AbortSignal} [signal] - Cancels in-flight page extractions.
- * @returns {Promise<{message: string, aiTab: {slug: string}}|string>} The
- *   text for the model plus the stored page's slug, or a string describing a
- *   failure.
+ * @returns {Promise<
+ *   {success: true,
+ *    toolResult: {message: string, aiTab: {slug: string}},
+ *    uiData: {uiType: "aitab",
+ *      properties: {state: "choose", viewerURL: string, title: string}}} |
+ *   {success: false, toolResult: string}
+ * >} The model response and UI data on success, or an error message on failure.
  */
 export async function createAITab({ url_list, focus }, conversation, signal) {
   lazy.console.log("[Tool] aiTab", JSON.stringify({ url_list, focus }));
@@ -1535,7 +1540,10 @@ export async function createAITab({ url_list, focus }, conversation, signal) {
     conversation
   );
   if (result.error) {
-    return `The page could not be created: ${result.error}.`;
+    return {
+      success: false,
+      toolResult: `The page could not be created: ${result.error}.`,
+    };
   }
 
   // The UI opens the page from its stored slug, so a page that never reached
@@ -1545,7 +1553,10 @@ export async function createAITab({ url_list, focus }, conversation, signal) {
     stored = await persistAITabPage(result, conversation);
   } catch (e) {
     lazy.console.error("[Tool] aiTab failed to persist page", e.message);
-    return "The page could not be created: it could not be saved.";
+    return {
+      success: false,
+      toolResult: "The page could not be created: it could not be saved.",
+    };
   }
 
   const viewerURL = lazy.AITab.buildViewerURL(stored.slug);
@@ -1564,9 +1575,17 @@ export async function createAITab({ url_list, focus }, conversation, signal) {
     result.metadata?.title || "the page",
     true // truncateOnly: the link label must stay readable.
   ).replace(/[[\]]/g, "");
+
   return {
-    message: `The page was created. Link the user to it as [${title}](§url_token: ${token}§).`,
-    aiTab: { slug: stored.slug },
+    success: true,
+    toolResult: {
+      message: `The page was created. Link the user to it as [${title}](§url_token: ${token}§).`,
+      aiTab: { slug: stored.slug },
+    },
+    uiData: {
+      uiType: UI_TYPES.AITAB,
+      properties: { state: "choose", viewerURL, title },
+    },
   };
 }
 

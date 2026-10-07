@@ -58,14 +58,8 @@ export function renderWithoutState() {
     );
   });
 
-  // Fall back to ReactDOM.render for React 16 (karma tests).
   const container = document.getElementById("root");
-  if (ReactDOM.createRoot) {
-    ReactDOM.createRoot(container).render(<NewTab store={store} />);
-  } else {
-    // eslint-disable-next-line react/no-deprecated -- Will be removed when Karma integration is removed in bug 2024073.
-    ReactDOM.render(<NewTab store={store} />, container);
-  }
+  ReactDOM.createRoot(container).render(<NewTab store={store} />);
 }
 
 export function renderCache(initialState) {
@@ -85,12 +79,6 @@ export function renderCache(initialState) {
   });
 
   // Use createRoot so stale startup cache DOM doesn't cause hydration mismatches. (Issue with React 19)
-  // Fall back to ReactDOM.render for React 16 (karma tests).
   const container = document.getElementById("root");
-  if (ReactDOM.createRoot) {
-    ReactDOM.createRoot(container).render(<NewTab store={store} />);
-  } else {
-    // eslint-disable-next-line react/no-deprecated -- Will be removed when Karma integration is removed in bug 2024073.
-    ReactDOM.render(<NewTab store={store} />, container);
-  }
+  ReactDOM.createRoot(container).render(<NewTab store={store} />);
 }

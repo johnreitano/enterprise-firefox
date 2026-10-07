@@ -5,13 +5,18 @@
 package org.mozilla.fenix.settings.logins
 
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.StandardMenuItem
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.ui.icons.R as iconsR
 import org.junit.Test
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuFragmentDirections
+import org.mozilla.fenix.components.menu.fake.FakeMenuHost
+import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
 
 class PasswordsMenuItemProviderTest {
@@ -34,5 +39,24 @@ class PasswordsMenuItemProviderTest {
         val provider = PasswordsMenuItemProvider(isAutofillSupported = false)
 
         assertNull(provider.itemFlow.value)
+    }
+
+    @Test
+    fun `WHEN clicking the item THEN show the saved passwords in place of the menu`() {
+        val menu = FakeMenuHost()
+
+        PasswordsMenuItemProvider(isAutofillSupported = true).onEvent(MenuAction.Navigate.Passwords, menu)
+
+        assertEquals(MenuFragmentDirections.actionMenuFragmentToLoginsListFragment(), menu.directions)
+    }
+
+    @Test
+    fun `WHEN building the item THEN handle all events it can dispatch and no others`() {
+        val provider = PasswordsMenuItemProvider(isAutofillSupported = true)
+
+        val events = requireNotNull(provider.itemFlow.value).reachableEvents()
+
+        assertTrue(events.all { provider.handles(it) }, "Not all of $events are handled")
+        assertFalse(provider.handles(MenuAction.Navigate.Settings))
     }
 }

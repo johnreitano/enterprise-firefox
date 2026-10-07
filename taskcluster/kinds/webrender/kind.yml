@@ -16,6 +16,11 @@ task-defaults:
     run-on-repo-type: [hg]
     attributes:
         retrigger: true
+    priority:
+        by-project:
+            autoland: high
+            mozilla-central: medium
+            default: null
     run-on-projects: ['integration', 'release']
     treeherder:
         tier: 1

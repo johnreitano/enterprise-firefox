@@ -138,6 +138,8 @@ browser.jar:
   content/browser/aiwindow/components/aitab-page-actions.css        (components/aitab-page/aitab-page-actions/aitab-page-actions.css)
   content/browser/aiwindow/components/aitab-table.mjs               (components/aitab-table/aitab-table.mjs)
   content/browser/aiwindow/components/aitab-table.css               (components/aitab-table/aitab-table.css)
+  content/browser/aiwindow/components/aitab-tool-ui.mjs                     (components/aitab-tool-ui/aitab-tool-ui.mjs)
+  content/browser/aiwindow/components/aitab-tool-ui.css                     (components/aitab-tool-ui/aitab-tool-ui.css)
   content/browser/aiwindow/components/aitab-highlights.mjs          (components/aitab-highlights/aitab-highlights.mjs)
   content/browser/aiwindow/components/aitab-highlights.css          (components/aitab-highlights/aitab-highlights.css)
   content/browser/aiwindow/components/aitab-error.mjs               (components/aitab-page/aitab-error/aitab-error.mjs)

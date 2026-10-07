@@ -18,7 +18,6 @@ EXPORTS += [
     "COLRFonts.h",
     "DrawMode.h",
     "gfx2DGlue.h",
-    "gfxAlphaRecovery.h",
     "gfxASurface.h",
     "gfxBlur.h",
     "gfxColor.h",
@@ -174,18 +173,6 @@ elif CONFIG["MOZ_WIDGET_TOOLKIT"] == "windows":
         "gfxDWriteFontList.cpp",
     ]
 
-# Are we targeting x86 or x64?  If so, build gfxAlphaRecoverySSE2.cpp.
-if CONFIG["INTEL_ARCHITECTURE"]:
-    SOURCES += ["gfxAlphaRecoverySSE2.cpp"]
-    # The file uses SSE2 intrinsics, so it needs special compile flags on some
-    # compilers.
-    SOURCES["gfxAlphaRecoverySSE2.cpp"].flags += CONFIG["SSE2_FLAGS"]
-
-# Are we targeting ARM with NEON capabilities? If so, build gfxAlphaRecoveryNeon.cpp.
-if CONFIG["TARGET_CPU"] == "aarch64" or CONFIG["BUILD_ARM_NEON"]:
-    SOURCES += ["gfxAlphaRecoveryNeon.cpp"]
-    SOURCES["gfxAlphaRecoveryNeon.cpp"].flags += CONFIG["NEON_FLAGS"]
-
 SOURCES += [
     # Includes mac system header conflicting with point/size,
     # and includes glxXlibSurface.h which drags in Xrender.h
@@ -205,7 +192,6 @@ UNIFIED_SOURCES += [
     "CJKCompatSVS.cpp",
     "COLRFonts.cpp",
     "FontPaletteCache.cpp",
-    "gfxAlphaRecovery.cpp",
     "gfxBlur.cpp",
     "gfxContext.cpp",
     "gfxFont.cpp",
@@ -267,7 +253,6 @@ LOCAL_INCLUDES += [
     "/dom/xml",
     "/gfx/cairo/cairo/src",
     "/image/encoders/jpeg",
-    "/third_party/xsimd/include",
     "/widget/gtk",
 ]
 

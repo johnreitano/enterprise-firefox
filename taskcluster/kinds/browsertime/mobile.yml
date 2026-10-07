@@ -103,7 +103,11 @@ task-defaults:
     dependencies:
         by-app:
             fenix:
-                signing-apk: signing-apk-fenix-nightly-simulation
+                by-test-platform:
+                    android-hw.*nightlyasrelease.*:
+                        signing-apk: signing-apk-fenix-nightlyasrelease-simulation
+                    default:
+                        signing-apk: signing-apk-fenix-nightly-simulation
             default: {}
 
 browsertime-tp6m:
@@ -464,12 +468,25 @@ browsertime-benchmark-speedometer3-mobile:
     run-on-projects:
         by-app:
             fenix:
-                by-test-platform:
-                    android-hw-a55.*shippable.*: [trunk-only]
-                    android-hw-p6.*shippable.*: [mozilla-central]
-                    android-hw-s24.*shippable.*: [mozilla-central]
-                    android-em-14-arm64.*shippable.*: [autoland]
-                    default: []
+                by-variant:
+                    # Bug 2037229 - clean up this config once no-fission is fully removed
+                    geckoview-no-fission:
+                        by-test-platform:
+                            android-hw-a55.*shippable.*: [trunk-only]
+                            android-hw-p6.*shippable.*: [mozilla-central]
+                            android-hw-s24.*shippable.*: [mozilla-central]
+                            android-em-14-arm64.*shippable.*: [autoland]
+                            default: []
+                    default:
+                        by-test-platform:
+                            android-hw-a55.*nightlyasrelease.*: [trunk-only]
+                            android-hw-p6.*nightlyasrelease.*: [mozilla-central]
+                            android-hw-s24.*nightlyasrelease.*: [mozilla-central]
+                            android-hw-a55.*shippable.*: [trunk-only]
+                            android-hw-p6.*shippable.*: [mozilla-central]
+                            android-hw-s24.*shippable.*: [mozilla-central]
+                            android-em-14-arm64.*shippable.*: [autoland]
+                            default: []
             geckoview: []
             chrome-m:
                 by-test-platform:

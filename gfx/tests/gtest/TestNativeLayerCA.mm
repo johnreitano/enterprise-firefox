@@ -65,6 +65,28 @@ class NativeLayerCAVideo : public ::testing::TestWithParam<bool> {
     return FindVideoLayer(IsOffscreen() ? mOffscreenRootCALayer : mRootCALayer);
   }
 
+  // The layer composited directly under the video layer.
+  CALayer* LayerUnderVideoLayer() {
+    AVSampleBufferDisplayLayer* videoLayer = VideoLayer();
+    if (!videoLayer) {
+      return nil;
+    }
+    NSArray<CALayer*>* siblings = videoLayer.superlayer.sublayers;
+    NSUInteger index = [siblings indexOfObject:videoLayer];
+    return index > 0 ? siblings[index - 1] : nil;
+  }
+
+  void ExpectOpaqueBlackBacking(CALayer* aLayer) {
+    ASSERT_NE(aLayer, nil);
+    EXPECT_TRUE(aLayer.opaque);
+    EXPECT_TRUE(CGColorEqualToColor(aLayer.backgroundColor,
+                                    CGColorGetConstantColor(kCGColorBlack)));
+    EXPECT_TRUE(CGRectEqualToRect(aLayer.bounds, VideoLayer().bounds));
+    EXPECT_TRUE(CGPointEqualToPoint(aLayer.position, VideoLayer().position));
+    EXPECT_TRUE(CATransform3DEqualToTransform(aLayer.transform,
+                                              VideoLayer().transform));
+  }
+
   static RefPtr<MacIOSurface> CreateNV12Surface() {
     return MacIOSurface::CreateBiPlanarSurface(
         kVideoSize, IntSize(kVideoSize.width / 2, kVideoSize.height / 2),
@@ -168,6 +190,41 @@ TEST_P(NativeLayerCAVideo, SwitchingFromDRMUsesNewLayer) {
   EXPECT_FALSE(VideoLayer().preventsCapture);
   EXPECT_NE(VideoLayer().contents, nil);
   EXPECT_TRUE(drmLayer.preventsCapture);
+}
+
+TEST_P(NativeLayerCAVideo, DRMVideoLayerHasOpaqueBlackBacking) {
+  // Present a DRM video frame on a scaled layer; an opaque black layer must
+  // sit directly under the video layer, covering the same area, so that a
+  // composition which leaves out the capture-protected video layer shows
+  // black there.
+  mLayer->SetTransform(Matrix4x4::Scaling(2, 3, 1));
+  ASSERT_NO_FATAL_FAILURE(Present(CreateNV12Surface(), PresentFlags::DRM));
+  ASSERT_NE(VideoLayer(), nil);
+  ASSERT_FALSE(CATransform3DIsIdentity(VideoLayer().transform));
+  ExpectOpaqueBlackBacking(LayerUnderVideoLayer());
+}
+
+TEST_P(NativeLayerCAVideo, BackingFollowsDRMChanges) {
+  // Present a DRM frame, then a non-DRM one on the same layer; the backing
+  // goes away with the DRM video layer it was under.
+  ASSERT_NO_FATAL_FAILURE(Present(CreateNV12Surface(), PresentFlags::DRM));
+  ASSERT_NO_FATAL_FAILURE(ExpectOpaqueBlackBacking(LayerUnderVideoLayer()));
+  ASSERT_NO_FATAL_FAILURE(Present(CreateNV12Surface(), PresentFlags::HDR));
+  ASSERT_NE(VideoLayer(), nil);
+  EXPECT_EQ(LayerUnderVideoLayer(), nil);
+
+  // Present a DRM frame again; the new video layer gets exactly one backing.
+  ASSERT_NO_FATAL_FAILURE(Present(CreateNV12Surface(), PresentFlags::DRM));
+  ASSERT_NO_FATAL_FAILURE(ExpectOpaqueBlackBacking(LayerUnderVideoLayer()));
+  EXPECT_EQ(VideoLayer().superlayer.sublayers.count, 2u);
+}
+
+TEST_P(NativeLayerCAVideo, NonDRMVideoLayerHasNoBacking) {
+  // Present a non-DRM HDR frame; the video layer is the bottom layer of its
+  // parent, with nothing composited under it.
+  ASSERT_NO_FATAL_FAILURE(Present(CreateNV12Surface(), PresentFlags::HDR));
+  ASSERT_NE(VideoLayer(), nil);
+  EXPECT_EQ(LayerUnderVideoLayer(), nil);
 }
 
 INSTANTIATE_TEST_SUITE_P(, NativeLayerCAVideo, ::testing::Bool(),

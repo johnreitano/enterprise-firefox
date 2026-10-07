@@ -414,7 +414,7 @@ html|textarea {
   font-size: inherit;
   padding: var(--space-small);
   margin: var(--space-xxsmall) var(--space-xsmall);
-  min-height: var(--input-text-min-height);
+  min-height: var(--input-min-height);
 }
 
 html|textarea {

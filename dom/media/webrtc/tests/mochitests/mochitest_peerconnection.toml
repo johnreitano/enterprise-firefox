@@ -1,7 +1,4 @@
 [DEFAULT]
-skip-if = [
-  "isolated_process", # Bug 1709948
-]
 tags = "mtg webrtc"
 subsuite = "media"
 scheme = "https"

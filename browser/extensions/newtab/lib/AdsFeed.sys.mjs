@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/** @import {Store} from "resource://newtab/lib/Store.sys.mjs" */
+
 const lazy = {
   Utils: "resource://services-settings/Utils.sys.mjs",
 };
@@ -54,6 +56,9 @@ const CACHE_KEY = "ads_feed";
 const ADS_UPDATE_TIME = 30 * 60 * 1000; // 30 minutes
 
 export class AdsFeed {
+  /** @type {Store} */
+  store = null;
+
   constructor() {
     this.enabled = false;
     this.loaded = false;

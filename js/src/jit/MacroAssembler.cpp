@@ -822,29 +822,45 @@ void MacroAssembler::preserveWrapper(Register wrapper, Register scratchSuccess,
 }
 
 void MacroAssembler::copySlotsFromTemplate(
-    Register obj, const TemplateNativeObject& templateObj, uint32_t start,
-    uint32_t end) {
-  uint32_t nfixed = std::min(templateObj.numFixedSlots(), end);
-  for (unsigned i = start; i < nfixed; i++) {
+    Register obj, Register temp, const TemplateNativeObject& templateObj,
+    uint32_t start, uint32_t end) {
+  auto slotValue = [&](uint32_t i) {
     // Template objects are not exposed to script and therefore immutable.
     // However, regexp template objects are sometimes used directly (when
     // the cloning is not observable), and therefore we can end up with a
     // non-zero lastIndex. Detect this case here and just substitute 0, to
     // avoid racing with the main thread updating this slot.
-    Value v;
     if (templateObj.isRegExpObject() && i == RegExpObject::lastIndexSlot()) {
-      v = Int32Value(0);
-    } else {
-      v = templateObj.getSlot(i);
+      return Int32Value(0);
     }
-    storeValue(v, Address(obj, NativeObject::getFixedSlotOffset(i)));
+    return templateObj.getSlot(i);
+  };
+
+  uint32_t nfixed = std::min(templateObj.numFixedSlots(), end);
+  for (uint32_t i = start; i < nfixed;) {
+    Value v = slotValue(i);
+    Address addr(obj, NativeObject::getFixedSlotOffset(i));
+
+    uint32_t runEnd = i + 1;
+    if (!v.isGCThing()) {
+      while (runEnd < nfixed && slotValue(runEnd) == v) {
+        runEnd++;
+      }
+    }
+
+    if (runEnd - i > 1) {
+      fillSlotsWithConstantValue(addr, temp, i, runEnd, v);
+    } else {
+      storeValue(v, addr);
+    }
+    i = runEnd;
   }
 }
 
 void MacroAssembler::fillSlotsWithConstantValue(Address base, Register temp,
                                                 uint32_t start, uint32_t end,
                                                 const Value& v) {
-  MOZ_ASSERT(v.isUndefined() || IsUninitializedLexical(v));
+  MOZ_ASSERT(!v.isGCThing());
 
   if (start >= end) {
     return;
@@ -1053,7 +1069,7 @@ void MacroAssembler::initGCSlots(Register obj, Register temp,
                 startOfUninitialized == startOfUndefined);
 
   // Copy over any preserved reserved slots.
-  copySlotsFromTemplate(obj, templateObj, 0, startOfUninitialized);
+  copySlotsFromTemplate(obj, temp, templateObj, 0, startOfUninitialized);
 
   // Fill the rest of the fixed slots with undefined and uninitialized.
   size_t offset = NativeObject::getFixedSlotOffset(startOfUninitialized);

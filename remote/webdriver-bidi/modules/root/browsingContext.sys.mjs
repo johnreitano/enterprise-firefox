@@ -1626,14 +1626,11 @@ class BrowsingContextModule extends RootBiDiModule {
       lazy.pprint`Expected "pageRanges" to be an array, got ${settings.pageRanges}`
     );
 
-    const printSettings = await lazy.print.getPrintSettings(settings);
-    const binaryString = await lazy.print.printToBinaryString(
-      context,
-      printSettings
-    );
+    const printSettings = lazy.print.getPrintSettings(settings);
+    const bytes = await lazy.print.printToBytes(context, printSettings);
 
     return {
-      data: btoa(binaryString),
+      data: bytes.toBase64(),
     };
   }
 

@@ -1196,6 +1196,7 @@ impl<'a> SceneBuilder<'a> {
             ClipId::root(iframe_pipeline_id),
             info.space_and_clip.spatial_id,
             &info.clip_rect,
+            false,
         );
 
         self.clip_tree_builder.push_clip_id(ClipId::root(iframe_pipeline_id));
@@ -1298,15 +1299,17 @@ impl<'a> SceneBuilder<'a> {
             common.clip_chain_id,
         );
 
+        let aligned_aa_edges = if common.flags.contains(PrimitiveFlags::ANTIALISED) {
+            EdgeMask::all()
+        } else {
+            EdgeMask::empty()
+        };
+
         let layout = LayoutPrimitiveInfo {
             rect: prim_rect,
             clip_rect,
             flags: common.flags,
-            // TODO: for CSS primitives axis-aligned edges should not get anti-aliased whereas
-            // for SVG primitives, they should. WebRender currently does not apply anti-aliasing
-            // to SVG aligned primitives as it should, which has gone largely unnoticed because
-            // most SVG primitives are rendered via blob-images.
-            aligned_aa_edges: EdgeMask::empty(),
+            aligned_aa_edges,
             transformed_aa_edges: EdgeMask::all(),
         };
 
@@ -1660,6 +1663,7 @@ impl<'a> SceneBuilder<'a> {
                     info.spatial_id,
                     &info.clip,
                     info.snap_outset,
+                    info.anti_aliased,
                 );
             }
             DisplayItem::RectClip(ref info) => {
@@ -1669,6 +1673,7 @@ impl<'a> SceneBuilder<'a> {
                     info.id,
                     info.spatial_id,
                     &info.clip_rect,
+                    info.anti_aliased,
                 );
             }
             DisplayItem::ClipChain(ref info) => {
@@ -2603,6 +2608,7 @@ impl<'a> SceneBuilder<'a> {
         new_node_id: ClipId,
         spatial_id: SpatialId,
         clip_rect: &LayoutRect,
+        anti_aliased: bool,
     ) {
         let spatial_node_index = self.get_space(spatial_id);
 
@@ -2625,6 +2631,7 @@ impl<'a> SceneBuilder<'a> {
             handle,
             spatial_node_index,
             clip_rect,
+            anti_aliased,
         );
     }
 
@@ -2634,6 +2641,7 @@ impl<'a> SceneBuilder<'a> {
         spatial_id: SpatialId,
         clip: &ComplexClipRegion,
         snap_outset: f32,
+        anti_aliased: bool,
     ) {
         let spatial_node_index = self.get_space(spatial_id);
 
@@ -2662,6 +2670,7 @@ impl<'a> SceneBuilder<'a> {
             spatial_node_index,
             region_rect,
             snap_outset,
+            anti_aliased,
         );
     }
 

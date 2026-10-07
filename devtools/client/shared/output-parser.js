@@ -367,6 +367,7 @@ class OutputParser {
             // we only want to handle lengths (e.g. not angles, frequency, …)
             InspectorUtils.valueMatchesSyntax(
               this.#doc,
+              this.parsedPropertyName,
               `1${token.unit}`,
               "<length>"
             )
@@ -957,7 +958,12 @@ class OutputParser {
 
         if (
           token.text !== "raw-string" &&
-          !InspectorUtils.valueMatchesSyntax(this.#doc, attrValue, "<number>")
+          !InspectorUtils.valueMatchesSyntax(
+            this.#doc,
+            this.parsedPropertyName,
+            attrValue,
+            "<number>"
+          )
         ) {
           fallbackValueIsUsed = true;
           attrTypeMismatchText = STYLE_INSPECTOR_L10N.getFormatStr(
@@ -986,7 +992,12 @@ class OutputParser {
           !attrValue.includes("var(") &&
           !attrValue.includes("attr(") &&
           !attrValue.includes("env(") &&
-          !InspectorUtils.valueMatchesSyntax(this.#doc, attrValue, syntax)
+          !InspectorUtils.valueMatchesSyntax(
+            this.#doc,
+            this.parsedPropertyName,
+            attrValue,
+            syntax
+          )
         ) {
           fallbackValueIsUsed = true;
           attrTypeMismatchText = STYLE_INSPECTOR_L10N.getFormatStr(

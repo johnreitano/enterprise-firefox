@@ -51,7 +51,10 @@ export default class MozInputSearch extends MozInputText {
   }
 
   inputStylesTemplate() {
-    return html`${super.inputStylesTemplate()}`;
+    return html`<link
+      rel="stylesheet"
+      href="chrome://global/content/elements/moz-input-search.css"
+    />`;
   }
 
   handleInput(e) {

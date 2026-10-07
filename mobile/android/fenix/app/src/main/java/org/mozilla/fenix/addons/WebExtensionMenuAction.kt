@@ -71,25 +71,41 @@ fun BrowserState.findWebExtensionMenuAction(
     customTabId: String? = null,
 ): Action? = extensions[extensionId]?.resolveAction(findCustomTabOrSelectedTab(customTabId), isPageAction)
 
+/**
+ * The actions of all extensions that can be shown in a menu opened for a specific tab, without their icons.
+ *
+ * Unlike the icons, which need to be loaded, everything else about the actions is known right away.
+ *
+ * @param customTabId The id of the custom tab to show the actions for, or `null` to show them for the selected tab.
+ */
+fun BrowserState.webExtensionMenuActionsWithoutIcons(customTabId: String?): List<WebExtensionMenuAction> {
+    val tab = findCustomTabOrSelectedTab(customTabId) ?: return emptyList()
+
+    return extensionActions(tab).map { (_, menuAction) -> menuAction }
+}
+
 private suspend fun BrowserState.webExtensionMenuActions(
     tab: SessionState,
     iconSize: Int,
 ): List<WebExtensionMenuAction> =
+    extensionActions(tab).map { (action, menuAction) -> menuAction.copy(icon = action.loadIcon?.invoke(iconSize)) }
+
+/** Each action that can be shown for [tab], together with what is needed to show it in a menu, except its icon. */
+private fun BrowserState.extensionActions(tab: SessionState): List<Pair<Action, WebExtensionMenuAction>> =
     extensions.values
         .filterNot { !it.allowedInPrivateBrowsing && tab.content.private }
         .sortedBy { it.name }
         .flatMap { extension ->
             listOfNotNull(
-                extension.toMenuAction(tab, iconSize, isPageAction = false),
-                extension.toMenuAction(tab, iconSize, isPageAction = true),
+                extension.toMenuAction(tab, isPageAction = false),
+                extension.toMenuAction(tab, isPageAction = true),
             )
         }
 
-private suspend fun WebExtensionState.toMenuAction(
+private fun WebExtensionState.toMenuAction(
     tab: SessionState,
-    iconSize: Int,
     isPageAction: Boolean,
-): WebExtensionMenuAction? {
+): Pair<Action, WebExtensionMenuAction>? {
     val action = resolveAction(tab, isPageAction) ?: return null
 
     // Browser actions are shown for every page, page actions only for the ones the extension enables them for.
@@ -97,16 +113,17 @@ private suspend fun WebExtensionState.toMenuAction(
 
     val label = action.title?.takeUnless { it.isBlank() } ?: name ?: return null
 
-    return WebExtensionMenuAction(
-        extensionId = id,
-        isPageAction = isPageAction,
-        label = label,
-        icon = action.loadIcon?.invoke(iconSize),
-        enabled = action.enabled,
-        badgeText = action.badgeText,
-        badgeTextColor = action.badgeTextColor,
-        badgeBackgroundColor = action.badgeBackgroundColor,
-    )
+    return action to
+        WebExtensionMenuAction(
+            extensionId = id,
+            isPageAction = isPageAction,
+            label = label,
+            icon = null,
+            enabled = action.enabled,
+            badgeText = action.badgeText,
+            badgeTextColor = action.badgeTextColor,
+            badgeBackgroundColor = action.badgeBackgroundColor,
+        )
 }
 
 /** The action of this extension as it applies to [tab], which can override any of the browser wide details. */

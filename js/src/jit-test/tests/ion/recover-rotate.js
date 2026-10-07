@@ -23,3 +23,14 @@ function test(n) {
 for (var n = -2; n < 40; n++) {
   test(n)
 }
+
+function maybeOverflow(value, flag) {
+  let sum = value + 1;
+  let rotated = (sum >>> 1) | (sum << 31);
+  if (flag) return rotated + 1;
+  return 0;
+}
+for (let iteration = 0; iteration < 100; iteration++) {
+  assertEq(maybeOverflow(iteration, false), 0);
+}
+assertEq(maybeOverflow(2147483647, true), 1073741825);

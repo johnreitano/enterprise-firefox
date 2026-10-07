@@ -2054,6 +2054,21 @@ add_task(async function test_apply_tells_content_once() {
     sent[0].args[0].data.endsWith(filename),
     "And it is told about the image that was picked"
   );
+  const actions = spy.getCalls().map(call => call.args[0]);
+  const sentAt = actions.findIndex(
+    action => action.type === actionTypes.WALLPAPERS_CUSTOM_SET
+  );
+  const enabledAt = actions.findIndex(
+    action =>
+      action.type === actionTypes.SET_PREF &&
+      action.data.name === "newtabWallpapers.user.enabled"
+  );
+  Assert.greater(sentAt, -1, "The URL message is found");
+  Assert.greater(
+    enabledAt,
+    sentAt,
+    "Before wallpapers are turned back on, so the old URL is never painted"
+  );
 
   Services.prefs.removeObserver(
     PREF_WALLPAPERS_CUSTOM_WALLPAPER_UUID,

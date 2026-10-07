@@ -432,9 +432,9 @@ We enable build-signing for `shippable`, `nightly`, and `enable-build-signing` t
 
 ## target-store
 
-The Android app store a `push-android` task submits to: `google`, `samsung` or
-`huawei`. Together with `build-type` it identifies a push task, since several
-stores can be fed from the same signed build.
+The Android app store a `push-android` task submits to: `google`, `samsung`,
+`huawei` or `vivo`. Together with `build-type` it identifies a push task, since
+several stores can be fed from the same signed build.
 
 ## run-visual-metrics
 

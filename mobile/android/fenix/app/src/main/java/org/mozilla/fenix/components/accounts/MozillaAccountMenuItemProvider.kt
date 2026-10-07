@@ -24,6 +24,7 @@ import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.MenuItemSummary
 import mozilla.components.compose.menu.data.StandardMenuItem
+import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemIcon
 import mozilla.components.compose.menu.ui.MenuItemIconBitmap
 import mozilla.components.compose.menu.ui.MenuItemIconDrawable
@@ -39,10 +40,13 @@ import mozilla.components.service.fxa.store.SyncState
 import mozilla.components.service.fxa.store.SyncStore
 import mozilla.components.support.ktx.android.util.dpToPx
 import mozilla.components.ui.icons.R as iconsR
+import org.mozilla.fenix.NavGraphDirections
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.menu.MenuAccessPoint
+import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
 import org.mozilla.fenix.components.menu.store.MenuAction
+import org.mozilla.fenix.components.menu.toFenixFxAEntryPoint
 import org.mozilla.fenix.ext.bitmapForUrl
 
 private const val AVATAR_SIZE_DP = 24
@@ -113,6 +117,26 @@ class MozillaAccountMenuItemProvider(
                 AuthenticationProblem -> warningIcon
                 else -> MenuItemIconRes(iconsR.drawable.mozac_ic_avatar_circle_24)
             }
+
+    override fun handles(event: MenuEvent) = event is MenuAction.Navigate.MozillaAccount
+
+    override fun onEvent(event: MenuEvent, menu: MenuHost) {
+        if (event !is MenuAction.Navigate.MozillaAccount) return
+
+        menu.navigate(
+            when (event.accountState) {
+                Authenticated -> NavGraphDirections.actionGlobalAccountSettingsFragment()
+                AuthenticationProblem ->
+                    NavGraphDirections.actionGlobalAccountProblemFragment(
+                        entrypoint = event.accesspoint.toFenixFxAEntryPoint()
+                    )
+                is Authenticating,
+                NotAuthenticated,
+                Unknown ->
+                    NavGraphDirections.actionGlobalTurnOnSync(entrypoint = event.accesspoint.toFenixFxAEntryPoint())
+            }
+        )
+    }
 }
 
 /** What to call the account, or `null` while there is nothing to say about it yet. */

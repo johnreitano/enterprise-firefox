@@ -608,6 +608,7 @@ class StyleRuleActor extends Actor {
             if (
               !InspectorUtils.valueMatchesSyntax(
                 targetDocument,
+                decl.name,
                 substitutedValue || declarationValue,
                 registeredProperty.syntax
               )

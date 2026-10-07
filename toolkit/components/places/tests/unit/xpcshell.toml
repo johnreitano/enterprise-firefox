@@ -127,6 +127,8 @@ run-if = [
 
 ["test_browserhistory.js"]
 
+["test_canAddURI.js"]
+
 ["test_childlessTags.js"]
 
 ["test_frecency_interactions.js"]

@@ -2457,6 +2457,14 @@ pref("sidebar.openTabsPanel.hoverPreview.enabled", true);
 
 pref("sidebar.notification.badge.aichat", false);
 
+// Adds the contextual password manager to the launcher for existing sidebar
+// users, as long as browser.contextual-password-manager.enabled is true.
+// See browser/components/sidebar/docs/index.md.
+pref(
+  "sidebar.newTool.migration.passwords",
+  '{"visibilityPref":"browser.contextual-password-manager.enabled"}'
+);
+
 pref("browser.resourceMonitor.enabled", false);
 // Registers the Resource Monitor for sidebar new-tool migration. When
 // browser.resourceMonitor.enabled flips to true, the tool is auto-added
@@ -2529,9 +2537,6 @@ pref("browser.smartwindow.mistralRelease", true);
 
 // Semantic distance threshold for Smart Window history search only.
 pref("places.semanticHistory.smartwindow.distanceThreshold", "0.6");
-
-// Smart Window: AITab
-pref("browser.smartwindow.aitab.enabled", false);
 
 // Smart Window: Auto Tab Grouping (bug 2054500).
 pref("browser.smartwindow.autoTabGrouping.enabled", true);

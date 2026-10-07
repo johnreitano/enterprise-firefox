@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/** @import {Store} from "resource://newtab/lib/Store.sys.mjs" */
+
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   AdsClient: "resource://newtab/lib/AdsClient.sys.mjs",
@@ -151,6 +153,9 @@ ChromeUtils.defineLazyGetter(lazy, "userAgent", () => {
 });
 
 export class DiscoveryStreamFeed {
+  /** @type {Store} */
+  store = null;
+
   constructor() {
     // Internal state for checking if we've intialized all our data
     this.loaded = false;
@@ -1125,9 +1130,6 @@ export class DiscoveryStreamFeed {
       return;
     }
 
-    // Reset the flag that indicates whether or not at least one API request
-    // was issued to fetch the component feed in `getComponentFeed()`.
-    this.componentFeedFetched = false;
     const { newFeedsPromises, newFeeds } = this.buildFeedPromises(
       DiscoveryStream.layout,
       isStartup,
@@ -2020,7 +2022,6 @@ export class DiscoveryStreamFeed {
 
         const { data: filteredResults } =
           await this.filterBlocked(rotatedItems);
-        this.componentFeedFetched = true;
         feed = {
           lastUpdated: Date.now(),
           personalized,

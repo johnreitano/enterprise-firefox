@@ -104,81 +104,6 @@ const tests = {
     return errors.length === 0;
   },
 
-  karma() {
-    logStart(`karma ${process.cwd()}`);
-
-    const errors = [];
-    const { exitCode, out } = execOut(npmCommand, [
-      "run",
-      "testmc:unit",
-      // , "--", "--log-level", "--verbose",
-      // to debug the karma integration, uncomment the above line
-    ]);
-
-    // karma spits everything to stdout, not stderr, so if nothing came back on
-    // stdout, give up now.
-    if (!out) {
-      return false;
-    }
-
-    // Detect mocha failures
-    let jsonContent;
-    try {
-      // Note that this will be overwritten at each run, but that shouldn't
-      // matter.
-      jsonContent = readFileSync(path.join("logs", "karma-run-results.json"));
-    } catch (ex) {
-      console.error("exception reading karma-run-results.json: ", ex);
-      return false;
-    }
-    const results = JSON.parse(jsonContent);
-    // eslint-disable-next-line guard-for-in
-    for (let testArray in results.result) {
-      let failedTests = Array.from(results.result[testArray]).filter(
-        test => !test.success && !test.skipped
-      );
-
-      errors.push(
-        ...failedTests.map(
-          test => `${test.suite.join(":")} ${test.description}: ${test.log[0]}`
-        )
-      );
-    }
-
-    // Detect istanbul failures (coverage thresholds set in karma config)
-    const coverage = out.match(/ERROR.+coverage-istanbul.+/g);
-    if (coverage) {
-      errors.push(...coverage.map(line => line.match(/Coverage.+/)[0]));
-    }
-
-    logErrors(`karma ${process.cwd()}`, errors);
-
-    console.log("-----karma stdout below this line---");
-    console.log(out);
-    console.log("-----karma stdout above this line---");
-
-    // Pass if there's no detected errors and nothing unexpected.
-    return errors.length === 0 && !exitCode;
-  },
-
-  zipCodeCoverage() {
-    logStart("zipCodeCoverage");
-
-    const { exitCode, out } = execOut("zip", [
-      "-j",
-      "logs/coverage/code-coverage-grcov",
-      "logs/coverage/lcov.info",
-    ]);
-
-    console.log("zipCodeCoverage log output: ", out);
-
-    if (!exitCode) {
-      return true;
-    }
-
-    return false;
-  },
-
   jest() {
     logStart(`jest ${process.cwd()}`);
 
@@ -188,6 +113,7 @@ const tests = {
       "run",
       "testmc:jest",
       "--",
+      "--coverage",
       "--json",
       `--outputFile=${resultsPath}`,
       // , "--log-level", "--verbose",
@@ -236,6 +162,24 @@ const tests = {
 
     return errors.length === 0 && !exitCode;
   },
+
+  zipCodeCoverage() {
+    logStart("zipCodeCoverage");
+
+    const { exitCode, out } = execOut("zip", [
+      "-j",
+      "logs/coverage/code-coverage-grcov",
+      "logs/coverage/lcov.info",
+    ]);
+
+    console.log("zipCodeCoverage log output: ", out);
+
+    if (!exitCode) {
+      return true;
+    }
+
+    return false;
+  },
 };
 
 async function main() {
@@ -253,8 +197,8 @@ async function main() {
     --help                 Show this help message.
 
   Examples
-    $ node bin/try-runner.js bundles karma
-    $ node bin/try-runner.js -t karma -t zip
+    $ node bin/try-runner.js bundles jest
+    $ node bin/try-runner.js -t jest -t zip
 `,
     {
       description: false,
@@ -282,8 +226,8 @@ async function main() {
   const aliases = {
     bundle: "bundles",
     build: "bundles",
-    coverage: "karma",
-    cov: "karma",
+    coverage: "jest",
+    cov: "jest",
     zip: "zipCodeCoverage",
   };
 

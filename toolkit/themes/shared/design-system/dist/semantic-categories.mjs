@@ -363,11 +363,11 @@ export const tokensTable = {
           },
         },
       },
-      name: "--input-text-background-color",
+      name: "--input-background-color",
     },
     {
-      value: "var(--button-background-color-disabled)",
-      name: "--input-text-background-color-disabled",
+      value: { default: "var(--button-background-color-disabled)" },
+      name: "--input-background-color-disabled",
     },
     {
       value: {
@@ -1244,10 +1244,9 @@ export const tokensTable = {
       name: "--info-bar-border-color",
     },
     { value: "var(--border-color-interactive)", name: "--input-border-color" },
-    { value: "var(--border-color)", name: "--input-text-border-color" },
     {
       value: "var(--border-color-interactive-disabled)",
-      name: "--input-text-border-color-disabled",
+      name: "--input-border-color-disabled",
     },
     {
       value: {
@@ -1472,12 +1471,9 @@ export const tokensTable = {
       value: "var(--border-radius-medium)",
       name: "--card-cover-image-border-radius",
     },
+    { value: "var(--border-radius-medium)", name: "--input-border-radius" },
     {
-      value: "var(--border-radius-medium)",
-      name: "--input-text-border-radius",
-    },
-    {
-      value: { default: "var(--input-text-border-radius)" },
+      value: { default: "var(--input-border-radius)" },
       name: "--input-search-border-radius",
     },
     { value: "var(--border-radius-small)", name: "--link-border-radius-focus" },
@@ -2052,7 +2048,7 @@ export const tokensTable = {
     { value: "160px", name: "--card-cover-image-height-default" },
     { value: "var(--size-item-small)", name: "--checkbox-size" },
     { value: "var(--size-item-small)", name: "--input-height" },
-    { value: "var(--button-min-height)", name: "--input-text-min-height" },
+    { value: "var(--button-min-height)", name: "--input-min-height" },
     { value: "var(--size-item-small)", name: "--input-width" },
     {
       value: { brand: { default: "664px" } },
@@ -2133,7 +2129,6 @@ export const tokensTable = {
     { value: "var(--space-small)", name: "--card-gap-article" },
     { value: "var(--space-small)", name: "--checkbox-margin-inline" },
     { value: { default: "4px" }, name: "--info-bar-margin" },
-    { value: "var(--space-medium)", name: "--input-folder-gap" },
     { value: { brand: { default: "64px" } }, name: "--page-space-block-start" },
     {
       value: "0 var(--panel-menuitem-margin-inline)",
@@ -2180,6 +2175,7 @@ export const tokensTable = {
       value: "var(--space-medium)",
       name: "--input-color-space-padding-inline",
     },
+    { value: "var(--space-medium)", name: "--input-folder-gap" },
     {
       value: "var(--space-xsmall) var(--space-large)",
       name: "--message-bar-actions-button-padding",
@@ -2997,8 +2993,8 @@ export const tokensTable = {
       name: "--card-border",
     },
     {
-      value: "var(--border-width) solid var(--input-text-border-color)",
-      name: "--input-text-border",
+      value: "var(--border-width) solid var(--input-border-color)",
+      name: "--input-border",
     },
     {
       value: "var(--box-border-width) solid var(--box-border-color)",
@@ -3542,7 +3538,7 @@ export const tokensTable = {
     },
     {
       value: "var(--button-opacity-disabled)",
-      name: "--input-text-opacity-disabled",
+      name: "--input-opacity-disabled",
     },
     {
       value: { default: "0.6", prefersContrast: "1" },
@@ -3576,8 +3572,11 @@ export const tokensTable = {
     { value: "24px", name: "--icon-size-large" },
     { value: "32px", name: "--icon-size-xlarge" },
     { value: "var(--size-item-xlarge)", name: "--icon-size-xxlarge" },
-    { value: "var(--icon-size-xsmall)", name: "--input-text-icon-size" },
-    { value: "var(--input-text-icon-size)", name: "--input-search-icon-size" },
+    { value: "var(--icon-size-xsmall)", name: "--input-icon-size" },
+    {
+      value: { default: "var(--input-icon-size)" },
+      name: "--input-search-icon-size",
+    },
     { value: "var(--icon-size)", name: "--box-icon-size" },
     { value: "var(--icon-size-xsmall)", name: "--breadcrumb-icon-size" },
     { value: "var(--icon-size)", name: "--message-bar-icon-size" },
@@ -4535,10 +4534,7 @@ export const variableLookupTable = {
   "icon-size-xxlarge": "var(--size-item-xlarge)",
   "info-bar-border-color": { default: "var(--border-color-deemphasized)" },
   "info-bar-margin": { default: "4px" },
-  "input-border-color": "var(--border-color-interactive)",
-  "input-folder-gap": "var(--space-medium)",
-  "input-height": "var(--size-item-small)",
-  "input-text-background-color": {
+  "input-background-color": {
     nativeTheme: "Field",
     platform: {
       default: "Field",
@@ -4549,14 +4545,19 @@ export const variableLookupTable = {
       },
     },
   },
-  "input-text-background-color-disabled":
-    "var(--button-background-color-disabled)",
-  "input-text-border":
-    "var(--border-width) solid var(--input-text-border-color)",
-  "input-text-border-color": "var(--border-color)",
-  "input-text-border-color-disabled":
-    "var(--border-color-interactive-disabled)",
-  "input-text-border-radius": "var(--border-radius-medium)",
+  "input-background-color-disabled": {
+    default: "var(--button-background-color-disabled)",
+  },
+  "input-border": "var(--border-width) solid var(--input-border-color)",
+  "input-border-color": "var(--border-color-interactive)",
+  "input-border-color-disabled": "var(--border-color-interactive-disabled)",
+  "input-border-radius": "var(--border-radius-medium)",
+  "input-height": "var(--size-item-small)",
+  "input-icon-size": "var(--icon-size-xsmall)",
+  "input-min-height": "var(--button-min-height)",
+  "input-opacity-disabled": "var(--button-opacity-disabled)",
+  "input-search-border-radius": { default: "var(--input-border-radius)" },
+  "input-search-icon-size": { default: "var(--input-icon-size)" },
   "input-text-color": {
     brand: { default: "var(--text-color)" },
     nativeTheme: "FieldText",
@@ -4573,11 +4574,6 @@ export const variableLookupTable = {
     default: "var(--input-text-color)",
     forcedColors: "GrayText",
   },
-  "input-text-icon-size": "var(--icon-size-xsmall)",
-  "input-text-min-height": "var(--button-min-height)",
-  "input-text-opacity-disabled": "var(--button-opacity-disabled)",
-  "input-search-border-radius": { default: "var(--input-text-border-radius)" },
-  "input-search-icon-size": "var(--input-text-icon-size)",
   "input-width": "var(--size-item-small)",
   "link-border-radius-focus": "var(--border-radius-small)",
   "link-color": {
@@ -5134,6 +5130,7 @@ export const variableLookupTable = {
   "input-color-text-color": "var(--button-text-color)",
   "input-color-text-color-active": "var(--button-text-color-active)",
   "input-color-text-color-hover": "var(--button-text-color-hover)",
+  "input-folder-gap": "var(--space-medium)",
   "message-bar-actions-button-padding":
     "var(--space-xsmall) var(--space-large)",
   "message-bar-actions-gap": "var(--space-small)",

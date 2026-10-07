@@ -17,11 +17,14 @@ import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.MenuItemBadge
 import mozilla.components.compose.menu.data.StandardMenuItem
+import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.compose.menu.ui.MenuItemState
 import mozilla.components.concept.engine.translate.findLanguage
 import mozilla.components.ui.icons.R as iconsR
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuFragmentDirections
+import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
 import org.mozilla.fenix.components.menu.store.MenuAction
 import org.mozilla.fenix.nimbus.FxNimbus
@@ -31,13 +34,14 @@ import org.mozilla.fenix.nimbus.FxNimbus
  *
  * Shown only where translating is actually available, and showing the language the page is already translated to.
  *
- * @param browserStore [BrowserStore] used to know whether the current page can be or already is translated.
+ * @param browserStore [BrowserStore] used to know whether the current page can be or already is translated, and to get
+ *   the current page to translate.
  * @param translationsSettings [TranslationsEnabledSettings] whether the user turned translations off.
  * @param scope [CoroutineScope] used to keep the item up to date for as long as it can be shown.
  * @param isFeatureEnabled whether the translations feature is enabled.
  */
 class TranslationsMenuItemProvider(
-    browserStore: BrowserStore,
+    private val browserStore: BrowserStore,
     translationsSettings: TranslationsEnabledSettings,
     scope: CoroutineScope,
     private val isFeatureEnabled: Boolean = FxNimbus.features.translations.value().mainFlowBrowserMenuEnabled,
@@ -74,6 +78,16 @@ class TranslationsMenuItemProvider(
             selectedTab.translationsState.translationEngineState?.requestedTranslationPair?.toLanguage ?: return null
 
         return translationEngine.supportedLanguages?.findLanguage(translatedTo)?.localizedDisplayName
+    }
+
+    override fun handles(event: MenuEvent) = event == MenuAction.Navigate.Translate
+
+    override fun onEvent(event: MenuEvent, menu: MenuHost) {
+        menu.navigate(
+            MenuFragmentDirections.actionMenuFragmentToTranslationsDialogFragment(
+                sessionId = browserStore.state.selectedTabId
+            )
+        )
     }
 }
 

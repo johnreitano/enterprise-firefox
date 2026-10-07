@@ -74,6 +74,12 @@ tardir=python
 
 cd `mktemp -d`
 ${python_src}/configure --prefix=/${tardir} --enable-optimizations --with-lto ${configure_flags_extra} || { exit_status=$? && cat config.log && exit $exit_status ; }
+# make re-adds these to the configure-recorded flags; Linux keeps them so setup.py gets a working $ORIGIN rpath.
+case `uname -s` in
+    Darwin)
+        unset CFLAGS CPPFLAGS LDFLAGS
+        ;;
+esac
 
 export MAKEFLAGS=-j`nproc`
 make

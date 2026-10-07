@@ -5,6 +5,8 @@
 package org.mozilla.fenix.downloads
 
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -14,11 +16,14 @@ import mozilla.components.compose.menu.data.StandardMenuItem
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.ui.icons.R as iconsR
 import org.junit.Test
+import org.mozilla.fenix.NavGraphDirections
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.AppStore
 import org.mozilla.fenix.components.appstate.AppAction
 import org.mozilla.fenix.components.appstate.AppState
 import org.mozilla.fenix.components.appstate.SupportedMenuNotifications
+import org.mozilla.fenix.components.menu.fake.FakeMenuHost
+import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -68,4 +73,23 @@ class DownloadsMenuItemProviderTest {
                 ),
             onClickEvent = MenuAction.Navigate.Downloads,
         )
+
+    @Test
+    fun `WHEN clicking the item THEN show the downloads in place of the menu`() = runTest {
+        val menu = FakeMenuHost()
+
+        DownloadsMenuItemProvider(AppStore(AppState()), backgroundScope).onEvent(MenuAction.Navigate.Downloads, menu)
+
+        assertEquals(NavGraphDirections.actionGlobalDownloadsFragment(), menu.directions)
+    }
+
+    @Test
+    fun `WHEN building the item THEN handle all events it can dispatch and no others`() = runTest {
+        val provider = DownloadsMenuItemProvider(AppStore(AppState()), backgroundScope)
+
+        val events = requireNotNull(provider.itemFlow.value).reachableEvents()
+
+        assertTrue(events.all { provider.handles(it) }, "Not all of $events are handled")
+        assertFalse(provider.handles(MenuAction.Navigate.History))
+    }
 }

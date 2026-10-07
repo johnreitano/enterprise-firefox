@@ -459,12 +459,12 @@
     "dark": "{Colors$color/gray/60}",
     "forcedColors": "{HCM Theme$CanvasText}"
   },
-  "input/text/background/color": {
+  "input/background/color": {
     "light": "{Theme$background/color/box}",
     "dark": "{Theme$background/color/box}",
     "forcedColors": "{Theme$background/color/box}"
   },
-  "input/text/background/color/disabled": {
+  "input/background/color/disabled": {
     "light": "{Theme$button/background/color/ghost/disabled}",
     "dark": "{Theme$button/background/color/ghost/disabled}",
     "forcedColors": "{Theme$button/background/color/ghost/disabled}"

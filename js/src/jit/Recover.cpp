@@ -294,7 +294,14 @@ RRotate::RRotate(CompactBufferReader& reader) {
 }
 
 bool RRotate::recover(JSContext* cx, SnapshotIterator& iter) const {
-  uint32_t input = uint32_t(iter.read().toInt32());
+  RootedValue operand(cx, iter.read());
+
+  // Our Int32 operand may have overflowed to double. This instruction
+  // is generated from bit shifts that convert their operands to int32,
+  // so we should do the same conversion here.
+  int32_t inputInt32;
+  MOZ_ALWAYS_TRUE(JS::ToInt32(cx, operand, &inputInt32));
+  uint32_t input = uint32_t(inputInt32);
   int32_t c = iter.read().toInt32();
   MOZ_ASSERT(c >= 1 && c <= 31);
 

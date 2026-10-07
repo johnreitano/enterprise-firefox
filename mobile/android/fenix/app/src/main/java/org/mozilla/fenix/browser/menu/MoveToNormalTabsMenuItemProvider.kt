@@ -11,9 +11,12 @@ import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.StandardMenuItem
+import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemIconRes
+import mozilla.components.feature.tabs.TabsUseCases
 import mozilla.components.ui.icons.R as iconsR
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
 import org.mozilla.fenix.components.menu.store.MenuAction
 
@@ -22,8 +25,12 @@ import org.mozilla.fenix.components.menu.store.MenuAction
  * the current tab is private.
  *
  * @param browserStore The [BrowserStore] to get the current tab from.
+ * @param migratePrivateTab [TabsUseCases.MigratePrivateTabUseCase] for moving the current tab to a non-private tab.
  */
-class MoveToNormalTabsMenuItemProvider(private val browserStore: BrowserStore) : MenuItemProvider {
+class MoveToNormalTabsMenuItemProvider(
+    private val browserStore: BrowserStore,
+    private val migratePrivateTab: TabsUseCases.MigratePrivateTabUseCase,
+) : MenuItemProvider {
     override val itemFlow: StateFlow<MenuItem?> =
         MutableStateFlow(
             if (browserStore.state.selectedTab?.content?.private == true) {
@@ -36,4 +43,13 @@ class MoveToNormalTabsMenuItemProvider(private val browserStore: BrowserStore) :
                 null
             }
         )
+
+    override fun handles(event: MenuEvent) = event == MenuAction.MoveToNonPrivateTab
+
+    override fun onEvent(event: MenuEvent, menu: MenuHost) {
+        val tabId = browserStore.state.selectedTab?.id ?: return
+
+        menu.dismiss()
+        migratePrivateTab(tabId)
+    }
 }

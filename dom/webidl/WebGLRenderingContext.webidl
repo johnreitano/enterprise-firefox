@@ -820,6 +820,22 @@ WebGLRenderingContext includes WebGLRenderingContextBase;
 ////////////////////////////////////////
 // specific extension interfaces
 
+// https://registry.khronos.org/webgl/extensions/EXT_clip_control/
+[LegacyNoInterfaceObject,
+ Exposed=(Window,Worker)]
+interface EXT_clip_control {
+    const GLenum LOWER_LEFT_EXT = 0x8CA1;
+    const GLenum UPPER_LEFT_EXT = 0x8CA2;
+
+    const GLenum NEGATIVE_ONE_TO_ONE_EXT = 0x935E;
+    const GLenum ZERO_TO_ONE_EXT         = 0x935F;
+
+    const GLenum CLIP_ORIGIN_EXT     = 0x935C;
+    const GLenum CLIP_DEPTH_MODE_EXT = 0x935D;
+
+    undefined clipControlEXT(GLenum origin, GLenum depth);
+};
+
 // https://registry.khronos.org/webgl/extensions/EXT_polygon_offset_clamp/
 [LegacyNoInterfaceObject,
  Exposed=(Window,Worker)]

@@ -811,9 +811,6 @@ open class FenixApplication : Application(), Provider, ThemeProvider {
     /**
      * Reconciles onboarding completion state for users who have already completed initial onboarding.
      *
-     * This is temporarily gated by build variant to prevent the change from reaching non-Nightly builds before QA. See
-     * [Bug 2074040](https://bugzilla.mozilla.org/show_bug.cgi?id=2074040).
-     *
      * The userHasBeenOnboarded check remains outside [reconcileOnboardingCompletionState] for now. Follow-up work will
      * consolidate onboarding-completion checks into a single API.
      *
@@ -823,7 +820,7 @@ open class FenixApplication : Application(), Provider, ThemeProvider {
      * [the Phabricator discussion](https://phabricator.services.mozilla.com/D326554#inline-1746839) for details.
      */
     fun maybeReconcileOnboardingCompletionState() {
-        if (components.fenixOnboarding.userHasBeenOnboarded() && Config.channel.isNightlyOrDebug) {
+        if (components.fenixOnboarding.userHasBeenOnboarded()) {
             components.settings.reconcileOnboardingCompletionState()
         }
     }

@@ -1346,29 +1346,19 @@ wr::WrClipId DisplayListBuilder::DefineImageMaskClip(
 }
 
 wr::WrClipId DisplayListBuilder::DefineRoundedRectClip(
-    Maybe<wr::WrSpatialId> aSpace, const wr::ComplexClipRegion& aComplex) {
-  WrClipId clipId;
-  if (aSpace) {
-    clipId = wr_dp_define_rounded_rect_clip(mWrState, *aSpace, aComplex);
-  } else {
-    clipId = wr_dp_define_rounded_rect_clip(
-        mWrState, mCurrentSpaceAndClipChain.space, aComplex);
-  }
-
-  return clipId;
+    Maybe<wr::WrSpatialId> aSpace, const wr::ComplexClipRegion& aComplex,
+    bool aAntiAliased) {
+  return wr_dp_define_rounded_rect_clip(
+      mWrState, aSpace.valueOr(mCurrentSpaceAndClipChain.space), aComplex,
+      aAntiAliased);
 }
 
 wr::WrClipId DisplayListBuilder::DefineRectClip(Maybe<wr::WrSpatialId> aSpace,
-                                                wr::LayoutRect aClipRect) {
-  WrClipId clipId;
-  if (aSpace) {
-    clipId = wr_dp_define_rect_clip(mWrState, *aSpace, aClipRect);
-  } else {
-    clipId = wr_dp_define_rect_clip(mWrState, mCurrentSpaceAndClipChain.space,
-                                    aClipRect);
-  }
-
-  return clipId;
+                                                wr::LayoutRect aClipRect,
+                                                bool aAntiAliased) {
+  return wr_dp_define_rect_clip(mWrState,
+                                aSpace.valueOr(mCurrentSpaceAndClipChain.space),
+                                aClipRect, aAntiAliased);
 }
 
 wr::WrSpatialId DisplayListBuilder::DefineStickyFrame(

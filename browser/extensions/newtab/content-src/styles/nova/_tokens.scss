@@ -258,10 +258,10 @@
     --info-bar-margin: 0;
 
     /** input **/
+    --input-background-color: var(--background-color-box);
+    --input-background-color-disabled: var(--button-background-color-ghost-disabled);
     --input-search-border-radius: var(--border-radius-circle);
     --input-search-icon-size: var(--icon-size-small);
-    --input-text-background-color: var(--background-color-box);
-    --input-text-background-color-disabled: var(--button-background-color-ghost-disabled);
 
     /** link **/
     --link-border-radius-focus: var(--border-radius-xsmall);

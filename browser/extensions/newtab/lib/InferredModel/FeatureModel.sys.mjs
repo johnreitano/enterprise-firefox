@@ -542,10 +542,10 @@ export class FeatureModel {
    * @param {string} [params.model_id="unknown"] - Identifier for the model used in generating the vectors.
    * @param {boolean} [params.condensePrivateValues=true] - If true, condenses coarse private interest values into an array format.
    *
-   * @returns {object} result - An object containing one or more of the following:
-   * @returns {object} result.inferredInterest - A dictionary of private inferred interest scores
-   * @returns {object} [result.coarseInferredInterests] - A dictionary of thresholded interest scores (non-private), if supported.
-   * @returns {object} [result.coarsePrivateInferredInterests] - A dictionary of thresholded interest scores with differential privacy, if supported.
+   * @returns {{inferredInterests: object, coarseInferredInterests?: object, coarsePrivateInferredInterests?: object}}
+   *   inferredInterests is a dictionary of private inferred interest scores.
+   *   coarseInferredInterests is a dictionary of thresholded interest scores (non-private), if supported.
+   *   coarsePrivateInferredInterests is a dictionary of thresholded interest scores with differential privacy, if supported.
    */
   computeCTRInterestVectors({
     clicks,
@@ -654,11 +654,11 @@ export class FeatureModel {
    * @param {string} [params.model_id="unknown"] - Identifier for the model used to produce these vectors.
    * @param {boolean} [params.condensePrivateValues=true] - If true, condenses coarse private interest values into an array format.
    *
-   * @returns {object} result - An object containing the computed interest vectors.
-   * @returns {object} result.inferredInterests - A dictionary of private inferred interest values, with `model_id`.
-   * @returns {object} [result.coarseInferredInterests] - Coarse thresholded (non-private) interest vector, if supported.
-   * @returns {object | {values: Array<number>, model_id: string}} [result.coarsePrivateInferredInterests] - Coarse and differentially private interests.
-   *           If `condensePrivateValues` is true, returned as an object with a `values` array; otherwise, as a dictionary.
+   * @returns {{inferredInterests: object, coarseInferredInterests?: object, coarsePrivateInferredInterests?: object | {values: Array<number>, model_id: string}}}
+   *   inferredInterests is a dictionary of private inferred interest values, with `model_id`.
+   *   coarseInferredInterests is a coarse thresholded (non-private) interest vector, if supported.
+   *   coarsePrivateInferredInterests holds coarse and differentially private interests. If
+   *   `condensePrivateValues` is true, it is an object with a `values` array; otherwise, a dictionary.
    */
   computeInterestVectors({
     dataForIntervals,

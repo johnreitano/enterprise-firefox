@@ -20,6 +20,7 @@ import {
 } from "common/WidgetsRegistry.mjs";
 import { MoveSubmenu } from "../MoveSubmenu";
 import { useWidgetTelemetry } from "../useWidgetTelemetry";
+import { WidgetMenuButton } from "../WidgetMenuButton";
 
 const USER_ACTION_TYPES = {
   CHANGE_SIZE: "change_size",
@@ -381,13 +382,10 @@ function Crossword({
           </h3>
         </div>
         <div className="crossword-context-menu-wrapper">
-          <moz-button
+          <WidgetMenuButton
             className="crossword-context-menu-button"
-            iconSrc="chrome://global/skin/icons/more.svg"
             menuId="crossword-context-menu"
-            type="ghost"
-            title="Crossword options"
-            aria-label="Crossword options"
+            l10nId="newtab-crossword-widget-open-menu-button"
           />
           <panel-list
             className="panel-list-no-icons"

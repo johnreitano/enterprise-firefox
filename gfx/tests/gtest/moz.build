@@ -20,6 +20,7 @@ UNIFIED_SOURCES += [
     "TestGfxWidgets.cpp",
     "TestMatrix.cpp",
     "TestMoz2D.cpp",
+    "TestPlanarYCbCrImage.cpp",
     "TestPoint.cpp",
     "TestPolygon.cpp",
     "TestQcms.cpp",

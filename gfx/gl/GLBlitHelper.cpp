@@ -469,6 +469,8 @@ class ScopedDrawBlitState final {
 
   realGLboolean colorMask[4];
   GLint viewport[4];
+  GLint clipOrigin = LOCAL_GL_LOWER_LEFT;
+  GLint clipDepthMode = LOCAL_GL_NEGATIVE_ONE_TO_ONE;
 
  public:
   ScopedDrawBlitState(GLContext* const gl, const gfx::IntSize& fbSize)
@@ -482,6 +484,12 @@ class ScopedDrawBlitState final {
         sampleCover(mGL.PushEnabled(LOCAL_GL_SAMPLE_COVERAGE, false)),
         scissor(mGL.PushEnabled(LOCAL_GL_SCISSOR_TEST, false)),
         stencil(mGL.PushEnabled(LOCAL_GL_STENCIL_TEST, false)) {
+    if (mGL.IsSupported(GLFeature::clip_control)) {
+      mGL.fGetIntegerv(LOCAL_GL_CLIP_ORIGIN, &clipOrigin);
+      mGL.fGetIntegerv(LOCAL_GL_CLIP_DEPTH_MODE, &clipDepthMode);
+      mGL.fClipControl(LOCAL_GL_LOWER_LEFT, LOCAL_GL_NEGATIVE_ONE_TO_ONE);
+    }
+
     if (mGL.IsSupported(GLFeature::transform_feedback2)) {
       // Technically transform_feedback2 requires transform_feedback, which
       // actually adds RASTERIZER_DISCARD.
@@ -511,6 +519,9 @@ class ScopedDrawBlitState final {
     mGL.SetEnabled(LOCAL_GL_SAMPLE_COVERAGE, sampleCover);
     mGL.SetEnabled(LOCAL_GL_SCISSOR_TEST, scissor);
     mGL.SetEnabled(LOCAL_GL_STENCIL_TEST, stencil);
+    if (mGL.IsSupported(GLFeature::clip_control)) {
+      mGL.fClipControl(clipOrigin, clipDepthMode);
+    }
     if (rasterizerDiscard) {
       mGL.SetEnabled(LOCAL_GL_RASTERIZER_DISCARD, rasterizerDiscard.value());
     }

@@ -12,7 +12,7 @@ import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
  * @import {UrlbarView} from "chrome://browser/content/urlbar/UrlbarView.mjs"
  * @import {WindowMode} from "moz-src:///browser/components/urlbar/content/UrlbarInputBase.mjs"
  * @import {SearchEngineInfo} from "chrome://browser/content/urlbar/SearchEngineStore.mjs"
- * @import {UrlbarLoadRequest} from "chrome://browser/content/urlbar/UrlbarShared.mjs"
+ * @import {UrlbarLoadRequest, LoadURLParams} from "chrome://browser/content/urlbar/UrlbarShared.mjs"
  * @import {UrlbarChildControllerProxy, UrlbarInputProxy, UrlbarViewProxy} from "moz-src:///browser/components/urlbar/actors/UrlbarParent.sys.mjs"
  */
 
@@ -1011,7 +1011,7 @@ export class UrlbarParentController {
    *   What to load.
    * @param {string} loadData.where
    *   Where to open, per `openTrustedLinkIn`.
-   * @param {object} loadData.params
+   * @param {LoadURLParams} loadData.params
    *   The serializable `openTrustedLinkIn` params.
    * @param {number} [loadData.browserId]
    *   The target browser's id; defaults to the selected browser. A content
@@ -1211,7 +1211,7 @@ export class UrlbarParentController {
    *   The URL being loaded.
    * @param {string} loadData.where
    *   Where to open, per `openTrustedLinkIn`.
-   * @param {object} loadData.params
+   * @param {LoadURLParams} loadData.params
    *   The `openTrustedLinkIn` params.
    * @param {string} [loadData.userTypedValue]
    *   The value to record as the browser's typed value, for a `current` load.

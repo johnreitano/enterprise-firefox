@@ -23,6 +23,11 @@ transforms:
 
 task-defaults:
     run-on-repo-type: ["hg", "git"]
+    priority:
+        by-project:
+            autoland: high
+            mozilla-central: medium
+            default: null
     attributes:
         retrigger: true
     use-python:
@@ -1080,8 +1085,13 @@ tasks:
             - webrender-sw
             - wmf-media-engine
             - msix
+            - geckoview-isolated-process
         run-on-projects:
             by-variant:
+                geckoview-isolated-process:
+                    by-test-platform:
+                        android-em.*/debug: built-projects
+                        default: []
                 socketprocess+no-fission:
                     by-test-platform:
                         .*hw-ref.*: []
@@ -1218,10 +1228,7 @@ tasks:
                         default: default
         worker-type:
             by-variant:
-                media-gpu:
-                    by-test-platform:
-                        linux.*: t-linux-talos-1804
-                        default: default
+                media-gpu: default
                 default:
                     by-test-platform:
                         windows11.*-asan/.*: win11-64-25h2-large

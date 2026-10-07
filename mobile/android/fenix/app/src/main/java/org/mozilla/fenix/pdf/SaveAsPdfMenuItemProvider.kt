@@ -6,21 +6,31 @@ package org.mozilla.fenix.pdf
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.StandardMenuItem
+import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemIconRes
+import mozilla.components.feature.session.SessionUseCases
 import mozilla.components.ui.icons.R as iconsR
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
 import org.mozilla.fenix.components.menu.store.MenuAction
 
 /**
  * [MenuItemProvider] for the menu item allowing to save the current webpage content as a PDF.
  *
- * Always shown, and always the same - searching a page is possible whatever else is going on.
+ * Always shown, and always the same - saving a page is possible whatever else is going on.
+ *
+ * @param browserStore [BrowserStore] used to get the current page.
+ * @param saveToPdf [SessionUseCases.SaveToPdfUseCase] for saving the current page as a PDF.
  */
-class SaveAsPdfMenuItemProvider : MenuItemProvider {
+class SaveAsPdfMenuItemProvider(
+    private val browserStore: BrowserStore,
+    private val saveToPdf: SessionUseCases.SaveToPdfUseCase,
+) : MenuItemProvider {
     override val itemFlow: StateFlow<MenuItem?> =
         MutableStateFlow(
             StandardMenuItem(
@@ -29,4 +39,11 @@ class SaveAsPdfMenuItemProvider : MenuItemProvider {
                 onClickEvent = MenuAction.SaveAsPdfRequested,
             )
         )
+
+    override fun handles(event: MenuEvent) = event == MenuAction.SaveAsPdfRequested
+
+    override fun onEvent(event: MenuEvent, menu: MenuHost) {
+        menu.dismiss()
+        saveToPdf(tabId = browserStore.state.selectedTabId)
+    }
 }

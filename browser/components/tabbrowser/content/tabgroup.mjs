@@ -798,13 +798,14 @@ export class MozTabbrowserTabGroup extends MozXULElement {
   }
 
   /**
-   * If one of this group's tabs is the selected tab, this will do nothing.
-   * Otherwise, it will expand the group if collapsed, and select the first
-   * tab in its list.
+   * Expands the group if it is collapsed. If one of this group's tabs is the
+   * selected tab, scrolls that tab into view. Otherwise, selects the first tab
+   * in its list.
    */
   select() {
     this.collapsed = false;
     if (gBrowser.selectedTab.group == this) {
+      gBrowser.tabContainer._handleTabSelect();
       return;
     }
     gBrowser.selectedTab = this.tabs[0];

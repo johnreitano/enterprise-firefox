@@ -179,12 +179,14 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _MSLocalized__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(5);
 /* harmony import */ var _lib_multistage_utils_mjs__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(3);
 /* harmony import */ var _MultiStageProtonScreen__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(6);
-/* harmony import */ var _LanguageSwitcher__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(8);
-/* harmony import */ var _SubmenuButton__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(13);
-/* harmony import */ var _lib_addUtmParams_mjs__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(35);
+/* harmony import */ var _ContentTiles__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(15);
+/* harmony import */ var _LanguageSwitcher__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(8);
+/* harmony import */ var _SubmenuButton__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(13);
+/* harmony import */ var _lib_addUtmParams_mjs__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(35);
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 
 
 
@@ -261,7 +263,8 @@ const MultiStageAboutWelcome = props => {
             screen_family: props.message_id,
             screen_index: order,
             screen_id: screen.id,
-            screen_initials: screenInitials
+            screen_initials: screenInitials,
+            ...(0,_ContentTiles__WEBPACK_IMPORTED_MODULE_4__.getTileImpressionContext)(screen.content?.tiles)
           });
 
           // Impression actions should be fired before recording the
@@ -440,7 +443,7 @@ const MultiStageAboutWelcome = props => {
     negotiatedLanguage,
     langPackInstallPhase,
     languageFilteredScreens
-  } = (0,_LanguageSwitcher__WEBPACK_IMPORTED_MODULE_4__.useLanguageSwitcher)(props.appAndSystemLocaleInfo, screens, index, setScreenIndex);
+  } = (0,_LanguageSwitcher__WEBPACK_IMPORTED_MODULE_5__.useLanguageSwitcher)(props.appAndSystemLocaleInfo, screens, index, setScreenIndex);
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
     setScreens(languageFilteredScreens);
   }, [languageFilteredScreens]);
@@ -648,7 +651,7 @@ const renderSingleSecondaryCTAButton = ({
     value: targetElement,
     disabled: computeDisabled(button?.disabled),
     onClick: shimmedHandleAction
-  })), isSplitButton ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_SubmenuButton__WEBPACK_IMPORTED_MODULE_5__.SubmenuButton, {
+  })), isSplitButton ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_SubmenuButton__WEBPACK_IMPORTED_MODULE_6__.SubmenuButton, {
     content: content,
     handleAction: handleAction
   }) : null);
@@ -758,7 +761,7 @@ class WelcomeScreen extends (react__WEBPACK_IMPORTED_MODULE_0___default().PureCo
     } = action;
     if (type === "SHOW_FIREFOX_ACCOUNTS") {
       let params = {
-        ..._lib_addUtmParams_mjs__WEBPACK_IMPORTED_MODULE_6__.BASE_PARAMS,
+        ..._lib_addUtmParams_mjs__WEBPACK_IMPORTED_MODULE_7__.BASE_PARAMS,
         utm_term: `${UTMTerm}-screen`
       };
       if (action.addFlowParams && flowParams) {
@@ -776,7 +779,7 @@ class WelcomeScreen extends (react__WEBPACK_IMPORTED_MODULE_0___default().PureCo
       };
     } else if (type === "OPEN_URL") {
       let url = new URL(data.args);
-      (0,_lib_addUtmParams_mjs__WEBPACK_IMPORTED_MODULE_6__.addUtmParams)(url, `${UTMTerm}-screen`);
+      (0,_lib_addUtmParams_mjs__WEBPACK_IMPORTED_MODULE_7__.addUtmParams)(url, `${UTMTerm}-screen`);
       if (action.addFlowParams && flowParams) {
         url.searchParams.append("device_id", flowParams.deviceId);
         url.searchParams.append("flow_id", flowParams.flowId);
@@ -4873,7 +4876,8 @@ const LinkParagraph = props => {
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   ContentTiles: () => (/* binding */ ContentTiles)
+/* harmony export */   ContentTiles: () => (/* binding */ ContentTiles),
+/* harmony export */   getTileImpressionContext: () => (/* binding */ getTileImpressionContext)
 /* harmony export */ });
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(1);
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
@@ -4922,6 +4926,21 @@ function _extends() { return _extends = Object.assign ? Object.assign.bind() : f
 const HEADER_STYLES = ["backgroundColor", "border", "padding", "margin", "width", "height"];
 const TILE_STYLES = ["border", "borderRadius", "marginBlock", "marginInline", "paddingBlock", "paddingInline"];
 const CONTAINER_STYLES = ["padding", "margin", "marginBlock", "marginInline", "paddingBlock", "paddingInline", "flexDirection", "flexWrap", "flexFlow", "flexGrow", "flexShrink", "justifyContent", "alignItems", "gap"];
+
+/**
+ * @param {object|object[]} tiles - The tiles of the screen being shown.
+ * @returns {object} Impression context, if any.
+ */
+function getTileImpressionContext(tiles) {
+  const pinnableSites = (Array.isArray(tiles) ? tiles : [tiles]).find(tile => tile?.type === "pinnable_sites" && Array.isArray(tile.data));
+  if (!pinnableSites) {
+    return {};
+  }
+  return {
+    total_sites: pinnableSites.data.length,
+    personalized_sites: pinnableSites.data.filter(item => item?.personalized).length
+  };
+}
 const ContentTiles = props => {
   const {
     content
@@ -6883,9 +6902,8 @@ const PinnableSitesList = ({
     ...prev,
     [id]: state
   }));
-  const handlePin = async (event, item) => {
+  const handlePin = async (event, item, position) => {
     setItemState(item.id, PENDING);
-    _lib_multistage_utils_mjs__WEBPACK_IMPORTED_MODULE_2__.MultiStageUtils.sendActionTelemetry(messageId, item.id, "CLICK_BUTTON");
     const result = await handleAction(event, {
       type: "PIN_TASKBAR_TAB",
       needsAwait: true,
@@ -6904,7 +6922,9 @@ const PinnableSitesList = ({
       pinResultLabel = "failure";
     }
     _lib_multistage_utils_mjs__WEBPACK_IMPORTED_MODULE_2__.MultiStageUtils.sendActionTelemetry(messageId, item.id, "PIN_SITE", {
-      result: pinResultLabel
+      result: pinResultLabel,
+      position,
+      personalized: !!item.personalized
     });
 
     // Re-enable the button only on explicit failure so the user can retry.
@@ -6918,7 +6938,7 @@ const PinnableSitesList = ({
   };
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("ul", {
     className: `pinnable-sites-list${alwaysShow ? " always-visible" : ""}`
-  }, items.map(item => {
+  }, items.map((item, index) => {
     const nameId = `pinnable-site-name-${item.id}`;
     const state = itemStates[item.id] ?? IDLE;
     const isPendingOrPinned = state === PENDING || state === PINNED;
@@ -6942,8 +6962,9 @@ const PinnableSitesList = ({
       className: "pinnable-sites-description"
     }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("button", {
       className: "pinnable-sites-pin-button primary",
+      value: item.id,
       disabled: isPendingOrPinned,
-      onClick: e => handlePin(e, item),
+      onClick: e => handlePin(e, item, index + 1),
       "aria-describedby": nameId
     }, pinButtonLabel && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_MSLocalized__WEBPACK_IMPORTED_MODULE_1__.Localized, {
       text: pinButtonLabel

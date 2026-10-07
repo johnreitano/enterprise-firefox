@@ -206,11 +206,12 @@ export const SpecialMessageActions = {
     };
 
     try {
-      await lazy.TaskbarTabs.findOrCreateTaskbarTab(uri, 0, {
+      let { created } = await lazy.TaskbarTabs.findOrCreateTaskbarTab(uri, 0, {
         manifest,
         ensurePinned: true,
       });
-      return true;
+      // If an existing tab is found, don't report that one was created.
+      return created ? true : null;
     } catch (e) {
       console.error("Failed to pin Taskbar Tab:", e);
       return false;

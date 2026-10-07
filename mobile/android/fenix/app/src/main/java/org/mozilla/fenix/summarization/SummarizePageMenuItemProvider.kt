@@ -17,14 +17,19 @@ import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.StandardMenuItem
+import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.compose.menu.ui.MenuItemState
 import mozilla.components.ui.icons.R as iconsR
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuFragmentDirections
+import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
 import org.mozilla.fenix.components.menu.store.MenuAction
 import org.mozilla.fenix.summarization.eligibility.SummarizationEligibilityChecker
 import org.mozilla.fenix.summarization.onboarding.SummarizationFeatureDiscoveryConfiguration
+import org.mozilla.fenix.summarization.onboarding.SummarizeDiscoveryEvent
+import org.mozilla.fenix.tabstray.ext.isNormalTab
 
 /**
  * [MenuItemProvider] for the menu item allowing to summarize the current page.
@@ -41,7 +46,7 @@ class SummarizePageMenuItemProvider(
     private val browserStore: BrowserStore,
     private val summarizationSettings: SummarizationFeatureDiscoveryConfiguration,
     private val eligibilityChecker: SummarizationEligibilityChecker,
-    scope: CoroutineScope,
+    private val scope: CoroutineScope,
 ) : MenuItemProvider {
     // The item is first offered as not usable, since knowing whether the page can be summarized means asking the
     // engine about it and the menu should not wait for that.
@@ -65,6 +70,35 @@ class SummarizePageMenuItemProvider(
         val session = browserStore.state.selectedTab?.engineState?.engineSession ?: return
 
         isPageEligible.value = eligibilityChecker.checkLanguage(session).getOrDefault(false)
+    }
+
+    override fun handles(event: MenuEvent) =
+        event == MenuAction.Navigate.Summarizer || event == MenuAction.OnSummarizationMenuExposed
+
+    override fun onEvent(event: MenuEvent, menu: MenuHost) {
+        when (event) {
+            MenuAction.Navigate.Summarizer ->
+                menu.navigate(
+                    MenuFragmentDirections.actionMenuFragmentToSummarizationFragment(
+                        sessionId = browserStore.state.selectedTabId
+                    )
+                )
+
+            MenuAction.OnSummarizationMenuExposed -> scope.launch { recordExposure() }
+
+            else -> Unit
+        }
+    }
+
+    /** Being shown counts towards the user discovering the feature only where it could actually be used. */
+    private suspend fun recordExposure() {
+        if (!summarizationSettings.showMenuItem) return
+        val tab = browserStore.state.selectedTab?.takeIf { it.isNormalTab() } ?: return
+        val session = tab.engineState.engineSession ?: return
+
+        if (eligibilityChecker.checkLanguage(session).getOrDefault(false)) {
+            summarizationSettings.cacheDiscoveryEvent(SummarizeDiscoveryEvent.MenuItemExposure)
+        }
     }
 
     /** Summarizing is only offered where the feature is available, and only usable for a normal page. */

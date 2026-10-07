@@ -158,6 +158,11 @@ nsresult nsXMLContentSink::MaybePrettyPrint() {
     nsAutoMicroTask mt;
   }
 
+  if (mDocument->GetRootElement() != mDocElement) {
+    mPrettyPrintXML = false;
+    return NS_OK;
+  }
+
   // Reenable the CSSLoader so that the prettyprinting stylesheets can load
   mDocument->EnsureCSSLoader().SetEnabled(true);
 

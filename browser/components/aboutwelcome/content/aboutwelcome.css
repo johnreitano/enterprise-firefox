@@ -4633,7 +4633,7 @@ html {
   user-select: none;
   cursor: default;
   text-align: start;
-  border-radius: var(--input-text-border-radius);
+  border-radius: var(--input-border-radius);
 }
 .onboardingContainer .confirmation-checklist-section {
   display: flex;

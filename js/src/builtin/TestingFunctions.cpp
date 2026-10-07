@@ -82,7 +82,8 @@
 #include "js/experimental/TypedData.h"         // JS_GetObjectAsUint8Array
 #include "js/friend/DumpFunctions.h"  // js::Dump{Backtrace,Heap,Object}, JS::FormatStackDump, js::IgnoreNurseryObjects
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
-#include "js/friend/WindowProxy.h"    // js::ToWindowProxyIfWindow
+#include "js/friend/PerformanceHint.h"  // js::SetRealmIsDyingHint
+#include "js/friend/WindowProxy.h"      // js::ToWindowProxyIfWindow
 #include "js/GlobalObject.h"
 #include "js/HashTable.h"
 #include "js/Interrupt.h"
@@ -2779,6 +2780,15 @@ static bool InternalConst(JSContext* cx, unsigned argc, Value* vp) {
   return true;
 }
 
+static bool SetRealmIsDyingHint(JSContext* cx, unsigned argc, Value* vp) {
+  CallArgs args = CallArgsFromVp(argc, vp);
+
+  js::SetRealmIsDyingHint(cx->global());
+
+  args.rval().setUndefined();
+  return true;
+}
+
 static bool GCPreserveCode(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -3720,6 +3730,57 @@ static bool SetTestFilenameValidationCallback(JSContext* cx, unsigned argc,
   JS::SetFilenameValidationCallback(testCb);
 
   args.rval().setUndefined();
+  return true;
+}
+
+// A forwarding proxy whose [[OwnPropertyKeys]] reports every key of its target
+// twice. Scripted proxies can't do this because the spec rejects duplicate
+// keys.
+class DuplicateOwnKeysProxyHandler final : public ForwardingProxyHandler {
+ public:
+  static const DuplicateOwnKeysProxyHandler singleton;
+  static const char family;
+
+  constexpr DuplicateOwnKeysProxyHandler() : ForwardingProxyHandler(&family) {}
+
+  bool ownPropertyKeys(JSContext* cx, HandleObject proxy,
+                       MutableHandleIdVector props) const override {
+    if (!ForwardingProxyHandler::ownPropertyKeys(cx, proxy, props)) {
+      return false;
+    }
+    size_t length = props.length();
+    for (size_t i = 0; i < length; i++) {
+      RootedId id(cx, props[i]);
+      if (!props.append(id)) {
+        return false;
+      }
+    }
+    return true;
+  }
+};
+
+const DuplicateOwnKeysProxyHandler DuplicateOwnKeysProxyHandler::singleton;
+const char DuplicateOwnKeysProxyHandler::family = 0;
+
+static bool NewProxyWithDuplicateOwnKeys(JSContext* cx, unsigned argc,
+                                         Value* vp) {
+  CallArgs args = CallArgsFromVp(argc, vp);
+  if (!args.requireAtLeast(cx, "newProxyWithDuplicateOwnKeys", 1)) {
+    return false;
+  }
+  if (!args[0].isObject()) {
+    JS_ReportErrorASCII(cx, "target must be an object");
+    return false;
+  }
+
+  RootedValue target(cx, args[0]);
+  JSObject* proxy = NewProxyObject(cx, &DuplicateOwnKeysProxyHandler::singleton,
+                                   target, nullptr);
+  if (!proxy) {
+    return false;
+  }
+
+  args.rval().setObject(*proxy);
   return true;
 }
 
@@ -10507,6 +10568,11 @@ static const JSFunctionSpecWithHelp TestingFunctions[] = {
 "  Set the filename validation callback to a callback that accepts only\n"
 "  filenames starting with 'safe' or (only in system realms) 'system'."),
 
+    JS_FN_HELP("newProxyWithDuplicateOwnKeys", NewProxyWithDuplicateOwnKeys, 1, 0,
+"newProxyWithDuplicateOwnKeys(target)",
+"  Returns a proxy that forwards to |target| but reports each of its own keys\n"
+"  twice from [[OwnPropertyKeys]]."),
+
     JS_FN_HELP("newObjectWithAddPropertyHook", NewObjectWithAddPropertyHook, 0, 0,
 "newObjectWithAddPropertyHook()",
 "  Returns a new object with an addProperty JSClass hook. This hook\n"
@@ -10704,6 +10770,11 @@ JS_FN_HELP("rejectPromise", RejectPromise, 2, 0,
     JS_FN_HELP("gcPreserveCode", GCPreserveCode, 0, 0,
 "gcPreserveCode()",
 "  Preserve JIT code during garbage collections."),
+
+    JS_FN_HELP("setRealmIsDyingHint", SetRealmIsDyingHint, 0, 0,
+"setRealmIsDyingHint()",
+"  Hint that the current realm is dying, like the browser does when a window\n"
+"  goes away. The GC then no longer preserves JIT code for it."),
 
 #ifdef JS_GC_ZEAL
     JS_FN_HELP("gczeal", GCZeal, 2, 0,

@@ -471,7 +471,7 @@ export class ChatConversation extends Conversation {
         return false;
       }
       // Keep localized messages (rendered from l10n id)
-      if (type === "text" && !body && !content?.l10nId) {
+      if (type === "text" && !body && !content?.l10nId && !message.toolUIData) {
         return false;
       }
       return true;
@@ -1099,7 +1099,7 @@ export class ChatConversation extends Conversation {
    * Updates the tool UI data for a message with a new UI state
    *
    * @param {ChatMessage} message - The message to update
-   * @param {object} data - The update data containing updateData
+   * @param {object} data - The update data containing properties or updateData
    * @param {string|null} nextUI - The next UI state to transition to, or null to clear
    */
   async updateToolUI(message, data, nextUI) {
@@ -1114,6 +1114,7 @@ export class ChatConversation extends Conversation {
       uiType: nextUI,
       properties: {
         ...message.toolUIData.properties,
+        ...data?.properties,
       },
     };
 
@@ -1132,9 +1133,11 @@ export class ChatConversation extends Conversation {
    *
    * @param {string} toolCallId - The ID of the tool call
    * @param {object} uiData - The UI data to attach to the message
+   * @param {object} [options]
+   * @param {boolean} [options.emitComplete=true] - Whether to mark the message complete
    * @returns {object} Result object with success status and message
    */
-  addUIToolToCurrentMessage(toolCallId, uiData) {
+  addUIToolToCurrentMessage(toolCallId, uiData, { emitComplete = true } = {}) {
     const enrichedUIData = { ...uiData };
 
     // Get the last assistant text message to attach UI to
@@ -1206,7 +1209,9 @@ export class ChatConversation extends Conversation {
 
     // Re-emit complete event since the message was already marked complete before tool execution
     // This forces the UI to re-render with the new toolUIData
-    this.emit("chat-conversation:message-complete", currentMessage);
+    if (emitComplete) {
+      this.emit("chat-conversation:message-complete", currentMessage);
+    }
 
     return {
       success: true,

@@ -6,6 +6,7 @@ package org.mozilla.fenix.components.menu
 
 import kotlinx.coroutines.flow.StateFlow
 import mozilla.components.compose.menu.data.MenuItem
+import mozilla.components.compose.menu.store.MenuEvent
 
 /**
  * Provides the configuration of one menu item, owned by the feature that item belongs to.
@@ -25,4 +26,19 @@ interface MenuItemProvider {
      * network - should return a default item immediately and offer a new item once it knows more.
      */
     val itemFlow: StateFlow<MenuItem?>
+
+    /** Get if the given [event] is one this knows how to handle. */
+    fun handles(event: MenuEvent): Boolean = false
+
+    /**
+     * Reacts to an [event] this provider [handles].
+     *
+     * This runs right when the event is dispatched, on the thread dispatching it. Work that needs waiting for should be
+     * launched in a scope tied to the lifetime of the menu, or, if it must complete even after the menu is closed, in a
+     * scope that outlives the menu.
+     *
+     * @param event The event to react to.
+     * @param menu [MenuHost] for integrating with the current menu.
+     */
+    fun onEvent(event: MenuEvent, menu: MenuHost) = Unit
 }

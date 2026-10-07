@@ -3694,11 +3694,7 @@ pref("browser.ml.modelCacheMaxSize", 4);
 // Model cache timeout in ms
 pref("browser.ml.modelCacheTimeout", 120000);
 // Route llama.cpp inference to the HWInference utility process
-#ifdef NIGHTLY_BUILD
-  pref("browser.ml.llama.hwInference", true);
-#else
-  pref("browser.ml.llama.hwInference", false);
-#endif
+pref("browser.ml.llama.hwInference", true);
 // Minimal Physical RAM required in GiB
 pref("browser.ml.minimumPhysicalMemory", 3);
 // Check for memory before running
@@ -4306,4 +4302,15 @@ pref("general.smoothScroll", true, sticky);
 // Trigger FOG's Artifact Build support on artifact builds.
 #ifdef MOZ_ARTIFACT_BUILDS
   pref("telemetry.fog.artifact_build", true);
+#endif
+
+// For artifact builds, launch child process executables using the executable
+// names in their respective Info.plist files rather than the compile-time
+// branding macros. Artifact build branding doesn't always match the local
+// repo branding configuration leading to mismatches because some macOS
+// executable filenames are derived from the branding. The plist files could
+// always be used, but reading the executable names from the plist requires
+// extra library calls so by default we'll use compile-time brand macros.
+#if defined(MOZ_ARTIFACT_BUILDS) && defined(XP_MACOSX)
+  pref("dom.ipc.processLaunch.useMacPlists", true);
 #endif

@@ -1646,6 +1646,7 @@ macosx64-clang-trunk-profile:
         toolchain:
             - macosx64-clang-trunk-stage2
             - macosx64-sdk-toolchain
+            - macosx64-x64-compiler-rt-trunk
 
 macosx64-clang-trunk-raw:
     description: "Clang trunk toolchain build"

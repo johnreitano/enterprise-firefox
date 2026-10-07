@@ -209,6 +209,7 @@ enum class WebGLTexDimensions : uint8_t { Tex2D, Tex3D };
 enum class WebGLExtensionID : uint8_t {
   ANGLE_instanced_arrays,
   EXT_blend_minmax,
+  EXT_clip_control,
   EXT_color_buffer_float,
   EXT_color_buffer_half_float,
   EXT_depth_clamp,

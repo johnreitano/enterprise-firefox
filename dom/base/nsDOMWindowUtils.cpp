@@ -2414,7 +2414,11 @@ nsDOMWindowUtils::SendContentCommandEvent(const nsAString& aType,
                                           const nsAString& aString,
                                           uint32_t aOffset,
                                           const nsAString& aReplaceSrcString,
-                                          uint32_t aAdditionalFlags) {
+                                          uint32_t aAdditionalFlags,
+                                          bool* aOutEnabled) {
+  MOZ_ASSERT(aOutEnabled);
+  *aOutEnabled = false;
+
   // get the widget to send the event to
   const nsCOMPtr<nsIWidget> widget = GetWidget();
   if (!widget) [[unlikely]] {
@@ -2465,6 +2469,7 @@ nsDOMWindowUtils::SendContentCommandEvent(const nsAString& aType,
   }
 
   dispatcher->DispatchContentCommandEvent(event);
+  *aOutEnabled = event.mSucceeded && event.mIsEnabled;
   return NS_OK;
 }
 

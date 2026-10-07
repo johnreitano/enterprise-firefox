@@ -1021,8 +1021,7 @@ tab-split-view-wrapper[dragtarget] {
     outline-color: var(--tab-close-button-border-color-active);
   }
 
-  #tabbrowser-tabs[orient="horizontal"] &[pinned],
-  :root:not([sidebar-expand-on-hover]) #tabbrowser-tabs[orient="vertical"] &[pinned],
+  &[pinned],
   #tabbrowser-tabs[closebuttons="activetab"][orient="horizontal"] &:not([selected]) {
     display: none;
   }
@@ -2351,7 +2350,7 @@ tab-group {
 
   @media -moz-pref("browser.nova.enabled") {
     --panel-padding: var(--space-large) var(--space-small) 0;
-    --input-text-background-color: var(--background-color-box);
+    --input-background-color: var(--background-color-box);
     --panel-separator-padding: 0;
     --panel-menuitem-padding-block: var(--space-xsmall);
     --panel-width: 24em;

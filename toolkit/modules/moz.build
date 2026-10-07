@@ -350,6 +350,7 @@ for var in (
     "MOZ_UPDATE_AGENT",
     "MOZ_BITS_DOWNLOAD",
     "MOZ_DEBUG",
+    "MOZ_DIAGNOSTIC_ASSERT_ENABLED",
     "MOZ_ASAN",
     "MOZ_ASAN_REPORTER",
     "MOZ_TSAN",

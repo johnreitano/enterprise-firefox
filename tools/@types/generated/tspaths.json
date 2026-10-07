@@ -6649,9 +6649,6 @@
       "resource://gre/modules/handlers/HandlerList.sys.mjs": [
         "../../../uriloader/exthandler/HandlerList.sys.mjs"
       ],
-      "resource://gre/modules/jsdebugger.sys.mjs": [
-        "../../../devtools/platform/jsdebugger.sys.mjs"
-      ],
       "resource://gre/modules/launchonlogin/MacOSLaunchOnLogin.sys.mjs": [
         "../../../toolkit/modules/launchonlogin/MacOSLaunchOnLogin.sys.mjs"
       ],

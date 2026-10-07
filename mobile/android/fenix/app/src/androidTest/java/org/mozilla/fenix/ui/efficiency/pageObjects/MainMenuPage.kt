@@ -7,6 +7,7 @@ package org.mozilla.fenix.ui.efficiency.pageObjects
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import mozilla.components.browser.state.selector.selectedTab
 import org.mozilla.fenix.components.menu.MenuDialogTestTag
 import org.mozilla.fenix.ext.components
 import org.mozilla.fenix.helpers.Constants.recommendedAddons
@@ -112,9 +113,16 @@ class MainMenuPage(composeRule: AndroidComposeTestRule<HomeActivityIntentTestRul
         val name: String
             get() = state.name ?: id
 
-        /** The label of the extension's main menu entry: its toolbar button title, falling back to [name]. */
+        /**
+         * The label of the extension's main menu entry: its toolbar button title as overridden for the selected tab
+         * (e.g. NoScript drops its version there), falling back to [name].
+         */
         val menuLabel: String
-            get() = state.browserAction?.title?.takeUnless { it.isBlank() } ?: name
+            get() {
+                val tabAction =
+                    appContext.components.core.store.state.selectedTab?.extensionState?.get(id)?.browserAction
+                return state.browserAction?.copyWithOverride(tabAction)?.title?.takeUnless { it.isBlank() } ?: name
+            }
     }
 
     /**

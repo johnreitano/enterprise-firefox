@@ -3184,6 +3184,10 @@ void ClientWebGLContext::ClearDepth(GLclampf v) { Run<RPROC(ClearDepth)>(v); }
 
 void ClientWebGLContext::ClearStencil(GLint v) { Run<RPROC(ClearStencil)>(v); }
 
+void ClientWebGLContext::ClipControlEXT(GLenum origin, GLenum depth) {
+  Run<RPROC(ClipControlEXT)>(origin, depth);
+}
+
 void ClientWebGLContext::ColorMaskI(Maybe<GLuint> i, bool r, bool g, bool b,
                                     bool a) const {
   const FuncScope funcScope(*this, "colorMask");

@@ -3333,7 +3333,7 @@ pub extern "C" fn wr_dp_push_stacking_context(
 
         result.id = wr_spatial_id.0;
         assert_ne!(wr_spatial_id.0, 0);
-    } else if bounds.min != LayoutPoint::zero() {
+    } else if bounds.min != LayoutPoint::zero() || params.should_snap {
         // Inherit the stacking context's transform style so this translate-only
         // reference frame doesn't introduce a 3D flattening boundary for
         // preserve-3d contexts.
@@ -3344,7 +3344,7 @@ pub extern "C" fn wr_dp_push_stacking_context(
             PropertyBinding::Value(LayoutTransform::identity()),
             ReferenceFrameKind::Transform {
                 is_2d_scale_translation: true,
-                should_snap: false,
+                should_snap: params.should_snap,
                 paired_with_perspective: false,
             },
         );
@@ -3430,24 +3430,36 @@ pub extern "C" fn wr_dp_define_rounded_rect_clip(
     state: &mut WrState,
     space: WrSpatialId,
     complex: ComplexClipRegion,
+    anti_aliased: bool,
 ) -> WrClipId {
     debug_assert!(unsafe { is_in_main_thread() });
 
-    let clip_id = state
-        .frame_builder
-        .dl_builder
-        .define_clip_rounded_rect(space.to_webrender(state.pipeline_id), complex);
+    let space = space.to_webrender(state.pipeline_id);
+    let dl_builder = &mut state.frame_builder.dl_builder;
+    let clip_id = if anti_aliased {
+        dl_builder.define_anti_aliased_clip_rounded_rect(space, complex)
+    } else {
+        dl_builder.define_clip_rounded_rect(space, complex)
+    };
     WrClipId::from_webrender(clip_id)
 }
 
 #[no_mangle]
-pub extern "C" fn wr_dp_define_rect_clip(state: &mut WrState, space: WrSpatialId, clip_rect: LayoutRect) -> WrClipId {
+pub extern "C" fn wr_dp_define_rect_clip(
+    state: &mut WrState,
+    space: WrSpatialId,
+    clip_rect: LayoutRect,
+    anti_aliased: bool,
+) -> WrClipId {
     debug_assert!(unsafe { is_in_main_thread() });
 
-    let clip_id = state
-        .frame_builder
-        .dl_builder
-        .define_clip_rect(space.to_webrender(state.pipeline_id), clip_rect);
+    let space = space.to_webrender(state.pipeline_id);
+    let dl_builder = &mut state.frame_builder.dl_builder;
+    let clip_id = if anti_aliased {
+        dl_builder.define_anti_aliased_clip_rect(space, clip_rect)
+    } else {
+        dl_builder.define_clip_rect(space, clip_rect)
+    };
     WrClipId::from_webrender(clip_id)
 }
 

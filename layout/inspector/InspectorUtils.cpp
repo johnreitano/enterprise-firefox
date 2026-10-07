@@ -1272,9 +1272,10 @@ void InspectorUtils::GetCSSRegisteredProperty(
 
 /* static */
 bool InspectorUtils::ValueMatchesSyntax(GlobalObject&, Document& aDocument,
+                                        const nsACString& aProperty,
                                         const nsACString& aValue,
                                         const nsACString& aSyntax) {
-  return Servo_Value_Matches_Syntax(&aValue, &aSyntax,
+  return Servo_Value_Matches_Syntax(&aProperty, &aValue, &aSyntax,
                                     aDocument.DefaultStyleAttrURLData());
 }
 

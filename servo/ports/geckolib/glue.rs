@@ -91,8 +91,8 @@ use style::properties::LonghandIdSet;
 use style::properties::{
     CSSWideKeyword, ComputedValues, CountedUnknownProperty, Importance, LonghandId,
     NonCustomPropertyId, OwnedPropertyDeclarationId, PropertyDeclarationBlock,
-    PropertyDeclarationId, PropertyDeclarationIdSet, PropertyFlags, PropertyId, ShorthandId,
-    SourcePropertyDeclaration, StyleBuilder,
+    PropertyDeclarationId, PropertyDeclarationIdSet, PropertyFlags, PropertyId, PropertyIdRef,
+    ShorthandId, SourcePropertyDeclaration, StyleBuilder,
     animated_properties::{AnimationValue, AnimationValueMap},
     parse_one_declaration_into, parse_style_attribute,
 };
@@ -10723,6 +10723,7 @@ pub unsafe extern "C" fn Servo_GetRegisteredCustomProperty(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn Servo_Value_Matches_Syntax(
+    property: &nsACString,
     value: &nsACString,
     syntax: &nsACString,
     extra_data: *mut URLExtraData,
@@ -10747,6 +10748,9 @@ pub unsafe extern "C" fn Servo_Value_Matches_Syntax(
     }
 
     let url_data = unsafe { UrlExtraData::from_ptr_ref(&extra_data) };
+    let prop_str = unsafe { property.as_str_unchecked() };
+    let property_id = PropertyId::parse_enabled_for_all_content(prop_str).ok();
+    let property_id_ref = property_id.as_ref().map(PropertyIdRef::from);
 
     SpecifiedValue::parse(
         &mut input,
@@ -10755,9 +10759,7 @@ pub unsafe extern "C" fn Servo_Value_Matches_Syntax(
         None,
         AllowComputationallyDependent::Yes,
         /* attr_taint */ Default::default(),
-        // TODO(Bug 2071366) - Thread the custom property name through InspectorUtils so that
-        // declarations using random() are not immediately flagged as non-matching.
-        None,
+        property_id_ref,
     )
     .is_ok()
 }

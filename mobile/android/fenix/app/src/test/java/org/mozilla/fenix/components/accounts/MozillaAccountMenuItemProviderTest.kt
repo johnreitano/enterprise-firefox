@@ -9,8 +9,10 @@ import io.mockk.mockk
 import io.mockk.verify
 import java.io.ByteArrayInputStream
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -42,8 +44,10 @@ import mozilla.components.support.test.robolectric.testContext
 import mozilla.components.ui.icons.R as iconsR
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mozilla.fenix.NavGraphDirections
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.menu.MenuAccessPoint
+import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.store.MenuAction
 import org.robolectric.RobolectricTestRunner
 
@@ -243,6 +247,48 @@ class MozillaAccountMenuItemProviderTest {
 
             verify(exactly = 1) { httpClient.fetch(any()) }
         }
+
+    @Test
+    fun `GIVEN someone is signed in WHEN clicking the item THEN show their account settings in place of the menu`() =
+        runTest {
+            val menu = FakeMenuHost()
+
+            provider().onEvent(MenuAction.Navigate.MozillaAccount(Authenticated, MenuAccessPoint.Browser), menu)
+
+            assertEquals(NavGraphDirections.actionGlobalAccountSettingsFragment(), menu.directions)
+        }
+
+    @Test
+    fun `GIVEN the account needs signing in again WHEN clicking the item THEN offer signing back in`() = runTest {
+        val menu = FakeMenuHost()
+
+        provider().onEvent(MenuAction.Navigate.MozillaAccount(AuthenticationProblem, MenuAccessPoint.Browser), menu)
+
+        assertEquals(
+            NavGraphDirections.actionGlobalAccountProblemFragment(entrypoint = FenixFxAEntryPoint.BrowserToolbar),
+            menu.directions,
+        )
+    }
+
+    @Test
+    fun `GIVEN nobody is signed in WHEN clicking the item THEN offer signing in`() = runTest {
+        val menu = FakeMenuHost()
+
+        provider().onEvent(MenuAction.Navigate.MozillaAccount(NotAuthenticated, MenuAccessPoint.Browser), menu)
+
+        assertEquals(
+            NavGraphDirections.actionGlobalTurnOnSync(entrypoint = FenixFxAEntryPoint.BrowserToolbar),
+            menu.directions,
+        )
+    }
+
+    @Test
+    fun `WHEN asked about the events of the account item THEN handle only those`() = runTest {
+        val provider = provider()
+
+        assertTrue(provider.handles(MenuAction.Navigate.MozillaAccount(Authenticated, MenuAccessPoint.Browser)))
+        assertFalse(provider.handles(MenuAction.Navigate.Settings))
+    }
 
     // The account is observed and its avatar downloaded on a scope that runTest cancels at the end of each test.
     private fun TestScope.provider(httpClient: Client = mockk(relaxed = true)) =
