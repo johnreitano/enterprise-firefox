@@ -76,7 +76,8 @@ fn bypass_allowed() -> bool {
 #[no_mangle]
 pub extern "C" fn felt_init() {
     trace!("felt_init()");
-    env_logger::init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("error,felt=warn"))
+        .init();
 
     let found_felt_ui_env = has_env("MOZ_FELT_UI");
     let bypass_env = has_env("MOZ_BYPASS_FELT") && bypass_allowed();
