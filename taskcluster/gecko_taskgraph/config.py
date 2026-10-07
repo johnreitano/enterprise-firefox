@@ -179,7 +179,12 @@ class GraphConfigSchema(Schema, kw_only=True):
     release_promotion: ReleasePromotionConfig
     scriptworker: ScriptworkerConfig
     task_priority: optionally_keyed_by(
-        "project", "shipping", TaskPriority, use_msgspec=True
+        "project",
+        "head-ref",
+        "shared-worker",
+        "shipping",
+        TaskPriority,
+        use_msgspec=True,
     )
     partner_urls: PartnerUrlsConfig
     workers: WorkersConfig

@@ -421,11 +421,29 @@ def get_task_source_url(config, task):
 
 
 @functools.cache
-def get_default_priority(graph_config, project, shipping):
+def is_shared_worker(graph_config, provisioner_id, worker_type):
+    """Whether a worker pool is shared with another trust domain.
+
+    Pools owned by our own trust domain always spell it out in either the
+    provisioner id or the worker type, so anything else (e.g. the
+    `releng-hardware/gecko-t-osx-*` macOS hardware) is shared with, and
+    competes against, the tasks of another trust domain.
+    """
+    trust_domain = graph_config["trust-domain"]
+    return trust_domain not in provisioner_id and trust_domain not in worker_type
+
+
+@functools.cache
+def get_default_priority(graph_config, project, head_ref, shared_worker, shipping):
     return evaluate_keyed_by(
         graph_config["task-priority"],
         "Graph Config",
-        {"project": project, "shipping": str(shipping).lower()},
+        {
+            "project": project,
+            "head-ref": head_ref,
+            "shared-worker": str(shared_worker).lower(),
+            "shipping": str(shipping).lower(),
+        },
     )
 
 
@@ -2618,6 +2636,8 @@ def build_task(config, tasks):
             task["priority"] = get_default_priority(
                 config.graph_config,
                 config.params["project"],
+                get_head_ref(config)[0],
+                is_shared_worker(config.graph_config, provisioner_id, worker_type),
                 config.params["shipping"],
             )
 
