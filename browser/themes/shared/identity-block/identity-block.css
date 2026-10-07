@@ -12,6 +12,14 @@
 }
 
 #identity-box {
+  margin-inline-start: calc(-1 * var(--urlbar-component-gap));
+
+  > #identity-icon-box,
+  > #identity-permission-box,
+  > #notification-popup-box {
+    margin-inline-start: var(--urlbar-component-gap);
+  }
+
   &[pageproxystate="invalid"] {
     pointer-events: none;
     -moz-user-focus: ignore;
@@ -325,13 +333,9 @@
     display: none;
   }
 
-  #identity-box {
-    /* Keep displaying the moz-extension or chrome UI chicklet */
-    &[pageproxystate="valid"]:not(.chromeUI, .extensionPage) {
-      #identity-icon-box {
-        display: none;
-      }
-    }
+  /* Keep displaying the moz-extension or chrome UI chicklet */
+  #identity-box[pageproxystate="valid"]:not(.chromeUI, .extensionPage) > #identity-icon-box {
+    display: none;
   }
 
   #trust-icon-container {

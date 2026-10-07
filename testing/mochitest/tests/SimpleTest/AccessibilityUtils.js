@@ -491,7 +491,10 @@ this.AccessibilityUtils = (function () {
       }
       // Use tabIndex rather than a11y focusable state because all tabs might
       // have tabindex="-1".
-      if (tab.DOMNode.tabIndex == 0) {
+      if (
+        tab.DOMNode.tabIndex == 0 &&
+        hasFocusableShadowAncestors(tab.DOMNode)
+      ) {
         if (foundFocusable) {
           // Only one tab within a tablist should be focusable.
           // ToDo: Fine-tune the a11y-check error message generated in this case.
@@ -508,6 +511,27 @@ this.AccessibilityUtils = (function () {
       }
     }
     return foundFocusable;
+  }
+
+  /**
+   * Determine if a node is keyboard focusable by ensuring none of its shadow
+   * host ancestors have a negative tabindex.
+   *
+   * @param {Node} node
+   *   The node to check within the shadow tree.
+   * @returns {boolean}
+   *   `true` if the node is not trapped behind an unfocusable shadow host.
+   */
+  function hasFocusableShadowAncestors(node) {
+    let root = node.getRootNode();
+    while (ShadowRoot.isInstance(root)) {
+      const host = root.host;
+      if (host.hasAttribute("tabindex") && host.tabIndex < 0) {
+        return false;
+      }
+      root = host.getRootNode();
+    }
+    return true;
   }
 
   /**
@@ -1282,6 +1306,15 @@ this.AccessibilityUtils = (function () {
    */
   const AccessibilityUtils = {
     assertCanBeClicked(node) {
+      if (node.frameLoader?.isRemoteFrame) {
+        // The click landed in a document of another process, which is what
+        // the user clicks, not the frame element itself. Remote documents
+        // aren't supported by these checks.
+        a11yWarn("Unable to perform a11y checks in a remote document", {
+          DOMNode: node,
+        });
+        return;
+      }
       // Click events might fire on an inaccessible or non-interactive
       // descendant, even if the test author targeted them at an interactive
       // element. For example, if there's a button with an image inside it,

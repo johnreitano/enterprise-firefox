@@ -58,6 +58,7 @@
 #include "mozilla/dom/Link.h"
 #include "mozilla/dom/MouseEventBinding.h"
 #include "mozilla/dom/PerformanceContainerTiming.h"
+#include "mozilla/dom/Range.h"
 #include "mozilla/dom/ScriptLoader.h"
 #include "mozilla/dom/ShadowIncludingTreeIterator.h"
 #include "mozilla/dom/ToggleEvent.h"
@@ -92,7 +93,6 @@
 #include "nsPIDOMWindow.h"
 #include "nsPresContext.h"
 #include "nsQueryObject.h"
-#include "nsRange.h"
 #include "nsString.h"
 #include "nsStyleUtil.h"
 #include "nsTableCellFrame.h"
@@ -3327,7 +3327,7 @@ void nsGenericHTMLElement::GetInnerText(mozilla::dom::DOMString& aValue,
   if (!IsRendered()) {
     GetTextContentInternal(aValue, aError);
   } else {
-    nsRange::GetInnerTextNoFlush(aValue, aError, this);
+    dom::Range::GetInnerTextNoFlush(aValue, aError, this);
   }
 }
 

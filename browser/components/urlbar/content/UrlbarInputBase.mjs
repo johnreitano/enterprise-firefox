@@ -5,7 +5,7 @@
 import { SearchModeSwitcher } from "chrome://browser/content/urlbar/SearchModeSwitcher.mjs";
 import { UrlbarChildController } from "chrome://browser/content/urlbar/UrlbarChildController.mjs";
 import { UrlbarEventBufferer } from "chrome://browser/content/urlbar/UrlbarEventBufferer.mjs";
-import * as UrlbarContentUtils from "chrome://browser/content/urlbar/UrlbarContentUtils.mjs";
+import { UrlbarContentUtils } from "chrome://browser/content/urlbar/UrlbarContentUtils.mjs";
 import UrlbarPrefs from "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs";
 import { UrlbarQueryContext } from "chrome://browser/content/urlbar/UrlbarQueryContext.mjs";
 import { UrlbarView } from "chrome://browser/content/urlbar/UrlbarView.mjs";
@@ -130,7 +130,8 @@ function parseMarkupToFragment(markup) {
 }
 
 /**
- * Implements the text input part of the address bar UI.
+ * Implements the text input part of search access points. Each access point
+ * extends this class (e.g. `UrlbarInput`, `SearchbarInput`).
  */
 export class UrlbarInputBase extends HTMLElement {
   static get #markup() {
@@ -197,7 +198,7 @@ ${
         <div class="urlbarView-background"/>
         <div class="urlbarView-results"
              role="listbox"/>
-        <panel-list class="urlbarView-result-menu"></panel-list>
+        <panel-list class="urlbarView-result-menu" accesskey-conflicts-bug="2073892"></panel-list>
         <moz-urlbar-slot name="search-one-offs" />
    </div>`;
   }
@@ -495,7 +496,7 @@ ${
   }
 
   /**
-   * Hook for subclass-specific initialization work, called during {@link #init}.
+   * Hook for subclass-specific initialization work, called during `#init`.
    * Default no-op.
    */
   sapInit() {}
@@ -656,10 +657,12 @@ ${
       return;
     }
 
-    this._initStripOnShare();
     this._initPasteAndGo();
     if (this.#isAddressbar && UrlbarContentUtils.getPlatform() == "macosx") {
+      // The share group handles the strip-on-share item on macOS.
       this.#initShareURL();
+    } else {
+      this._initStripOnShare();
     }
     if (this.#isAddressbar) {
       this._initAutofillDismiss();
@@ -745,7 +748,8 @@ ${
   /**
    * Whether this is a bar dedicated to search.
    *
-   * @see {UrlbarShared.isSearchbarSAP}
+   * See `UrlbarShared.isSearchbarSAP`.
+   *
    * @type {boolean}
    */
   get isSearchbarSAP() {
@@ -1292,6 +1296,13 @@ ${
       !this.searchMode?.engineName ||
       (result &&
         !(result.heuristic && result.type == UrlbarShared.RESULT_TYPE.SEARCH))
+    ) {
+      return null;
+    }
+    if (
+      !result &&
+      this._resultForCurrentValue?.type == UrlbarShared.RESULT_TYPE.URL &&
+      UrlbarShared.navigationInSearchModeEnabled(this.#sapName)
     ) {
       return null;
     }
@@ -4426,50 +4437,62 @@ ${
       after: "edit-contextmenu-copy",
       createItems: () => {
         let fragment = this.document.createDocumentFragment();
-        let stripOnShare = this.document.createXULElement("menuitem");
-        this.document.l10n.setAttributes(
-          stripOnShare,
-          "text-action-copy-clean-link"
-        );
-        stripOnShare.setAttribute("anonid", "strip-on-share");
-        stripOnShare.id = "strip-on-share";
-
-        // Register listener that returns the stripped url or falls back
-        // to the original url if nothing can be stripped.
-        stripOnShare.addEventListener("command", () => {
-          let strippedURI = this.#stripURI();
-          lazy.ClipboardHelper.copyString(strippedURI.displaySpec);
-        });
-
-        fragment.appendChild(stripOnShare);
+        fragment.appendChild(this.#createStripOnShareItem());
         return fragment;
       },
-      // Hide the menu item if there is nothing to copy.
       onShowing: (input, [stripOnShare]) => {
-        // feature is not enabled
-        if (
-          !UrlbarPrefs.get("privacy.query_stripping.strip_on_share.enabled")
-        ) {
-          stripOnShare.setAttribute("hidden", true);
-          return;
-        }
-        let controller =
-          this.document.commandDispatcher.getControllerForCommand("cmd_copy");
-        if (
-          !controller.isCommandEnabled("cmd_copy") ||
-          !this.#isClipboardURIValid()
-        ) {
-          stripOnShare.setAttribute("hidden", true);
-          return;
-        }
-        stripOnShare.removeAttribute("hidden");
-        if (!this.#canStrip()) {
-          stripOnShare.setAttribute("disabled", true);
-          return;
-        }
-        stripOnShare.removeAttribute("disabled");
+        this.#updateStripOnShareItem(stripOnShare);
       },
     });
+  }
+
+  /**
+   * Builds the strip-on-share menuitem. On macOS the addressbar appends it to
+   * the share group instead of registering its own item set.
+   *
+   * @returns {Element} A newly created menuitem
+   */
+  #createStripOnShareItem() {
+    let stripOnShare = this.document.createXULElement("menuitem");
+    this.document.l10n.setAttributes(
+      stripOnShare,
+      "text-action-copy-clean-link"
+    );
+    stripOnShare.setAttribute("anonid", "strip-on-share");
+    stripOnShare.id = "strip-on-share";
+
+    // Register listener that returns the stripped url or falls back
+    // to the original url if nothing can be stripped.
+    stripOnShare.addEventListener("command", () => {
+      let strippedURI = this.#stripURI();
+      lazy.ClipboardHelper.copyString(strippedURI.displaySpec);
+    });
+
+    return stripOnShare;
+  }
+
+  // Hide the menu item if there is nothing to copy.
+  #updateStripOnShareItem(stripOnShare) {
+    // feature is not enabled
+    if (!UrlbarPrefs.get("privacy.query_stripping.strip_on_share.enabled")) {
+      stripOnShare.setAttribute("hidden", true);
+      return;
+    }
+    let controller =
+      this.document.commandDispatcher.getControllerForCommand("cmd_copy");
+    if (
+      !controller.isCommandEnabled("cmd_copy") ||
+      !this.#isClipboardURIValid()
+    ) {
+      stripOnShare.setAttribute("hidden", true);
+      return;
+    }
+    stripOnShare.removeAttribute("hidden");
+    if (!this.#canStrip()) {
+      stripOnShare.setAttribute("disabled", true);
+      return;
+    }
+    stripOnShare.removeAttribute("disabled");
   }
 
   _initPasteAndGo() {
@@ -4504,6 +4527,23 @@ ${
         // selection. This has to happen before the menu opens: hiding the
         // popover once it's open keeps it from showing (bug 2037468).
         this.view.close();
+
+        // The edit context menu is shared with other inputs in chrome, and
+        // only the items we add here conflict, so mark it for this opening
+        // alone, removing the marker again when closed.
+        let popup = this.window.EditContextMenu.popup;
+        popup.setAttribute("accesskey-conflicts-bug", "2073891");
+        popup.addEventListener(
+          "popuphidden",
+          () => {
+            // An opening that got superseded before it finished still fires
+            // popuphidden while the menu is open.
+            if (popup.state == "closed") {
+              popup.removeAttribute("accesskey-conflicts-bug");
+            }
+          },
+          { once: true }
+        );
 
         let controller =
           this.document.commandDispatcher.getControllerForCommand("cmd_paste");
@@ -4630,7 +4670,7 @@ ${
   }
 
   /**
-   * Initializes the share URL context menu item.
+   * Initializes the share group: Share…, Create QR Code and Copy Clean Link.
    * This is only shown on the addressbar and only on macOS.
    */
   #initShareURL() {
@@ -4639,26 +4679,42 @@ ${
       createItems: () => {
         let fragment = this.document.createDocumentFragment();
         fragment.appendChild(this.document.createXULElement("menuseparator"));
+
+        let shareItem = this.document.createXULElement("menuitem");
+        shareItem.classList.add("share-tab-url-item", "share-mac-picker-item");
+        this.document.l10n.setAttributes(shareItem, "urlbar-share-url");
+        shareItem.addEventListener("command", () => {
+          lazy.SharingUtils.shareOnMacPicker(shareItem);
+        });
+        fragment.appendChild(shareItem);
+
+        let qrCodeItem = this.document.createXULElement("menuitem");
+        qrCodeItem.classList.add("share-qrcode-item");
+        qrCodeItem.id = "share-qrcode";
+        this.document.l10n.setAttributes(qrCodeItem, "menu-file-share-qrcode3");
+        qrCodeItem.addEventListener("command", () => {
+          lazy.SharingUtils.showQRCode(qrCodeItem);
+        });
+        fragment.appendChild(qrCodeItem);
+        fragment.appendChild(this.#createStripOnShareItem());
+
         return fragment;
       },
-      onShowing: (input, items) => {
-        let [separator] = items;
-        let gBrowser = this.window.gBrowser;
-        let browser = gBrowser?.selectedBrowser;
-        if (!browser) {
-          return;
-        }
-        lazy.SharingUtils.ensureShareMenu(
-          browser,
-          gBrowser.selectedTabs.length > 1
-            ? gBrowser.selectedTabs.map(t => t.linkedBrowser)
-            : null,
-          separator
+      onShowing: (input, [, shareItem, qrCodeItem, stripOnShare]) => {
+        this.#updateStripOnShareItem(stripOnShare);
+        let browser = this.window.gBrowser?.selectedBrowser;
+        let browserRef = browser ? Cu.getWeakReference(browser) : null;
+        shareItem.contextBrowserToShare = browserRef;
+        shareItem.browsersToShare = null;
+        qrCodeItem.contextBrowserToShare = browserRef;
+        let shareable =
+          !!lazy.SharingUtils.getLinkToShare(shareItem).urlToShare;
+        shareItem.toggleAttribute("disabled", !shareable);
+        qrCodeItem.hidden = !Services.prefs.getBoolPref(
+          "browser.shareqrcode.enabled",
+          false
         );
-        // ensureShareMenu inserts the share menu after the separator. Claim it
-        // so it's hidden along with the separator when the menu opens on
-        // another input.
-        items[1] = separator.nextElementSibling;
+        qrCodeItem.toggleAttribute("disabled", !shareable);
       },
     });
   }

@@ -121,6 +121,8 @@ support-files= [
 
 ["browser_onModifyRequestNotificationForTrackingResources.js"]
 
+["browser_openerAfterUserInteractionHeuristic.js"]
+
 ["browser_partitionKey_XSLT.js"]
 support-files= [
   "file_xslt.xml",
@@ -237,9 +239,6 @@ support-files = [
   "!/browser/components/originattributes/test/browser/file_thirdPartyChild.worker.request.html",
   "!/browser/components/originattributes/test/browser/file_thirdPartyChild.worker.xhr.html",
   "!/browser/components/originattributes/test/browser/file_thirdPartyChild.xhr.html",
-]
-skip-if = [
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64' && debug", # Bug 1775745
 ]
 
 ["browser_staticPartition_network.js"]

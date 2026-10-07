@@ -284,11 +284,11 @@ void InspectorFontFace::GetFeatures(nsTArray<InspectorFontFeature>& aResult,
   }
 }
 
-void InspectorFontFace::GetRanges(nsTArray<RefPtr<nsRange>>& aResult) {
+void InspectorFontFace::GetRanges(nsTArray<RefPtr<dom::Range>>& aResult) {
   aResult = mRanges.Clone();
 }
 
-void InspectorFontFace::AddRange(nsRange* aRange) {
+void InspectorFontFace::AddRange(dom::Range* aRange) {
   mRanges.AppendElement(aRange);
 }
 

@@ -32,16 +32,14 @@ class MOZ_RAII ModuleLoadFrame final {
   /**
    * Helper for the NtMapViewOfSection hook.
    *
-   * Ownership of aSectionHandle is transfered to this function.
-   * The section handle may be null, in which case the parent simply cannot
+   * Ownership of aFileHandle is transfered to this function.
+   * The file handle may be null, in which case the parent simply cannot
    * evaluate this module.
    */
   static void NotifySectionMap(nt::AllocatedUnicodeString&& aSectionName,
                                const void* aMapBaseAddr, NTSTATUS aMapNtStatus,
                                ModuleLoadInfo::Status aLoadStatus,
-                               bool aIsDependent,
-                               nt::AutoHandle&& aSectionHandle,
-                               bool aSectionHandleUnavailable);
+                               bool aIsDependent, nt::AutoHandle&& aFileHandle);
   static bool ExistsTopFrame();
 
   /**
@@ -62,15 +60,13 @@ class MOZ_RAII ModuleLoadFrame final {
   ModuleLoadFrame(nt::AllocatedUnicodeString&& aSectionName,
                   const void* aMapBaseAddr, NTSTATUS aNtStatus,
                   ModuleLoadInfo::Status aLoadStatus, bool aIsDependent,
-                  nt::AutoHandle&& aSectionHandle,
-                  bool aSectionHandleUnavailable);
+                  nt::AutoHandle&& aFileHandle);
 
   void SetLSPSubstitutionRequired(PCUNICODE_STRING aLeafName);
   void OnSectionMap(nt::AllocatedUnicodeString&& aSectionName,
                     const void* aMapBaseAddr, NTSTATUS aMapNtStatus,
                     ModuleLoadInfo::Status aLoadStatus, bool aIsDependent,
-                    nt::AutoHandle&& aSectionHandle,
-                    bool aSectionHandleUnavailable);
+                    nt::AutoHandle&& aFileHandle);
 
   /**
    * A "bare" section mapping is one that was mapped without the code passing
@@ -80,9 +76,7 @@ class MOZ_RAII ModuleLoadFrame final {
   static void OnBareSectionMap(nt::AllocatedUnicodeString&& aSectionName,
                                const void* aMapBaseAddr, NTSTATUS aMapNtStatus,
                                ModuleLoadInfo::Status aLoadStatus,
-                               bool aIsDependent,
-                               nt::AutoHandle&& aSectionHandle,
-                               bool aSectionHandleUnavailable);
+                               bool aIsDependent, nt::AutoHandle&& aFileHandle);
 
  private:
   // Link to the previous frame

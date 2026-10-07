@@ -13991,8 +13991,6 @@ interface nsICookieManager extends nsISupports {
   add(aHost: string, aPath: string, aName: string, aValue: string, aIsSecure: boolean, aIsHttpOnly: boolean, aIsSession: boolean, aExpiry: i64, aOriginAttributes: any, aSameSite: i32, aSchemeMap: nsICookie.schemeType, aIsPartitioned?: boolean): nsICookieValidation;
   /** <!-- binding_to(idl, method, XPIDL_nsICookieManager_cookieExists) --> */
   cookieExists(aHost: string, aPath: string, aName: string, aOriginAttributes: any): boolean;
-  /** <!-- binding_to(idl, method, XPIDL_nsICookieManager_countCookiesFromHost) --> */
-  countCookiesFromHost(aHost: string): u32;
   /** <!-- binding_to(idl, method, XPIDL_nsICookieManager_hasCookiesForSite) --> */
   hasCookiesForSite(aHost: string, aPattern: string): boolean;
   /** <!-- binding_to(idl, method, XPIDL_nsICookieManager_getCookiesFromHost) --> */
@@ -14081,12 +14079,6 @@ interface nsICookiePermission extends nsISupports {
 
 // https://searchfox.org/firefox-main/source/netwerk/cookie/nsICookieService.idl
 
-/** <!-- binding_to(idl, interface_name, XPIDL_nsICookieTransactionCallback) --> */
-type nsICookieTransactionCallback = Callable<{
-  /** <!-- binding_to(idl, method, XPIDL_nsICookieTransactionCallback_callback) --> */
-  callback(): void;
-}>
-
 /** <!-- binding_to(idl, interface_name, XPIDL_nsICookieService) --> */
 interface nsICookieService extends nsISupports {
   /** <!-- binding_to(idl, const, XPIDL_nsICookieService_BEHAVIOR_ACCEPT) --> */
@@ -14108,8 +14100,6 @@ interface nsICookieService extends nsISupports {
   getCookieStringFromHttp(aURI: nsIURI, aChannel: nsIChannel): string;
   /** <!-- binding_to(idl, method, XPIDL_nsICookieService_setCookieStringFromHttp) --> */
   setCookieStringFromHttp(aURI: nsIURI, aCookie: string, aChannel: nsIChannel): void;
-  /** <!-- binding_to(idl, method, XPIDL_nsICookieService_runInTransaction) --> */
-  runInTransaction(aCallback: nsICookieTransactionCallback): void;
 }
 
 // https://searchfox.org/firefox-main/source/netwerk/cookie/nsICookieValidation.idl
@@ -27130,7 +27120,6 @@ interface nsIXPCComponents_Interfaces {
   nsICookieManager: nsJSIID<nsICookieManager>;
   nsICookieNotification: nsJSIID<nsICookieNotification, typeof nsICookieNotification_Action>;
   nsICookiePermission: nsJSIID<nsICookiePermission>;
-  nsICookieTransactionCallback: nsJSIID<nsICookieTransactionCallback>;
   nsICookieService: nsJSIID<nsICookieService>;
   nsICookieValidation: nsJSIID<nsICookieValidation, typeof nsICookieValidation_ValidationError>;
   nsIThirdPartyCookieBlockingExceptionListService: nsJSIID<nsIThirdPartyCookieBlockingExceptionListService>;

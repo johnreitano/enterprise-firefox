@@ -25,6 +25,7 @@
 #include "mozilla/dom/Document.h"
 #include "mozilla/dom/EditContext.h"
 #include "mozilla/dom/Element.h"
+#include "mozilla/dom/Range.h"
 #include "mozilla/dom/Selection.h"
 #include "nsAtom.h"
 #include "nsContentUtils.h"
@@ -37,7 +38,6 @@
 #include "nsIWeakReferenceUtils.h"
 #include "nsIWidget.h"
 #include "nsPresContext.h"
-#include "nsRange.h"
 #include "nsRefreshDriver.h"
 #include "nsString.h"
 
@@ -324,7 +324,7 @@ Element* IMEContentObserver::ComputeRootElement(PresShell* aPresShell) const {
 
   // If there is a selection range, we should compute our root element from the
   // first range.
-  if (const nsRange* selRange = selection->GetRangeAt(0)) {
+  if (const dom::Range* selRange = selection->GetRangeAt(0)) {
     MOZ_ASSERT(!mIsTextControl);
     if (NS_WARN_IF(!selRange->GetStartContainer())) {
       return nullptr;

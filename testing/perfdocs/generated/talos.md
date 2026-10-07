@@ -832,60 +832,6 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms
 * **Test Task**:
 
-:::{list-table} **{ref}`test-linux1804-64-qr/opt <hardware-hpe-moonshot>`**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-chrome**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-chrome-no-nv**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-chrome-swr**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **{ref}`test-linux1804-64-shippable-qr/opt <hardware-hpe-moonshot>`**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-chrome**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-chrome-no-nv**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-chrome-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
 :::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
@@ -2001,50 +1947,6 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms
 * win_counters: None
 * **Test Task**:
-
-:::{list-table} **{ref}`test-linux1804-64-qr/opt <hardware-hpe-moonshot>`**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-damp-inspector**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-damp-webconsole**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **{ref}`test-linux1804-64-shippable-qr/opt <hardware-hpe-moonshot>`**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-damp-inspector**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-damp-webconsole**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
 
 :::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
@@ -10129,60 +10031,6 @@ For the sample commands found below, note that the capitalization used is import
 * tppagecycles: 20
 * unit: ms
 * **Test Task**:
-
-:::{list-table} **{ref}`test-linux1804-64-qr/opt <hardware-hpe-moonshot>`**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-chrome**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-chrome-no-nv**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-chrome-swr**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **{ref}`test-linux1804-64-shippable-qr/opt <hardware-hpe-moonshot>`**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-chrome**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-chrome-no-nv**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-chrome-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
 
 :::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15

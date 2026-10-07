@@ -107,6 +107,15 @@ impl ItemUid {
     pub fn get_uid(&self) -> u64 {
         self.uid
     }
+
+    /// Wrap an id from a counter the caller guarantees is unique, for interning
+    /// schemes that mint their own rather than deriving one from a handle.
+    /// `Handle::uid` packs an index and an epoch, which only works because one
+    /// interner owns the whole index space; see `DlStore::uid` for a scheme that
+    /// cannot make that assumption.
+    pub fn from_counter(id: u64) -> Self {
+        ItemUid { uid: id }
+    }
 }
 
 impl std::fmt::Debug for ItemUid {
@@ -345,6 +354,12 @@ impl<I: Internable> Interner<I> {
         handle
     }
 
+    /// Retrieve the pending list of updates without running a GC step or
+    /// advancing the epoch.
+    pub fn take_pending_updates(&mut self) -> UpdateList<I::Key> {
+        self.update_list.take_and_preallocate()
+    }
+
     /// Retrieve the pending list of updates for an interner
     /// that need to be applied to the data store. Also run
     /// a GC step that removes old entries.
@@ -508,12 +523,17 @@ pub struct InterningMemoryReport {
     pub interners: InternerSubReport,
     ///
     pub data_stores: InternerSubReport,
+    /// The follower stores for types interned by the content display list
+    /// builder rather than by a scene builder interner. Same field list; a
+    /// type is accounted under one or the other.
+    pub dl_stores: InternerSubReport,
 }
 
 impl ::std::ops::AddAssign for InterningMemoryReport {
     fn add_assign(&mut self, other: InterningMemoryReport) {
         self.interners += other.interners;
         self.data_stores += other.data_stores;
+        self.dl_stores += other.dl_stores;
     }
 }
 

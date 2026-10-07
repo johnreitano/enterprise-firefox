@@ -21,7 +21,7 @@ class PathOps {
   explicit PathOps(S& aStream);
 
   PathOps(const PathOps& aOther) {
-    MOZ_ALWAYS_TRUE(
+    MOZ_RELEASE_ASSERT(
         mPathData.append(aOther.mPathData.begin(), aOther.mPathData.length()));
   }
   PathOps& operator=(const PathOps&) = delete;  // assign using std::move()!
@@ -58,14 +58,16 @@ class PathOps {
 
   template <typename T>
   void AppendPathOp(const T& aOpData) {
-    MOZ_ALWAYS_TRUE(
+    MOZ_RELEASE_ASSERT(
         mPathData.append((const uint8_t*)(&aOpData), sizeof(aOpData)));
   }
 
   template <typename T>
   void AppendPathOp(const OpType& aOpType, const T& aOpParams) {
-    AppendPathOp(aOpType);
-    AppendPathOp(aOpParams);
+    MOZ_RELEASE_ASSERT(mPathData.reserve(mPathData.length() + sizeof(aOpType) +
+                                         sizeof(aOpParams)));
+    mPathData.infallibleAppend((const uint8_t*)&aOpType, sizeof(aOpType));
+    mPathData.infallibleAppend((const uint8_t*)&aOpParams, sizeof(aOpParams));
   }
 
   struct TwoPoints {
@@ -119,6 +121,7 @@ class PathOps {
 
   Maybe<Path::Circle> AsCircle() const;
   Maybe<Path::Line> AsLine() const;
+  Maybe<Rect> AsRect() const;
 
   bool IsActive() const { return !mPathData.empty(); }
 
@@ -243,13 +246,9 @@ class PathRecording final : public Path {
     return mPath->GetStrokedBounds(aStrokeOptions, aTransform);
   }
 
-  Maybe<Rect> AsRect() const final {
-    EnsurePath();
-    return mPath->AsRect();
-  }
-
   Maybe<Path::Circle> AsCircle() const final { return mPathOps.AsCircle(); }
   Maybe<Path::Line> AsLine() const final { return mPathOps.AsLine(); }
+  Maybe<Rect> AsRect() const final { return mPathOps.AsRect(); }
 
   void StreamToSink(PathSink* aSink) const final {
     mPathOps.StreamToSink(*aSink);

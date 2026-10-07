@@ -144,9 +144,6 @@ function Widgets({ widgetIds }) {
   const { messageData } = useSelector(state => state.Messages);
   const timerType = useSelector(state => state.TimerWidget.timerType);
   const timerData = useSelector(state => state.TimerWidget);
-  const sportsWidgetState = useSelector(
-    state => state.SportsWidget?.widgetState
-  );
   const dispatch = useDispatch();
   // Unique per instance, because a thematic space mounts one Widgets each and
   // moz-button resolves menuId with querySelector -- a shared id would hand
@@ -267,11 +264,6 @@ function Widgets({ widgetIds }) {
     lists: listsEnabled,
     focusTimer: timerEnabled,
     weather: weatherEnabled && !weatherGoesToSidebar,
-    sportsWidget: isWidgetEnabled(
-      WIDGET_REGISTRY.find(w => w.id === "sportsWidget"),
-      prefs,
-      widgetsEnabled
-    ),
     clocks: isWidgetEnabled(
       WIDGET_REGISTRY.find(w => w.id === "clocks"),
       prefs,
@@ -900,15 +892,7 @@ function Widgets({ widgetIds }) {
                   return null;
                 }
                 const entry = WIDGET_REGISTRY.find(w => w.id === id);
-                let size = entry ? resolveWidgetSize(entry, prefs) : null;
-                // The follow-teams panel needs the larger grid cell to fit its content,
-                // so we override the user's size pref while that state is active.
-                if (
-                  id === "sportsWidget" &&
-                  sportsWidgetState === "sports-follow-state"
-                ) {
-                  size = "large";
-                }
+                const size = entry ? resolveWidgetSize(entry, prefs) : null;
                 const renderIdx = enabledWidgetIds.indexOf(id);
                 const hiddenAttrs = {
                   "data-hidden-1": hiddenAtCols[1].has(renderIdx)

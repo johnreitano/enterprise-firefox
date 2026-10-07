@@ -353,11 +353,14 @@ class TimerThread final : public mozilla::Runnable, public nsIObserver {
 
   ProfilerThreadId mProfilerThreadId MOZ_GUARDED_BY(mMonitor);
 
-  // Time at which we were intending to wake up the last time that we slept.
-  // Is "null" if we have never slept or if our last sleep was "forever".
-  TimeStamp mIntendedWakeupTime;
+  // End of the wakeup window handed to the monitor the last time that we
+  // slept. Is "null" if we have never slept or if our last sleep was "forever".
+  TimeStamp mLatestIntendedWakeupTime;
 
 #if TIMER_THREAD_STATISTICS
+  // Start of that window, with the same "null" cases.
+  TimeStamp mIntendedWakeupTime;
+
   static constexpr size_t sTimersFiredPerWakeupBucketCount = 16;
   static inline constexpr std::array<size_t, sTimersFiredPerWakeupBucketCount>
       sTimersFiredPerWakeupThresholds = {

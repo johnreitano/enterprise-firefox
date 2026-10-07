@@ -23,20 +23,23 @@ from mozbuild.frontend.context import (
 )
 from mozbuild.frontend.data import (
     BaseProgram,
+    BaseRustLibrary,
+    BaseRustProgram,
     ChromeManifestEntry,
+    ComputedFlags,
     ConfigFileSubstitution,
-    DeclaredLicensedPaths,
-    DeclaredLicenseNotice,
     Exports,
     FinalTargetFiles,
     FinalTargetPreprocessedFiles,
     GeneratedFile,
     HostLibrary,
+    HostRustLibrary,
     HostSources,
     IPDLCollection,
     JsShellArchive,
     LocalizedFiles,
     LocalizedPreprocessedFiles,
+    RustTests,
     SandboxedWasmLibrary,
     SharedLibrary,
     Sources,
@@ -51,8 +54,11 @@ from mozbuild.frontend.l10n_manifest import (
     build_l10n_manifest_from_substs,
     write_l10n_manifest,
 )
+from mozbuild.frontend.reader import SandboxValidationError
 from mozbuild.jar import DeprecatedJarManifest, JarManifestParser
+from mozbuild.licenses import LicenseCollection, LicenseError
 from mozbuild.preprocessor import Preprocessor
+from mozbuild.rust_commands import CARGO_SPEC_FILES, CargoCommand, cargo_spec
 
 
 class XPIDLManager:
@@ -118,33 +124,145 @@ class CommonBackend(BuildBackend):
         self._configs = set()
         self._generated_sources = set()
         self._l10n_manifest_data = []
-        self._license_notices = {}
-        self._license_coverage = defaultdict(set)
+        self._licenses = LicenseCollection()
+        self._computed_flags = defaultdict(list)
+        # Collect Rust edges until all per directory flags are available.
+        self._rust_libraries_for_spec = []
+        self._rust_programs_for_spec = defaultdict(list)
+        self._rust_tests_for_spec = []
+
+    def _computed_flag_list(self, relobjdir, var):
+        """Return all values for a computed flag in one directory."""
+        out = []
+        for cf in self._computed_flags.get(relobjdir, ()):
+            out.extend(dict(cf.get_flags()).get(var, []))
+        return out
+
+    def _rust_computed_flags(self, relobjdir):
+        return {
+            "computed_cflags": self._computed_flag_list(relobjdir, "CFLAGS"),
+            "computed_cxxflags": self._computed_flag_list(relobjdir, "CXXFLAGS"),
+            "computed_host_cflags": self._computed_flag_list(relobjdir, "HOST_CFLAGS"),
+            "computed_host_cxxflags": self._computed_flag_list(
+                relobjdir, "HOST_CXXFLAGS"
+            ),
+            "link_flags": self._computed_flag_list(relobjdir, "LDFLAGS"),
+        }
+
+    def _rust_library_command(self, lib, profile_suffix):
+        is_host = isinstance(lib, HostRustLibrary)
+        return CargoCommand(
+            kind="host-library" if is_host else "library",
+            manifest_path=mozpath.normsep(lib.cargo_file),
+            names=(lib.lib_name,),
+            features=lib.features or (),
+            cargo_profile_suffix=profile_suffix,
+            cargo_crate_type=lib.cargo_crate_type,
+            lto=not lib.no_lto,
+            working_directory=mozpath.normsep(lib.objdir),
+            **self._rust_computed_flags(lib.relobjdir),
+        )
+
+    def _rust_program_command(self, programs, kind, profile_suffix):
+        """Build one Cargo command for all Rust programs of one kind in a directory."""
+        first = programs[0]
+        objdir = mozpath.normsep(first.objdir)
+        rustc_flags = ()
+        # Windows programs link a version resource generated in the object
+        # directory.
+        if (
+            kind == "program"
+            and self.environment.substs.get("MOZ_WIDGET_TOOLKIT") == "windows"
+        ):
+            rustc_flags = ("-C", f"link-arg={objdir}/module.res")
+        return CargoCommand(
+            kind=kind,
+            manifest_path=mozpath.normsep(first.cargo_file),
+            names=tuple(program.name for program in programs),
+            outputs=tuple(mozpath.normsep(program.location) for program in programs),
+            features=first.features or (),
+            cargo_profile_suffix=profile_suffix,
+            working_directory=objdir,
+            rustc_flags=rustc_flags,
+            **self._rust_computed_flags(first.relobjdir),
+        )
+
+    def _rust_tests_command(self, tests, profile_suffix=""):
+        """Build a Cargo test command using the directory's Cargo profile."""
+        rustflags = ()
+        # Test executables load shared libraries from dist/bin. Other platforms
+        # use an rpath, while Windows stages the libraries next to the test
+        # binaries.
+        if self.environment.substs.get("OS_TARGET") != "WINNT":
+            dist_bin = mozpath.join(self.environment.topobjdir, "dist", "bin")
+            rustflags = ("-C", f"link-arg=-Wl,-rpath,{dist_bin}")
+        return CargoCommand(
+            kind="test",
+            manifest_path=mozpath.normsep(mozpath.join(tests.srcdir, "Cargo.toml")),
+            names=tests.names,
+            features=tests.features or (),
+            cargo_profile_suffix=profile_suffix,
+            working_directory=mozpath.normsep(tests.objdir),
+            rustflags=rustflags,
+            **self._rust_computed_flags(tests.relobjdir),
+        )
+
+    def _rust_commands(self):
+        """Yield each spec path and Cargo command after collecting directory flags."""
+        # Every Rust edge in a directory containing a target library with a custom
+        # Cargo profile uses that profile.
+        profile_suffixes = {
+            lib.relobjdir: lib.cargo_profile_suffix
+            for lib in self._rust_libraries_for_spec
+            if lib.KIND == "target" and lib.cargo_profile_suffix
+        }
+        for lib in self._rust_libraries_for_spec:
+            command = self._rust_library_command(
+                lib, profile_suffixes.get(lib.relobjdir, "")
+            )
+            path = mozpath.join(lib.objdir, CARGO_SPEC_FILES[command.kind])
+            yield (path, command)
+
+        for (relobjdir, kind_attr), programs in self._rust_programs_for_spec.items():
+            kind = "program" if kind_attr == "target" else "host-program"
+            path = mozpath.join(programs[0].objdir, CARGO_SPEC_FILES[kind])
+            command = self._rust_program_command(
+                programs, kind, profile_suffixes.get(relobjdir, "")
+            )
+            yield (path, command)
+
+        for tests in self._rust_tests_for_spec:
+            path = mozpath.join(tests.objdir, CARGO_SPEC_FILES["test"])
+            command = self._rust_tests_command(
+                tests, profile_suffixes.get(tests.relobjdir, "")
+            )
+            yield (path, command)
+
+    def _write_rust_command(self, path, command):
+        spec = cargo_spec(
+            command,
+            self.environment.substs,
+            self.environment.topsrcdir,
+            self.environment.topobjdir,
+        )
+        with self._write_file(path) as fh:
+            json.dump(spec, fh, indent=2, sort_keys=True)
 
     def consume_object(self, obj):
         self._configs.add(obj.config)
 
-        if isinstance(obj, DeclaredLicenseNotice):
-            existing = self._license_notices.get(obj.id)
-            if existing and existing["declared_in"] != obj.relsrcdir:
-                raise Exception(
-                    f'LICENSES["{obj.id}"] is declared in both '
-                    f"{existing['declared_in']} and {obj.relsrcdir}."
-                )
-            self._license_notices[obj.id] = obj.asdict() | {
-                "declared_in": obj.relsrcdir
-            }
-            self.backend_input_files.add(obj.text_path)
-            self._license_coverage[obj.id].update(obj.paths)
-            return True
-
-        if isinstance(obj, DeclaredLicensedPaths):
-            self._license_coverage[obj.id].update(obj.paths or [obj.relsrcdir])
+        # A duplicate id is only detectable once a second moz.build has been
+        # read, so unlike the rest of the license validation this cannot happen
+        # in the emitter. Report it the same way the emitter would.
+        try:
+            consumed = self._licenses.add(obj)
+        except LicenseError as error:
+            raise SandboxValidationError(str(error), obj._context)
+        if consumed:
+            self.backend_input_files.update(self._licenses.text_paths)
             return True
 
         if isinstance(obj, XPIDLModule):
-            # TODO bug 1240134 tracks not processing XPIDL files during
-            # artifact builds.
             self._idl_manager.link_module(obj)
 
         elif isinstance(obj, ConfigFileSubstitution):
@@ -183,6 +301,22 @@ class CommonBackend(BuildBackend):
             if hasattr(self, "_process_unified_sources"):
                 self._process_unified_sources(obj)
 
+        elif isinstance(obj, ComputedFlags):
+            self._computed_flags[obj.relobjdir].append(obj)
+            return False
+
+        elif isinstance(obj, BaseRustLibrary):
+            self._rust_libraries_for_spec.append(obj)
+            return False
+
+        elif isinstance(obj, BaseRustProgram):
+            self._rust_programs_for_spec[(obj.relobjdir, obj.KIND)].append(obj)
+            return False
+
+        elif isinstance(obj, RustTests):
+            self._rust_tests_for_spec.append(obj)
+            return False
+
         elif isinstance(obj, BaseProgram):
             self._binaries.programs.append(obj)
             return False
@@ -196,12 +330,10 @@ class CommonBackend(BuildBackend):
                 mozpath.join(obj.relobjdir, f"{obj.basename}.h")
             ])
             return False
-
         elif isinstance(obj, (Sources, HostSources)):
             if obj.generated_files:
                 self._handle_generated_sources(obj.generated_files)
             return False
-
         elif isinstance(obj, GeneratedFile):
             for f in obj.outputs:
                 if f == "cbindgen-metadata.json":
@@ -256,35 +388,16 @@ class CommonBackend(BuildBackend):
                 fh.write(f.target_basename + "\n")
 
     def _write_licenses_json(self):
-        """Aggregate every LICENSES declaration into one machine-readable file.
+        """Write the tree's LICENSES declarations for the generator and the SBOM.
 
-        This is the single source of truth for both the generated
-        about:license page and the CycloneDX SBOM. Only licenses reachable in
-        this configuration appear, because an unconfigured directory is never
-        traversed.
-
-        Coverage naming an id with no notice is dropped rather than rejected: a
-        configuration that traverses a LICENSED_UNDER directory need not
-        traverse the one holding the matching LICENSES declaration, which is
-        how a JS shell or a mar-tools build sees js/ and intl/ but never
-        toolkit/content/licenses. The `licenses` linter checks the tree-wide
-        declarations, where a missing id really is a typo.
+        Only licenses reachable in this configuration appear, because an
+        unconfigured directory is never traversed.
         """
-        licenses = []
-        for license_id in sorted(self._license_notices):
-            notice = dict(self._license_notices[license_id])
-            text_path = notice.pop("text_path")
-            # A .html notice is structured markup (MPL, the LGPLs) and is
-            # emitted verbatim; a .txt one is plain text wrapped in <pre>.
-            notice["html"] = text_path.endswith(".html")
-            with open(text_path, encoding="utf-8") as fh:
-                notice["text"] = fh.read()
-            notice["paths"] = sorted(self._license_coverage.get(license_id, ()))
-            licenses.append(notice)
-
         path = mozpath.join(self.environment.topobjdir, "licenses.json")
         with self._write_file(path) as fh:
-            json.dump({"licenses": licenses}, fh, sort_keys=True, indent=2)
+            json.dump(
+                {"licenses": self._licenses.records()}, fh, sort_keys=True, indent=2
+            )
 
     def consume_finished(self):
         if len(self._idl_manager.modules):
@@ -322,6 +435,9 @@ class CommonBackend(BuildBackend):
                 self.environment.substs, self._l10n_manifest_data
             )
             write_l10n_manifest(manifest, pathlib.Path(topobjdir, "l10n-manifest.json"))
+
+        for path, command in self._rust_commands():
+            self._write_rust_command(path, command)
 
     def _expand_libs(self, input_bin):
         os_libs = []

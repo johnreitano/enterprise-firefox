@@ -25,6 +25,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   ScreenshotsUtils:
     "moz-src:///browser/components/screenshots/ScreenshotsUtils.sys.mjs",
+  SELECTION_MODES:
+    "moz-src:///browser/components/screenshots/ScreenshotsSelectionModes.sys.mjs",
   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
   SearchUIUtils: "moz-src:///browser/components/search/SearchUIUtils.sys.mjs",
   SearchUtils: "moz-src:///toolkit/components/search/SearchUtils.sys.mjs",
@@ -629,13 +631,13 @@ export class nsContextMenu {
 
     initBackForwardMenuItemTooltip(
       "context-back",
-      "main-context-menu-back-2",
+      "main-context-menu-back-3",
       "goBackKb"
     );
 
     initBackForwardMenuItemTooltip(
       "context-forward",
-      "main-context-menu-forward-2",
+      "main-context-menu-forward-3",
       "goForwardKb"
     );
   }
@@ -1431,10 +1433,17 @@ export class nsContextMenu {
 
     this.showItem("context-sep-screenshots", shouldShow);
     this.showItem("context-take-screenshot", shouldShow);
+    this.showItem(
+      "context-use-mini-window",
+      shouldShow &&
+        Services.prefs.getBoolPref("browser.mini-window.enabled", false) &&
+        !this.document.documentElement.hasAttribute("mini-window")
+    );
   }
 
   initPasswordControlItems() {
-    let shouldShow = this.onPassword;
+    let shouldShow =
+      this.onPassword && Services.policies.isAllowed("passwordReveal");
     if (shouldShow) {
       let revealPassword = this.document.getElementById(
         "context-reveal-password"
@@ -1675,6 +1684,12 @@ export class nsContextMenu {
       "menuitem-screenshot",
       "ContextMenu"
     );
+  }
+
+  useMiniWindow() {
+    lazy.ScreenshotsUtils.toggle(this.browser, "MiniWindowContextMenu", {
+      mode: lazy.SELECTION_MODES.MINI_WINDOW,
+    });
   }
 
   // View Partial Source

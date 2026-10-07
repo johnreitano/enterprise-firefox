@@ -6,7 +6,7 @@
 #include "nsISupports.idl"
 #include "nsICookie.idl"
 
-[scriptable, uuid(373195cb-bbb9-4e01-b276-b799a18ca355)]
+[scriptable, uuid(48fc7a4c-058a-4231-8650-83160ee20cb9)]
 interface nsIFelt : nsISupports {
   const unsigned long FeltEncryptionExitCode_Archive = 0x93;
   const unsigned long FeltEncryptionExitCode_Delete = 0x94;
@@ -35,7 +35,7 @@ interface nsIFelt : nsISupports {
   boolean isFeltSafeMode();
 
   [must_use]
-  void ipcChannel();
+  void ipcChannel(in unsigned long browserGeneration);
 
   [must_use]
   void sendBoolPreference(in ACString name, in boolean value);
@@ -111,7 +111,7 @@ interface nsIFelt : nsISupports {
    * EnterpriseHandler). Because the intent travels with the exit itself, a
    * quit vetoed by a beforeunload handler leaves nothing to undo.
    */
-  void setShutdownLockIntent(in boolean lock);
+  void setShutdownLockIntent(in boolean lockIntent);
 
   /**
    * Called by the spawned Firefox to tell the Felt UI process whether the
@@ -123,6 +123,21 @@ interface nsIFelt : nsISupports {
    * session in memory.
    */
   void setRestartLockIntent(in boolean lockIntent);
+
+  /**
+   * Called by the spawned Firefox to relay whether the session should be
+   * locked (rather than discarded) when repeated crashes abort the automatic
+   * restart. The browser owns the `enterprise.locking.crash` pref, which the
+   * Felt UI process cannot read, and it is dead by the time the crash
+   * decision is made, so the value must be relayed while the session is
+   * alive: once at startup and again on every pref change. Sends a
+   * CrashLockIntent message over the Felt IPC channel, which the Felt UI
+   * process turns into a `felt-firefox-crash-lock-intent` observer
+   * notification. Returns a failure nsresult (throwing on the caller side) if
+   * the IPC client is not available or the message could not be sent.
+   */
+  [must_use]
+  void setCrashLockIntent(in boolean lockIntent);
 
   [must_use]
   void shutdownFirefox();

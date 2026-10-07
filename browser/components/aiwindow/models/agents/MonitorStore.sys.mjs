@@ -60,6 +60,17 @@ function timestampField(value, field, nullable = false) {
   return value;
 }
 
+function runCountField(value, recoverInvalid = false) {
+  if (Number.isInteger(value) && value >= 0) {
+    return value;
+  }
+  if (!recoverInvalid) {
+    throw invalidField("run count");
+  }
+  lazy.log.warn("Discarding invalid stored monitor run count.");
+  return 0;
+}
+
 function scheduleRecord(schedule) {
   if (!schedule || typeof schedule !== "object" || Array.isArray(schedule)) {
     throw invalidField("schedule");
@@ -248,6 +259,13 @@ function sanitizeMonitorRecord(monitor, recoverInvalid = false) {
     watchUrls: watchUrlRecords(monitor.watchUrls),
     schedule: scheduleRecord(monitor.schedule),
     enabled: monitor.enabled,
+    // Monitors stored before the counter existed start from their visible
+    // history length.
+    runCount: runCountField(
+      monitor.runCount ??
+        (Array.isArray(monitor.history) ? monitor.history.length : 0),
+      recoverInvalid
+    ),
     createdAt: timestampField(monitor.createdAt, "creation timestamp"),
     updatedAt: timestampField(monitor.updatedAt, "update timestamp"),
     lastRunTime: timestampField(monitor.lastRunTime, "last run timestamp"),

@@ -554,6 +554,7 @@ class MenuDialogFragment : BottomSheetDialogFragment() {
                                 webExtensionMenuCount = webExtensionsCount,
                                 isAllWebExtensionsDisabled = isAllWebExtensionsDisabled,
                                 showIPProtection = components.ipProtection.store.state.isEligible,
+                                showPasswords = settings.isAutofillSupported,
                                 ipProtectionMenuState = ipProtectionMenuState,
                                 onMozillaAccountButtonClick = {
                                     menuStore.dispatch(

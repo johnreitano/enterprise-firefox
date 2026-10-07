@@ -201,3 +201,8 @@ DIRS += ["../build/pure_virtual"]
 
 if CONFIG["MOZ_BUILD_APP"] != "memory":
     FINAL_LIBRARY = "mozglue"
+
+LICENSED_UNDER += ["mit"]
+LICENSED_UNDER["mit"].paths = [
+    "Span.h",
+]

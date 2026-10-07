@@ -157,12 +157,13 @@ add_task(async function () {
       continue;
     }
 
-    EventUtils.sendMouseEvent(
-      { type: "mousedown" },
-      document.querySelectorAll(
-        ".request-list-item .requests-list-initiator-lastframe"
-      )[index]
-    );
+    const initiator = document.querySelectorAll(
+      ".request-list-item .requests-list-initiator-lastframe"
+    )[index];
+    initiator.scrollIntoView({ block: "center" });
+    // Click the start of the initiator, as the rest of it overflows into the
+    // next column once the side panel narrows the request list.
+    EventUtils.synthesizeMouse(initiator, 2, 2, {}, monitor.panelWin);
 
     // Clicking on the initiator column should open the Stack Trace panel
     const onStackTraceRendered = waitUntil(() =>

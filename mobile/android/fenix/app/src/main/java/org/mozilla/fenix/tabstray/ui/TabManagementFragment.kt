@@ -109,7 +109,7 @@ import org.mozilla.fenix.tabstray.TabsTrayTelemetryMiddleware
 import org.mozilla.fenix.tabstray.binding.SecureTabManagerBinding
 import org.mozilla.fenix.tabstray.controller.DefaultTabManagerController
 import org.mozilla.fenix.tabstray.controller.DefaultTabManagerInteractor
-import org.mozilla.fenix.tabstray.controller.TabInteractionHandler
+import org.mozilla.fenix.tabstray.controller.ItemInteractionHandler
 import org.mozilla.fenix.tabstray.controller.TabManagerController
 import org.mozilla.fenix.tabstray.controller.TabManagerInteractor
 import org.mozilla.fenix.tabstray.data.TabData
@@ -165,8 +165,8 @@ class TabManagementFragment : Fragment() {
 
     private val animationDurationMs = 200
 
-    private val tabInteractionHandler =
-        object : TabInteractionHandler {
+    private val itemInteractionHandler =
+        object : ItemInteractionHandler {
             override fun onMove(
                 sourceKey: String,
                 targetKey: String?,
@@ -549,7 +549,7 @@ class TabManagementFragment : Fragment() {
             group = expandedGroup,
             actions = expandedGroupActions,
             displayTabsInGrid = displayTabsInGrid,
-            tabInteractionHandler = tabInteractionHandler,
+            itemInteractionHandler = itemInteractionHandler,
         )
     }
 
@@ -658,7 +658,7 @@ class TabManagementFragment : Fragment() {
             },
             onTabAutoCloseBannerDismiss = tabManagerCfrController::onTabAutoCloseBannerDismiss,
             onTabAutoCloseBannerShown = {},
-            tabInteractionHandler = tabInteractionHandler,
+            itemInteractionHandler = itemInteractionHandler,
             onInactiveTabsCFRShown = { TabsTray.inactiveTabsCfrVisible.record(NoExtras()) },
             onInactiveTabsCFRClick = {
                 tabManagerCfrController.onInactiveTabsCfrClick()

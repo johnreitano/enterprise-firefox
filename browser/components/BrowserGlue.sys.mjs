@@ -30,7 +30,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/DefaultBrowserCheck.sys.mjs",
   DesktopActorRegistry:
     "moz-src:///browser/components/DesktopActorRegistry.sys.mjs",
-  DistributionManagement: "resource:///modules/distribution.sys.mjs",
+  DistributionManagement: "moz-src:///browser/components/distribution.sys.mjs",
   DownloadsViewableInternally:
     "moz-src:///browser/components/downloads/DownloadsViewableInternally.sys.mjs",
   ExtensionsUI: "resource:///modules/ExtensionsUI.sys.mjs",
@@ -40,7 +40,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   LoginBreaches:
     "moz-src:///browser/components/aboutlogins/LoginBreaches.sys.mjs",
   LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
-  MigrationUtils: "resource:///modules/MigrationUtils.sys.mjs",
+  MigrationUtils:
+    "moz-src:///browser/components/migration/MigrationUtils.sys.mjs",
   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
   OnboardingMessageProvider:
     "resource:///modules/asrouter/OnboardingMessageProvider.sys.mjs",
@@ -85,6 +86,7 @@ if (AppConstants.MOZ_ENTERPRISE) {
   ChromeUtils.defineESModuleGetters(lazy, {
     EnterpriseHandler:
       "resource:///modules/enterprise/EnterpriseHandler.sys.mjs",
+    isTesting: "resource://gre/modules/enterprise/EnterpriseCommon.sys.mjs",
   });
 }
 
@@ -412,8 +414,7 @@ BrowserGlue.prototype = {
     if (
       Services.appinfo.inSafeMode &&
       (!AppConstants.MOZ_ENTERPRISE ||
-        (Services.felt?.isFeltBrowser() &&
-          !Services.prefs.getBoolPref("enterprise.is_testing", false)))
+        (Services.felt?.isFeltBrowser() && !lazy.isTesting()))
     ) {
       Services.ww.openWindow(
         null,

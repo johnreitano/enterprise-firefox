@@ -479,6 +479,9 @@ describe("Auto Tab Grouping toolbar button", () => {
         win.document.getElementById("smartwindow-group-tabs-panel"),
         "Clicking in the menu the row raised is not a click outside the panel"
       );
+      contextMenu.dispatchEvent(
+        new win.MouseEvent("mouseup", { bubbles: true })
+      );
 
       contextMenu.activateItem(
         win.document.getElementById("open-tab-group-context-menu_delete")

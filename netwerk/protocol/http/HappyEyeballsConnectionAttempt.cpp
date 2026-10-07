@@ -1057,8 +1057,10 @@ nsresult HappyEyeballsConnectionAttempt::EstablishTCPConnection(
   RefPtr<nsHttpConnectionInfo> info = mConnInfo->CloneAndAdoptPortAndAlpn(
       aPort, happy_eyeballs::ConnectionAttemptHttpVersions::H2OrH1);
   if (!aEchConfig.IsEmpty()) {
-    info->SetEchConfig(
-        nsCString((const char*)aEchConfig.Elements(), aEchConfig.Length()));
+    info = info->Mutate()
+               .SetEchConfig(nsCString((const char*)aEchConfig.Elements(),
+                                       aEchConfig.Length()))
+               .Finalize();
     NotifyConnectionActivity(info, NS_HTTP_ACTIVITY_SUBTYPE_ECH_SET);
   }
   NotifyConnectionActivity(info, NS_HTTP_ACTIVITY_SUBTYPE_CONNECTION_CREATED);
@@ -1114,8 +1116,10 @@ nsresult HappyEyeballsConnectionAttempt::EstablishUDPConnection(
   RefPtr<nsHttpConnectionInfo> info = mConnInfo->CloneAndAdoptPortAndAlpn(
       aPort, happy_eyeballs::ConnectionAttemptHttpVersions::H3);
   if (!aEchConfig.IsEmpty()) {
-    info->SetEchConfig(
-        nsCString((const char*)aEchConfig.Elements(), aEchConfig.Length()));
+    info = info->Mutate()
+               .SetEchConfig(nsCString((const char*)aEchConfig.Elements(),
+                                       aEchConfig.Length()))
+               .Finalize();
     NotifyConnectionActivity(info, NS_HTTP_ACTIVITY_SUBTYPE_ECH_SET);
   }
   NotifyConnectionActivity(info, NS_HTTP_ACTIVITY_SUBTYPE_CONNECTION_CREATED);
@@ -1996,9 +2000,17 @@ nsresult HappyEyeballsConnectionAttempt::OnARecord(nsIDNSRecord* aRecord,
       mOriginDnsLookupIds.Remove(aId);
       MaybeBuildOriginCoalescingKeys();
     }
+    // A negative answer can be served from a stale (grace-period) cache entry;
+    // report that so the state machine revalidates it (optimistic DNS). The
+    // record is available even on failure because the lookup used
+    // RESOLVE_WANT_RECORD_ON_ERROR.
+    bool fromStaleCache = false;
+    if (addrRecord) {
+      (void)addrRecord->GetFromStaleCache(&fromStaleCache);
+    }
     nsTArray<happy_eyeballs::IpAddr> emptyArray;
-    rv = happy_eyeballs_process_dns_response_a(mHappyEyeballs, aId, &emptyArray,
-                                               mDnsMetadata.mIsTRR, false);
+    rv = happy_eyeballs_process_dns_response_a(
+        mHappyEyeballs, aId, &emptyArray, mDnsMetadata.mIsTRR, fromStaleCache);
     if (NS_FAILED(rv)) {
       return rv;
     }
@@ -2058,9 +2070,15 @@ nsresult HappyEyeballsConnectionAttempt::OnAAAARecord(nsIDNSRecord* aRecord,
       mOriginDnsLookupIds.Remove(aId);
       MaybeBuildOriginCoalescingKeys();
     }
+    // See OnARecord: a stale (grace-period) negative must be reported as such
+    // so the state machine revalidates it.
+    bool fromStaleCache = false;
+    if (addrRecord) {
+      (void)addrRecord->GetFromStaleCache(&fromStaleCache);
+    }
     nsTArray<happy_eyeballs::IpAddr> emptyArray;
     rv = happy_eyeballs_process_dns_response_aaaa(
-        mHappyEyeballs, aId, &emptyArray, mDnsMetadata.mIsTRR, false);
+        mHappyEyeballs, aId, &emptyArray, mDnsMetadata.mIsTRR, fromStaleCache);
     if (NS_FAILED(rv)) {
       return rv;
     }
@@ -2152,9 +2170,15 @@ nsresult HappyEyeballsConnectionAttempt::OnHTTPSRecord(nsIDNSRecord* aRecord,
        this, static_cast<uint32_t>(status), aId));
   nsCOMPtr<nsIDNSHTTPSSVCRecord> httpsRecord = do_QueryInterface(aRecord);
   if (!httpsRecord || NS_FAILED(status)) {
+    // A stale (grace-period) negative must be reported as such so the state
+    // machine revalidates it (optimistic DNS).
+    bool fromStaleCache = false;
+    if (nsCOMPtr<nsIDNSByTypeRecord> byTypeRec = do_QueryInterface(aRecord)) {
+      (void)byTypeRec->GetFromStaleCache(&fromStaleCache);
+    }
     nsTArray<happy_eyeballs::ServiceInfo> emptyArray;
     (void)happy_eyeballs_process_dns_response_https(
-        mHappyEyeballs, aId, &emptyArray, mDnsMetadata.mIsTRR, false);
+        mHappyEyeballs, aId, &emptyArray, mDnsMetadata.mIsTRR, fromStaleCache);
     return ProcessHappyEyeballsOutput();
   }
 
@@ -2184,7 +2208,7 @@ nsresult HappyEyeballsConnectionAttempt::OnHTTPSRecord(nsIDNSRecord* aRecord,
   if (svcbRecords.IsEmpty()) {
     nsTArray<happy_eyeballs::ServiceInfo> emptyArray;
     (void)happy_eyeballs_process_dns_response_https(
-        mHappyEyeballs, aId, &emptyArray, httpsIsTRR, false);
+        mHappyEyeballs, aId, &emptyArray, httpsIsTRR, httpsFromStaleCache);
     return ProcessHappyEyeballsOutput();
   }
 

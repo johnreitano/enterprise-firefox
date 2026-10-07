@@ -59,6 +59,11 @@ const SIMPLETEST_OVERRIDES = [
   "requestCompleteLog",
 ];
 
+// An uncaught error with one of these names, from any process, fails the
+// running test. Currently this is only the accesskey check by menupopup and
+// panel-list code.
+const FAILING_UNCAUGHT_ERROR_NAMES = ["AccessKeyConflictError"];
+
 setTimeout(testInit, 0);
 
 var TabDestroyObserver = {
@@ -929,6 +934,21 @@ Tester.prototype = {
     try {
       var msg = "Console message: " + aConsoleMessage.message;
       if (this.currentTest) {
+        if (
+          aConsoleMessage instanceof Ci.nsIScriptError &&
+          FAILING_UNCAUGHT_ERROR_NAMES.some(name =>
+            aConsoleMessage.errorMessage.startsWith(`${name}:`)
+          )
+        ) {
+          this.currentTest.addResult(
+            new testResult({
+              name: msg,
+              pass: false,
+              allowFailure: this.currentTest.allowFailure,
+            })
+          );
+          return;
+        }
         this.currentTest.addResult(new testMessage(msg));
       } else {
         this.structuredLogger.info(
@@ -1131,7 +1151,9 @@ Tester.prototype = {
     );
 
     // Forget closed tab groups in the test window.
-    const closedTabGroups = window.SessionStore.getClosedTabGroups(window);
+    const closedTabGroups = window.SessionStore.getClosedTabGroups({
+      sourceWindow: window,
+    });
     closedTabGroups.forEach(tabGroup =>
       window.SessionStore.forgetClosedTabGroup(window, tabGroup.id)
     );
@@ -1216,6 +1238,21 @@ Tester.prototype = {
           })
         );
         winUtils.restoreNormalRefresh();
+      }
+
+      if (winUtils.isMouseDown) {
+        this.currentTest.addResult(
+          new testResult({
+            name:
+              "test left the mouse button pressed; synthesize a matching" +
+              " mouseup. While the mouse is down, moving or resizing a" +
+              " window suppresses drag and drop for the following tests.",
+            allowFailure: this.currentTest.allowFailure,
+          })
+        );
+        // Outside of the window, so that the mouseup only generates a click
+        // on the root element, if any.
+        window.synthesizeMouseEvent("mouseup", -10, -10);
       }
 
       if (this.SimpleTest.isExpectingUncaughtException()) {

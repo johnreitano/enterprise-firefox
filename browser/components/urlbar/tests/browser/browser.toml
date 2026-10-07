@@ -17,7 +17,6 @@ support-files = [
 prefs = [
   "browser.bookmarks.testing.skipDefaultBookmarksImport=true",
   "browser.urlbar.trending.featureGate=false",
-  "layout.css.attr.enabled=true",
   "screenshots.browser.component.enabled=true",
   "sidebar.revamp=false",
 ]
@@ -162,8 +161,6 @@ skip-if = [
 
 ["browser_top_sites.js"]
 https_first_disabled = true
-
-["browser_top_sites_attribution.js"]
 
 ["browser_top_sites_private.js"]
 https_first_disabled = true

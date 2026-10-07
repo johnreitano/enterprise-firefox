@@ -232,6 +232,7 @@ class BrowserChild final : public nsMessageManagerScriptExecutor,
                                const ViewID& aViewId,
                                const Maybe<ZoomConstraints>& aConstraints);
 
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY
   mozilla::ipc::IPCResult RecvLoadURL(nsDocShellLoadState* aLoadState,
                                       const ParentShowInfo& aInfo);
 

@@ -675,6 +675,8 @@ internal object IntegrityCheckingUniffiLib {
         Native.register(IntegrityCheckingUniffiLib::class.java, findLibraryName(componentName = "fxa_client"))
         uniffiCheckContractApiVersion(this)
     }
+
+    internal fun ensureInitialized() = Unit
     external fun uniffi_fxa_client_checksum_method_firefoxaccount_simulate_network_error(
     ): Int
     external fun uniffi_fxa_client_checksum_method_firefoxaccount_get_connection_success_url(
@@ -702,6 +704,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_fxa_client_checksum_method_firefoxaccount_on_auth_issues(
     ): Int
     external fun uniffi_fxa_client_checksum_method_firefoxaccount_process_event(
+    ): Int
+    external fun uniffi_fxa_client_checksum_method_firefoxaccount_reset_auth_recheck_timer(
     ): Int
     external fun uniffi_fxa_client_checksum_method_firefoxaccount_simulate_permanent_auth_token_issue(
     ): Int
@@ -776,6 +780,8 @@ internal object UniffiLib {
         mozilla.appservices.sync15.uniffiEnsureInitialized()
         
     }
+
+    internal fun ensureInitialized() = Unit
     external fun uniffi_fxa_client_fn_clone_firefoxaccount(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
     external fun uniffi_fxa_client_fn_free_firefoxaccount(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -812,6 +818,8 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_fxa_client_fn_method_firefoxaccount_process_event(`ptr`: Long,`event`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_fxa_client_fn_method_firefoxaccount_reset_auth_recheck_timer(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_fxa_client_fn_method_firefoxaccount_simulate_permanent_auth_token_issue(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_fxa_client_fn_method_firefoxaccount_simulate_temporary_auth_token_issue(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -984,10 +992,10 @@ private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
  * @suppress
  */
 public fun uniffiEnsureInitialized() {
-    IntegrityCheckingUniffiLib
-    // UniffiLib() initialized as objects are used, but we still need to explicitly
-    // reference it so initialization across crates works as expected.
-    UniffiLib
+    // Call arbitrary methods on IntegrityCheckingUniffiLib and UniffiLib to ensure that
+    // their init blocks run. This ensures initialization across crates works as expected.
+    IntegrityCheckingUniffiLib.ensureInitialized()
+    UniffiLib.ensureInitialized()
 }
 
 // Async support
@@ -1484,6 +1492,20 @@ public interface FirefoxAccountInterface {
      * On error, the state will remain the same.
      */
     fun `processEvent`(`event`: FxaEvent): FxaState
+    
+    /**
+     * Reset the timer indicating time since last auth issues were encountered.
+     *
+     * **💾 This method alters the persisted account state.**
+     *
+     * Call this if we have encountered the [FxaRustAuthState.AuthIssues] state as a result of a
+     * failure happening (i.e. not as a result of initialization simply loading that state from a
+     * previous failure).
+     * Most likely, this should not need to be called externally except in testing since the state
+     * machine's `transition` function should generally call the internal version of this function
+     * when necessary.
+     */
+    fun `resetAuthRecheckTimer`()
     
     /**
      * Used by the application to test auth token issues
@@ -2319,6 +2341,30 @@ open class FirefoxAccount: Disposable, AutoCloseable, FirefoxAccountInterface
     }
     )
     }
+    
+
+    
+    /**
+     * Reset the timer indicating time since last auth issues were encountered.
+     *
+     * **💾 This method alters the persisted account state.**
+     *
+     * Call this if we have encountered the [FxaRustAuthState.AuthIssues] state as a result of a
+     * failure happening (i.e. not as a result of initialization simply loading that state from a
+     * previous failure).
+     * Most likely, this should not need to be called externally except in testing since the state
+     * machine's `transition` function should generally call the internal version of this function
+     * when necessary.
+     */override fun `resetAuthRecheckTimer`()
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_fxa_client_fn_method_firefoxaccount_reset_auth_recheck_timer(
+        it,
+        _status)
+}
+    }
+    
     
 
     

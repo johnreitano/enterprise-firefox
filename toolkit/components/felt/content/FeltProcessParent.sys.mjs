@@ -81,6 +81,9 @@ let gFeltProcessParentInstance = null;
 // page, which a refresh can outlive.
 let gSessionGeneration = 0;
 
+// Identifies the browser IPC connection, including each crash restart.
+let gBrowserGeneration = 0;
+
 // The browser-driven refresh in flight, for teardown to wait on: it is tracked
 // here rather than by PostureMonitor, which only owns the refreshes it starts.
 let gBrowserRefresh = null;
@@ -130,11 +133,18 @@ const kBrowserObserverTopics = [
   "felt-firefox-check-for-updates",
   "felt-ready",
   "felt-firefox-logout",
+  "felt-firefox-crash-lock-intent",
   "felt-firefox-tokens",
   "felt-firefox-refresh-tokens",
 ];
 
 let gObserversRegistered = false;
+
+// Module-scoped (not instance state) so the browser-relayed value survives
+// actor re-creation and the crash restarts it exists to handle: if the final
+// crash lands before a freshly restarted browser re-relays the pref, an
+// instance reset would silently turn a lock policy into a token wipe.
+let gCrashLockIntent = false;
 
 /**
  * Manages the SSO login and launching Firefox
@@ -338,6 +348,21 @@ export class FeltProcessParent extends JSProcessActorParent {
               lazy.log.error(`Logout failed: ${err}`);
             });
             break;
+
+          case "felt-firefox-crash-lock-intent": {
+            const { generation, lock_intent } = JSON.parse(aData);
+            if (generation !== gBrowserGeneration) {
+              lazy.log.debug(
+                `Ignoring crash lock intent from browser generation ${generation}`
+              );
+              break;
+            }
+            gCrashLockIntent = lock_intent;
+            lazy.log.debug(
+              `ParentProcess: crashLockIntent=${gCrashLockIntent}`
+            );
+            break;
+          }
 
           case "felt-firefox-tokens": {
             const data = JSON.parse(aData);
@@ -578,6 +603,10 @@ export class FeltProcessParent extends JSProcessActorParent {
   }
 
   async startFirefox(startReason, ssoCollectedCookies = []) {
+    const browserGeneration = ++gBrowserGeneration;
+    if (startReason === PROCESS_START_REASON.INITIAL_START) {
+      gCrashLockIntent = false;
+    }
     // Finish refreshes from the previous browser before replacing its session
     // id and clearing the posture baseline.
     if (startReason !== PROCESS_START_REASON.INITIAL_START) {
@@ -653,7 +682,7 @@ export class FeltProcessParent extends JSProcessActorParent {
 
     this._startupPolicies = await lazy.StartupPolicies.fetch();
 
-    this.firefox = this.startFirefoxProcess();
+    this.firefox = this.startFirefoxProcess(browserGeneration);
     this.firefox
       .then(async () => {
         // Send primarySecret FIRST, before any other state, so the
@@ -828,10 +857,36 @@ export class FeltProcessParent extends JSProcessActorParent {
       lazy.log.debug(
         "Abort restarting Firefox and inform the user of the crashes."
       );
-      Services.cpmm.sendAsyncMessage("FeltParent:FirefoxAbnormalExit", {});
+      this.finalizeAbortedRestart();
     } else {
       lazy.log.debug("Trying to restart Firefox again.");
       this.startFirefox(PROCESS_START_REASON.CRASH);
+    }
+  }
+
+  /**
+   * Locks or signs out the session per the browser-relayed
+   * crash-locking policy, then informs the FELT UI that restarting was
+   * aborted. FirefoxAbnormalExit is only sent once the token work settles so
+   * the sign-in window renders the correct unlock state.
+   */
+  async finalizeAbortedRestart() {
+    try {
+      const lockRequested = gCrashLockIntent;
+      const sessionLocked =
+        lockRequested && (await this._persistLockedSession());
+      lazy.log.info(
+        sessionLocked
+          ? "Crash restart aborted: session locked"
+          : `Crash restart aborted: signing out (${lockRequested ? "locking failed" : "locking disabled"})`
+      );
+      if (!sessionLocked) {
+        await this._signOutSession();
+      }
+    } catch (err) {
+      lazy.log.error(`Finalizing crash abort failed: ${err}`);
+    } finally {
+      Services.cpmm.sendAsyncMessage("FeltParent:FirefoxAbnormalExit", {});
     }
   }
 
@@ -880,7 +935,7 @@ export class FeltProcessParent extends JSProcessActorParent {
     return this._resolvedProfile;
   }
 
-  async startFirefoxProcess() {
+  async startFirefoxProcess(browserGeneration) {
     let socket = Services.felt.oneShotIpcServer();
 
     const firefoxBin = Services.felt.binPath();
@@ -968,7 +1023,7 @@ export class FeltProcessParent extends JSProcessActorParent {
       lazy.logProcess.error(`[${pid}]: ${chunk}`);
     });
 
-    Services.felt.ipcChannel();
+    Services.felt.ipcChannel(browserGeneration);
   }
 
   /**
@@ -1108,6 +1163,40 @@ export class FeltProcessParent extends JSProcessActorParent {
   }
 
   /**
+   * Drain token refreshes, end the server session, and clear all credentials.
+   *
+   * @returns {Promise<void>}
+   */
+  async _signOutSession() {
+    this.logoutReported = true;
+    let signedOut = false;
+    try {
+      try {
+        await this._drainPendingRefresh();
+      } catch (err) {
+        lazy.log.error(`Draining pending refresh failed: ${err}`);
+      }
+      try {
+        await lazy.ConsoleClient.performServerSignout();
+        signedOut = true;
+      } catch (err) {
+        lazy.log.error(`Server signout failed: ${err}`);
+      }
+    } finally {
+      lazy.FeltLocking.clearLockAndTokens();
+      try {
+        if (signedOut) {
+          await lazy.FeltStorage.endSession();
+        } else {
+          await lazy.FeltStorage.flush();
+        }
+      } catch (err) {
+        lazy.log.error(`Failed to persist signout state: ${err}`);
+      }
+    }
+  }
+
+  /**
    * Perform all the logout operations on FELT side.
    *
    * @returns {Promise<void>} Resolves once the browser shutdown was requested.
@@ -1125,20 +1214,7 @@ export class FeltProcessParent extends JSProcessActorParent {
     lazy.log.debug(
       `Logout, waiting on process ${gFeltProcessParentInstance.proc.pid}`
     );
-    gFeltProcessParentInstance.logoutReported = true;
-
-    await this._drainPendingRefresh();
-
-    // Send the logout request to the server.
-    // Handle any errors that occur during signout gracefully,
-    // i.e. report, but ignore them and proceed with the signout.
-    try {
-      await lazy.ConsoleClient.performServerSignout();
-    } catch (err) {
-      lazy.log.error(`Server signout failed: ${err}`);
-    }
-
-    lazy.FeltLocking.clearLockAndTokens();
+    await this._signOutSession();
     Services.felt.shutdownFirefox();
     const reportSignedOut = () => {
       Services.cpmm.sendAsyncMessage("FeltParent:FirefoxLogoutExit", {});
@@ -1172,6 +1248,7 @@ export class FeltProcessParent extends JSProcessActorParent {
         Services.felt.getRefreshToken(),
         this.loggedInUserInfo?.id
       );
+      await lazy.FeltStorage.endSession();
     } catch (err) {
       lazy.log.error(`Locking failed: ${err}`);
       return false;
@@ -1300,6 +1377,7 @@ export class FeltProcessParent extends JSProcessActorParent {
             ));
           } else {
             try {
+              await lazy.FeltStorage.beginSession(email);
               ({ posture, measuredAt } = await this._redeemLoginTokens(
                 message.data
               ));

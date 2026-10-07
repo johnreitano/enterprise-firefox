@@ -2,7 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import React, { useCallback, useLayoutEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { DSEmptyState } from "../DSEmptyState/DSEmptyState";
 import { DSCard, PlaceholderDSCard } from "../DSCard/DSCard";
 import { useSelector } from "react-redux";
@@ -744,6 +750,25 @@ function CardSection({
   );
 }
 
+/**
+ * Sends the rendered section order to the parent so telemetry that goes
+ * through randomizeOrganicContentEvent can report a real section_position.
+ *
+ * @param {object} props
+ * @param {string} props.sectionKeys Comma-joined sectionKeys in render order.
+ */
+function SectionsOrderReporter({ sectionKeys, dispatch }) {
+  useEffect(() => {
+    dispatch(
+      ac.OnlyToMain({
+        type: at.CARD_SECTIONS_ORDER,
+        data: { sections: sectionKeys.split(",") },
+      })
+    );
+  }, [dispatch, sectionKeys]);
+  return null;
+}
+
 function CardSections({
   data,
   feed,
@@ -975,6 +1000,10 @@ function CardSections({
     </div>
   ) : (
     <div className="ds-section-wrapper">
+      <SectionsOrderReporter
+        sectionKeys={filteredSections.map(s => s.sectionKey).join(",")}
+        dispatch={dispatch}
+      />
       {topicNavigationEnabled && !spocsLoading && (
         <TopicNavigation sections={filteredSections} dispatch={dispatch} />
       )}

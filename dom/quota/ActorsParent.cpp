@@ -4286,23 +4286,27 @@ Result<Ok, nsresult> QuotaManager::InitializeOriginDirectory(
     PersistenceType aPersistenceType,
     nsTArray<RenameAndInitInfo>& aRenameAndInitInfos, OriginFunc&& aOriginFunc,
     OriginCacheMap& aCacheMap) {
-  QM_TRY_UNWRAP(auto maybeMetadata,
-                QM_OR_ELSE_WARN_IF(
-                    // Expression
-                    LoadFullOriginMetadataWithRestore(aChildDirectory)
-                        .map([](FullOriginMetadata&& metadata)
-                                 -> Maybe<FullOriginMetadata> {
-                          return Some(std::move(metadata));
-                        }),
-                    // Predicate.
-                    IsSpecificError<NS_ERROR_MALFORMED_URI>,
-                    // Fallback.
-                    ErrToDefaultOk<Maybe<FullOriginMetadata>>));
+  QM_TRY_UNWRAP(
+      auto maybeMetadata,
+      QM_OR_ELSE_WARN_IF(
+          // Expression
+          LoadFullOriginMetadataWithRestore(aChildDirectory)
+              .map([](FullOriginMetadata&& metadata)
+                       -> Maybe<FullOriginMetadata> {
+                return Some(std::move(metadata));
+              }),
+          // Predicate.
+          IsSpecificError<NS_ERROR_MALFORMED_URI>,
+          // Fallback. The origin is permanently unresolvable
+          // (e.g. an orphaned moz-extension directory whose
+          // extension has been uninstalled), so remove it.
+          ([&aChildDirectory](
+               const nsresult) -> Result<Maybe<FullOriginMetadata>, nsresult> {
+            QM_TRY(MOZ_TO_RESULT(aChildDirectory->Remove(true)));
+            return Maybe<FullOriginMetadata>{};
+          })));
 
   if (!maybeMetadata) {
-    // Unknown directories during initialization are
-    // allowed. Just warn if we find them.
-    UNKNOWN_FILE_WARNING(aLeafName);
     return Ok{};
   }
 
@@ -6975,8 +6979,6 @@ QuotaManager::EnsurePersistentOriginIsInitializedInternal(
           // Get the metadata. We only use the timestamp.
           QM_TRY_INSPECT(const auto& metadata,
                          LoadFullOriginMetadataWithRestore(directory));
-
-          MOZ_ASSERT(metadata.mLastAccessTime <= PR_Now());
 
           return metadata;
         }()));

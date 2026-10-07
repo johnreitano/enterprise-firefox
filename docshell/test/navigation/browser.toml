@@ -7,6 +7,7 @@ support-files = [
   "bug343515_pg3_1_1.html",
   "bug343515_pg3_2.html",
   "blank.html",
+  "file_never_responds.sjs",
   "file_reload_subframe_history.html",
   "file_reload_subframe_history_expired.html",
   "file_reload_subframe_history_expired.html^headers^",

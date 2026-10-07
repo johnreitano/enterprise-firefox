@@ -437,6 +437,7 @@ const CONFIG_PANES = Object.freeze({
       "searchShortcuts",
       "searchSuggestions",
       "firefoxSuggest",
+      "addressBarNavigation",
     ],
     iconSrc: "chrome://browser/skin/preferences/category-search.svg",
     module: "chrome://browser/content/preferences/config/search.mjs",

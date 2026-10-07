@@ -4675,8 +4675,10 @@ bool nsGlobalWindowOuter::CanMoveResizeWindows(CallerType aCallerType,
     nsCOMPtr<nsIDragService> ds =
         do_GetService("@mozilla.org/widget/dragservice;1");
     if (ds) {
-      nsGlobalWindowInner::sDragServiceDisabled = true;
+      // Suppress() ends the current drag session, which calls
+      // MouseButtonReleased(), so only mark the suppression as ours afterwards.
       ds->Suppress();
+      nsGlobalWindowInner::sDragServiceDisabled = true;
     }
   }
   return true;
@@ -5712,8 +5714,6 @@ Nullable<WindowProxyHolder> nsGlobalWindowOuter::OpenDialogOuter(
 }
 
 WindowProxyHolder nsGlobalWindowOuter::GetFramesOuter() {
-  RefPtr<nsPIDOMWindowOuter> frames(this);
-  FlushPendingNotifications(FlushType::ContentAndNotify);
   return WindowProxyHolder(mBrowsingContext);
 }
 

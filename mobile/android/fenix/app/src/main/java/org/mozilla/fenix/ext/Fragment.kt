@@ -244,10 +244,13 @@ fun Fragment.isWideWindow(): Boolean {
  *   calculation.
  * @param includeNavBarIfEnabled If true and the navigation bar feature is enabled it's height will be included in the
  *   calculation.
+ * @param includeTabGroupsStrip If true and the tab groups strip is enabled its height will be included in the
+ *   calculation.
  */
 fun Fragment.getBottomToolbarHeight(
     includeTabStripIfAvailable: Boolean = true,
     includeNavBarIfEnabled: Boolean = true,
+    includeTabGroupsStrip: Boolean = true,
 ): Int {
     val settings = requireComponents.settings
 
@@ -255,6 +258,8 @@ fun Fragment.getBottomToolbarHeight(
     val isToolbarAtBottom = settings.toolbarPosition == ToolbarPosition.BOTTOM
     val isNavBarEnabled = settings.shouldUseExpandedToolbar && isTallWindow() && !isWideWindow()
     val shouldShowTabStrip = includeTabStripIfAvailable && settings.shouldShowTabStripAtBottom
+    val shouldShowTabGroupsStrip = includeTabGroupsStrip && settings.shouldShowTabGroupsStrip
+    val navBarDimen = if (isToolbarAtBottom) R.dimen.browser_navbar_height_small else R.dimen.browser_navbar_height
 
     val microsurveyHeight =
         if (isMicrosurveyEnabled) {
@@ -278,18 +283,18 @@ fun Fragment.getBottomToolbarHeight(
 
     val navBarHeight =
         if (includeNavBarIfEnabled && isNavBarEnabled) {
-            pixelSizeFor(
-                if (isToolbarAtBottom) {
-                    R.dimen.browser_navbar_height_small
-                } else {
-                    R.dimen.browser_navbar_height
-                }
-            )
+            pixelSizeFor(navBarDimen)
         } else {
             0
         }
 
-    return microsurveyHeight + toolbarHeight + navBarHeight + tabstripHeight
+    val tabGroupsStripHeight =
+        when (shouldShowTabGroupsStrip) {
+            true -> pixelSizeFor(R.dimen.tab_groups_strip_height)
+            else -> 0
+        }
+
+    return microsurveyHeight + toolbarHeight + navBarHeight + tabstripHeight + tabGroupsStripHeight
 }
 
 /**

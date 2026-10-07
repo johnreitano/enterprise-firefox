@@ -128,6 +128,13 @@
   max-inline-size: var(--content-max-width);
 }
 
+// The widgets section should have some bottom margin if Recommended stories or Recent Activity are not present.
+.nova-enabled
+.content-full-width:not(:has(.layout-content-column.has-feed, .layout-highlights-column))
+.widgets-section-container {
+  margin-block-end: var(--space-xxlarge);
+}
+
 // Side-by-side layouts (Bug 2061741). The lead class means the experiment is
 // assigned, which is enough to frame a lone section; .side-by-side-active means the
 // page has both a feed and a content-area widget to place. Base.jsx decides both. A

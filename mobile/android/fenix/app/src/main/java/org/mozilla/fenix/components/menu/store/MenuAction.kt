@@ -94,8 +94,12 @@ sealed class MenuAction : MenuEvent {
      * [MenuAction] dispatched when an addon is to be installed.
      *
      * @property addon The [Addon] to install.
+     * @property addonName The localized name of the addon.
      */
-    data class InstallAddon(val addon: Addon) : MenuAction()
+    data class InstallAddon(
+        val addon: Addon,
+        val addonName: String? = null,
+    ) : MenuAction()
 
     /**
      * [MenuAction] dispatched when an addon installation is in progress.
@@ -157,6 +161,23 @@ sealed class MenuAction : MenuEvent {
 
     /** [MenuAction] dispatched when the user clicks the IP protection menu item. */
     data object IPProtectionToggle : MenuAction()
+
+    /**
+     * [MenuAction] dispatched when the user expands or collapses the extensions menu item. The expansion itself is
+     * owned by the menu item, this only allows observers to react to it.
+     */
+    data object OnExtensionsMenuClicked : MenuAction()
+
+    /**
+     * [MenuAction] dispatched when the user clicks what an extension offers for the current page.
+     *
+     * @property extensionId The id of the extension owning the clicked action.
+     * @property isPageAction Whether the clicked action is a page action, as opposed to a browser action.
+     */
+    data class WebExtensionActionClicked(
+        val extensionId: String,
+        val isPageAction: Boolean,
+    ) : MenuAction()
 
     /** [MenuAction] dispatched when the user asks to save the current webpage content as a PDF. */
     data object SaveAsPdfRequested : MenuAction()

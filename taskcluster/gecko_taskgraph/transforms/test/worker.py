@@ -173,6 +173,7 @@ MACOSX_WORKER_TYPES = {
     "macosx1500-64": "t-osx-1500-m4",
     "macosx1500-aarch64": "t-osx-1500-m4",
     "macosx1500-aarch64-vms": "t-osx-1500-m-vms",
+    "macosx2700-aarch64": "t-osx-2700-m4",
 }
 
 transforms = TransformSequence()
@@ -203,6 +204,8 @@ def set_worker_type(config, tasks):
             task["worker-type"] = MACOSX_WORKER_TYPES["macosx1500-aarch64"]
         elif test_platform.startswith("macosx1500-64"):
             task["worker-type"] = MACOSX_WORKER_TYPES["macosx1500-64"]
+        elif test_platform.startswith("macosx2700-aarch64"):
+            task["worker-type"] = MACOSX_WORKER_TYPES["macosx2700-aarch64"]
         elif test_platform.startswith("win"):
             # figure out what platform the job needs to run on
             if task["virtualization"] == "hardware":
@@ -268,15 +271,10 @@ def set_worker_type(config, tasks):
             elif task.get("suite", "") in ["talos", "raptor"] and not task[
                 "build-platform"
             ].startswith("linux64-ccov"):
-                if test_platform.startswith("linux2404"):
-                    if "browsertime-network-bench" in task.get("test-name"):
-                        task["worker-type"] = "t-linux-netperf-2404"
-                    else:
-                        task["worker-type"] = "t-linux-talos-2404"
-                elif "browsertime-network-bench" in task.get("test-name"):
-                    task["worker-type"] = "t-linux-netperf-1804"
+                if "browsertime-network-bench" in task.get("test-name"):
+                    task["worker-type"] = "t-linux-netperf-2404"
                 else:
-                    task["worker-type"] = "t-linux-talos-1804"
+                    task["worker-type"] = "t-linux-talos-2404"
             else:
                 task["worker-type"] = LINUX_WORKER_TYPES[task["instance-size"]]
         else:

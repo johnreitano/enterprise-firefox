@@ -453,8 +453,8 @@ const kActionAlways = 1;
 const kActionDeny = 2;
 const kActionNever = 3;
 
-async function activateSecondaryAction(aAction) {
-  let notification = PopupNotifications.panel.firstElementChild;
+async function activateSecondaryAction(aAction, aWindow = window) {
+  let notification = aWindow.PopupNotifications.panel.firstElementChild;
   switch (aAction) {
     case kActionNever:
       if (notification.notification.secondaryActions.length > 1) {
@@ -464,7 +464,8 @@ async function activateSecondaryAction(aAction) {
           BrowserTestUtils.waitForEvent(notification.menupopup, "popupshown"),
           EventUtils.synthesizeMouseAtCenter(
             notification.secondaryButton.chevronButtonEl,
-            {}
+            {},
+            aWindow
           ),
         ]);
         notification.menupopup.querySelector("menuitem").click();

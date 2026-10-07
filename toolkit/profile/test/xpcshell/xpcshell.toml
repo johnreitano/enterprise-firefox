@@ -86,6 +86,8 @@ run-sequentially = ["true"]
 
 ["test_profile_metrics_store_id_mismatch.js"]
 
+["test_profile_metrics_store_id_null.js"]
+
 ["test_previous_dedicated.js"]
 
 ["test_profile_descriptor_and_localdir.js"]
@@ -163,6 +165,16 @@ skip-if = [
 ["test_steal_inuse.js"]
 
 ["test_storeid.js"]
+
+["test_unreadable_ini.js"]
+
+["test_unreadable_ini_createprofile.js"]
+
+["test_unreadable_ini_no_profile.js"]
+
+["test_unreadable_ini_p.js"]
+
+["test_unreadable_ini_profilemanager.js"]
 
 ["test_update_paths.js"]
 

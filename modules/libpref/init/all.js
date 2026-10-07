@@ -396,12 +396,6 @@ pref("gfx.downloadable_fonts.enabled", true);
 pref("gfx.downloadable_fonts.fallback_delay", 3000);
 pref("gfx.downloadable_fonts.fallback_delay_short", 100);
 
-#ifdef XP_WIN
-  // Bug 2011408 will remove this pref and the code that uses it completely if
-  // we don't see any performance issues.
-  pref("gfx.font_rendering.directwrite.use_gdi_table_loading", false);
-#endif
-
 // comma separated list of backends to use in order of preference
 // e.g., pref("gfx.canvas.azure.backends", "direct2d,skia");
 pref("gfx.canvas.azure.backends", "skia");
@@ -598,6 +592,9 @@ pref("toolkit.telemetry.user_characteristics_ping.logLevel", "Warn");
 #else
   pref("toolkit.asyncshutdown.crash_timeout", 60000); // 1 minute
 #endif // !defined(MOZ_ASAN) && !defined(MOZ_TSAN)
+// Additional delay before the terminator crashes on top of crash_timeout, to
+// let AsyncShutdown write its own crash report first.
+pref("toolkit.asyncshutdown.crash_timeout_additional_wait", 10000); // 10 seconds
 // Extra logging for AsyncShutdown barriers and phases
 pref("toolkit.asyncshutdown.log", false);
 
@@ -3027,7 +3024,7 @@ pref("signon.firefoxRelay.privacy_policy_url", "https://www.mozilla.org/%LOCALE%
 pref("signon.signupDetection.confidenceThreshold",     "0.75");
 
 // Logins Rust storage backend is enabled by default
-#if MOZ_UPDATE_CHANNEL != release && MOZ_UPDATE_CHANNEL != esr
+#if MOZ_UPDATE_CHANNEL != release && MOZ_UPDATE_CHANNEL != esr && !defined(MOZ_ENTERPRISE)
   pref("signon.storage.rust.enabled", true);
 #else
   pref("signon.storage.rust.enabled", false);
@@ -3184,7 +3181,7 @@ pref("extensions.recommendations.themeRecommendationUrl", "");
 // disable it in problematic tests, see disableNonReleaseActions() inside
 // browser/modules/test/browser/head.js
 pref("extensions.webcompat-reporter.newIssueEndpoint", "https://webcompat.com/issues/new");
-#if MOZ_UPDATE_CHANNEL != release && MOZ_UPDATE_CHANNEL != esr
+#if MOZ_UPDATE_CHANNEL != release && MOZ_UPDATE_CHANNEL != esr && !defined(MOZ_ENTERPRISE)
   pref("extensions.webcompat-reporter.enabled", true);
 #else
   pref("extensions.webcompat-reporter.enabled", false);
@@ -3696,6 +3693,12 @@ pref("browser.ml.modelHubUrlTemplate", "{model}/{revision}");
 pref("browser.ml.modelCacheMaxSize", 4);
 // Model cache timeout in ms
 pref("browser.ml.modelCacheTimeout", 120000);
+// Route llama.cpp inference to the HWInference utility process
+#ifdef NIGHTLY_BUILD
+  pref("browser.ml.llama.hwInference", true);
+#else
+  pref("browser.ml.llama.hwInference", false);
+#endif
 // Minimal Physical RAM required in GiB
 pref("browser.ml.minimumPhysicalMemory", 3);
 // Check for memory before running
@@ -3841,6 +3844,8 @@ pref("services.common.log.logger.tokenserverclient", "Debug");
   // The addresses and CC engines might not actually be available at all.
   pref("services.sync.engine.addresses.available", false);
   pref("services.sync.engine.creditcards.available", false);
+
+  pref("services.sync.perDeviceEngineChoices", false);
 
   // If true, add-on sync ignores changes to the user-enabled flag. This
   // allows people to have the same set of add-ons installed across all
@@ -4094,7 +4099,7 @@ pref("security.storage.encryption.sqlite.enabled", true);
 pref("extensions.formautofill.available", "detect");
 
 #if !defined(ANDROID)
-  #if MOZ_UPDATE_CHANNEL != release && MOZ_UPDATE_CHANNEL != esr
+  #if MOZ_UPDATE_CHANNEL != release && MOZ_UPDATE_CHANNEL != esr && !defined(MOZ_ENTERPRISE)
     pref("extensions.formautofill.addresses.supported", "on");
   #else
     pref("extensions.formautofill.addresses.supported", "detect");
@@ -4105,7 +4110,7 @@ pref("extensions.formautofill.addresses.supported", "detect");
 
 // Use ML for address form field detection.
 #if defined(XP_WIN) || defined(XP_MACOSX)
-  #if MOZ_UPDATE_CHANNEL != release && MOZ_UPDATE_CHANNEL != esr
+  #if MOZ_UPDATE_CHANNEL != release && MOZ_UPDATE_CHANNEL != esr && !defined(MOZ_ENTERPRISE)
     pref("extensions.formautofill.useml", true);
   #else
     pref("extensions.formautofill.useml", false);
@@ -4217,6 +4222,14 @@ pref("extensions.formautofill.creditCards.cvv.supported", "off");
 // CVVs are only captured and stored when both prefs are true; see
 // FormAutofill.isAutofillCreditCardCVVEnabled.
 pref("extensions.formautofill.creditCards.cvv.enabled", true);
+
+// Leave a field whose autocomplete attribute is present but cannot be parsed
+// into a known field name, e.g. autocomplete="shopify checkout", out of
+// autofill entirely: it is offered no dropdown of its own, and it is not
+// filled when autofill is triggered from another field in the same form.
+// Treated as a signal that the site provides its own suggestion UI. A field
+// with no autocomplete attribute, or with "off"/"on", is unaffected.
+pref("extensions.formautofill.suppressUnrecognizedAutocomplete.enabled", false);
 
 // Supported countries need to follow ISO 3166-1 to align with "browser.search.region"
 pref("extensions.formautofill.creditCards.supportedCountries", "US,CA,GB,FR,DE,IT,ES,AT,BE,PL");

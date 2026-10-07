@@ -59,6 +59,7 @@
 #include "mozilla/dom/HTMLBodyElement.h"
 #include "mozilla/dom/HTMLDocumentBinding.h"
 #include "mozilla/dom/HTMLIFrameElement.h"
+#include "mozilla/dom/Range.h"
 #include "mozilla/dom/Selection.h"
 #include "mozilla/dom/ShadowIncludingTreeIterator.h"
 #include "mozilla/dom/nsCSPContext.h"
@@ -76,7 +77,6 @@
 #include "nsMimeTypes.h"
 #include "nsNodeInfoManager.h"
 #include "nsParser.h"
-#include "nsRange.h"
 #include "nsSandboxFlags.h"
 
 using namespace mozilla;
@@ -826,14 +826,6 @@ void nsHTMLDocument::GetFormsAndFormControls(ContentList** aFormList,
                                              ContentList** aFormControlList) {
   RefPtr<ContentListHolder> holder = mContentListHolder;
   if (!holder) {
-    // Flush our content model so it'll be up to date
-    // If this becomes unnecessary and the following line is removed,
-    // please also remove the corresponding flush operation from
-    // nsHtml5TreeBuilderCppSupplement.h. (Look for "See bug 497861." there.)
-    // XXXsmaug nsHtml5TreeBuilderCppSupplement doesn't seem to have such flush
-    //         anymore.
-    FlushPendingNotifications(FlushType::Content);
-
     RefPtr<ContentList> htmlForms = GetExistingForms();
     if (!htmlForms) {
       // If the document doesn't have an existing forms content list, create a

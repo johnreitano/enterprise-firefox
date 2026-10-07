@@ -82,6 +82,20 @@ class TestSerialization(unittest.TestCase):
         self.assertEqual(component["purl"], "pkg:github/facebook/zstd@v1.5.7")
         self.assertEqual(component["type"], "library")
 
+    def test_root_component_is_named_after_the_product(self):
+        # The same shippable builds that generate an SBOM include GeckoView, so
+        # the root must not be hardcoded to Firefox desktop.
+        self.assertEqual(render([record()])["metadata"]["component"]["name"], "Firefox")
+
+        document = json.loads(
+            to_json(
+                build_bom(
+                    [record()], "155.0a1", REVISION, TIMESTAMP, product_name="Fennec"
+                )
+            )
+        )
+        self.assertEqual(document["metadata"]["component"]["name"], "Fennec")
+
     def test_serial_number_is_derived_from_revision(self):
         first = render([record()])["serialNumber"]
         second = render([record()])["serialNumber"]
@@ -91,6 +105,28 @@ class TestSerialization(unittest.TestCase):
             to_json(build_bom([record()], "155.0a1", "deadbeef", TIMESTAMP))
         )
         self.assertNotEqual(first, other["serialNumber"])
+
+    def test_build_tooling_document(self):
+        product = render([record()])
+        self.assertNotIn("lifecycles", product["metadata"])
+        self.assertNotIn("scope", product["components"][0])
+
+        tooling = json.loads(
+            to_json(
+                build_bom(
+                    [record()], "155.0a1", REVISION, TIMESTAMP, build_tooling=True
+                )
+            )
+        )
+        self.assertEqual(
+            sorted(
+                lifecycle["phase"] for lifecycle in tooling["metadata"]["lifecycles"]
+            ),
+            ["build", "post-build", "pre-build"],
+        )
+        self.assertEqual(tooling["components"][0]["scope"], "excluded")
+        # Two documents of the same revision must not share an identity.
+        self.assertNotEqual(tooling["serialNumber"], product["serialNumber"])
 
     def test_output_is_byte_identical_across_runs(self):
         records = [record(), record(bom_ref="media/libjpeg", name="libjpeg")]

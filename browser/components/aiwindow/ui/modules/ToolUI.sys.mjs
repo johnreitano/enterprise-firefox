@@ -610,15 +610,12 @@ export class ToolUI {
     const { selectedTabs = [], tabGroupLabel = "Tab Group" } = updateData ?? {};
 
     const originTab = this.findChatTab(conversation?.id);
-    const isSingleTab = selectedTabs.length === 1;
-    const result = isSingleTab
-      ? await this.openOrSwitchToTab({ tab: selectedTabs[0], window })
-      : await this.openAndGroupTabs({
-          tabs: selectedTabs,
-          window,
-          label: tabGroupLabel,
-          originTab,
-        });
+    const result = await this.openOrGroupTabs({
+      tabs: selectedTabs,
+      window,
+      label: tabGroupLabel,
+      originTab,
+    });
     this.clearTabKeys(toolCallId);
     if (!result?.success) {
       return false;
@@ -632,7 +629,7 @@ export class ToolUI {
         operationIds: result.group?.id ? [result.group.id] : [],
         group: result.group ?? null,
         mergedCount: result.mergedCount,
-        switched: isSingleTab ? result.switched : false,
+        switched: result.switched ?? false,
       },
     });
 
@@ -1112,6 +1109,24 @@ export class ToolUI {
 
     lazy.tabManagementService.switchToTab({ tab: openedTabs[0], window: win });
     return { success: true, switched: false };
+  }
+
+  /**
+   * Opens or switches to a single tab, or opens and groups multiple tabs.
+   *
+   * @param {object} options
+   * @param {Array<TabSelectionData>} options.tabs - Tabs to open
+   * @param {ChromeWindow} options.window - The browser window
+   * @param {string} options.label - Tab group label, used only when grouping
+   * @param {MozTabbrowserTab} [options.originTab] - See openAndGroupTabs
+   * @returns {Promise<object|null>} Result of openOrSwitchToTab for a
+   *   single tab, or of openAndGroupTabs otherwise
+   */
+  static async openOrGroupTabs({ tabs = [], window: win, label, originTab }) {
+    if (tabs.length === 1) {
+      return this.openOrSwitchToTab({ tab: tabs[0], window: win });
+    }
+    return this.openAndGroupTabs({ tabs, window: win, label, originTab });
   }
 
   /**

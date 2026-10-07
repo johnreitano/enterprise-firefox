@@ -136,7 +136,7 @@ const LOG_PREF = "browser.ipProtection.log";
 
 ChromeUtils.defineLazyGetter(lazy, "logConsole", function () {
   return console.createInstance({
-    prefix: "IPPProxyManager",
+    prefix: "IPP_ProxyManager",
     maxLogLevel: Services.prefs.getBoolPref(LOG_PREF, false) ? "Debug" : "Warn",
   });
 });
@@ -955,7 +955,9 @@ class IPPProxyManagerSingleton extends EventTarget {
     this.#rotation?.controller.abort();
 
     const isString = typeof error === "string";
-    this.#errorType = isString ? ERRORS.from(error) : ERRORS.GENERIC;
+    // Keep the kind in a local: updateState() below clears #errorType.
+    const errorType = isString ? ERRORS.from(error) : ERRORS.GENERIC;
+    this.#errorType = errorType;
 
     if (this.#state === IPPProxyStates.ACTIVE) {
       // If the proxy is active, switch to the error state.
@@ -973,7 +975,7 @@ class IPPProxyManagerSingleton extends EventTarget {
       : stackSource(error?.stack ?? new Error().stack);
     Glean.ipprotection.error.record({
       source: stack || "ProxyManager",
-      reason: this.#errorType ?? "",
+      reason: errorType,
     });
   }
 

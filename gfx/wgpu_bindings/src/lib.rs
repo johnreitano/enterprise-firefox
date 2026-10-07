@@ -281,7 +281,6 @@ pub(crate) enum Message<'a> {
     },
     BufferUnmap(id::DeviceId, id::BufferId, bool),
     QueueSubmit(
-        id::DeviceId,
         id::QueueId,
         Cow<'a, [id::CommandBufferId]>,
         Cow<'a, [id::TextureId]>,

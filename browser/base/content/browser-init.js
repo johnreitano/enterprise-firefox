@@ -189,6 +189,14 @@ var gBrowserInit = {
       }
     }
 
+    let tabToAdopt = this.getTabToAdopt();
+    if (tabToAdopt?.hasAttribute?.("mini-window")) {
+      document.documentElement.setAttribute("mini-window", "true");
+      if (tabToAdopt.hasAttribute("cropped-mini-window")) {
+        document.documentElement.setAttribute("cropped-mini-window", "true");
+      }
+    }
+
     // Run menubar initialization first, to avoid CustomTitlebar code picking
     // up mutations from it and causing a reflow.
     BrowserUtils.callModulesFromCategory(
@@ -346,7 +354,8 @@ var gBrowserInit = {
 
     if (
       !window.toolbar.visible ||
-      window.document.documentElement.hasAttribute("taskbartab")
+      window.document.documentElement.hasAttribute("taskbartab") ||
+      window.document.documentElement.hasAttribute("cropped-mini-window")
     ) {
       // adjust browser UI for popups
       gURLBar.readOnly = true;
@@ -376,17 +385,17 @@ var gBrowserInit = {
       gURLBar.removeAttribute("focused");
 
       let swapBrowsers = () => {
-        if (gBrowser.isTabGroupLabel(tabToAdopt)) {
+        if (Tabbrowser.isTabGroupLabel(tabToAdopt)) {
           // TODO bug 1967937: Merge this case with the tab group case below.
           gBrowser.adoptTabGroup(tabToAdopt.group, { elementIndex: 0 });
           gBrowser.removeTab(gBrowser.selectedTab);
-        } else if (gBrowser.isTabGroup(tabToAdopt)) {
+        } else if (Tabbrowser.isTabGroup(tabToAdopt)) {
           // Via gBrowser.replaceGroupWithWindow
           let tempBlankTab = gBrowser.selectedTab;
           gBrowser.adoptTabGroup(tabToAdopt, { tabIndex: 0, selectTab: true });
           gBrowser.removeTab(tempBlankTab);
           Glean.tabgroup.groupInteractions.move_window.add(1);
-        } else if (gBrowser.isSplitViewWrapper(tabToAdopt)) {
+        } else if (Tabbrowser.isSplitViewWrapper(tabToAdopt)) {
           let tempBlankTab = gBrowser.selectedTab;
           let splitview = gBrowser.adoptSplitView(tabToAdopt, {
             elementIndex: 0,
@@ -411,7 +420,7 @@ var gBrowserInit = {
         this._clearTabToAdopt();
       };
       if (
-        gBrowser.isTab(tabToAdopt) &&
+        Tabbrowser.isTab(tabToAdopt) &&
         !tabToAdopt.linkedBrowser.isRemoteBrowser
       ) {
         swapBrowsers();
@@ -563,13 +572,13 @@ var gBrowserInit = {
 
     initBackForwardButtonTooltip(
       "back-button-tooltip-description",
-      "navbar-tooltip-back-2",
+      "navbar-tooltip-back-3",
       "goBackKb"
     );
 
     initBackForwardButtonTooltip(
       "forward-button-tooltip-description",
-      "navbar-tooltip-forward-2",
+      "navbar-tooltip-forward-3",
       "goForwardKb"
     );
 

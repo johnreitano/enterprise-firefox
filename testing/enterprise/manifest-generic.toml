@@ -24,6 +24,8 @@ subsuite = "enterprise"
 
 ["test_felt_exit_tokens.py"]
 
+["test_felt_forced_signout.py"]
+
 ["test_felt_init_failures.py"]
 
 ["test_felt_restart_is_quit.py"]

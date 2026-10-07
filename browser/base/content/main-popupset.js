@@ -11,6 +11,8 @@ document.addEventListener(
         "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
       ContentSharingUtils:
         "moz-src:///browser/components/sharing/ContentSharingUtils.sys.mjs",
+      MiniWindowManager:
+        "moz-src:///browser/components/miniwindow/MiniWindowManager.sys.mjs",
       TabMetrics: "moz-src:///browser/components/tabbrowser/TabMetrics.sys.mjs",
       TabNotes: "moz-src:///browser/components/tabnotes/TabNotes.sys.mjs",
     });
@@ -67,9 +69,7 @@ document.addEventListener(
           TabContextMenu.contextTab.resumeDelayedMedia();
           break;
         case "context_playSelectedTabs":
-          gBrowser.resumeDelayedMediaOnMultiSelectedTabs(
-            TabContextMenu.contextTab
-          );
+          gBrowser.resumeDelayedMediaOnMultiSelectedTabs();
           break;
         case "context_toggleMuteTab":
           TabContextMenu.contextTab.toggleMuteAudio();
@@ -160,6 +160,12 @@ document.addEventListener(
               gBrowser.TabMetrics.METRIC_SOURCE.TAB_MENU
             ),
           });
+          break;
+        case "context_openTabInMiniWindow":
+          lazy.MiniWindowManager.popTab(
+            TabContextMenu.contextTab,
+            "tab_context_menu"
+          );
           break;
         case "context_selectAllTabs":
           gBrowser.selectAllTabs();

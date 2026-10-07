@@ -7,6 +7,9 @@
 //! but implements no commands yet.
 
 mod lifecycle;
+mod preferences;
+mod pushconnection;
+mod widestring;
 
 use std::env;
 use std::fs::File;
@@ -21,6 +24,9 @@ use clap::Parser;
 
 use mozbuild::config::MOZ_APP_NAME;
 
+use crate::preferences::*;
+use crate::pushconnection::{Event, PushConnection};
+
 const PROGRAM: &str = env!("CARGO_BIN_NAME");
 
 const COMPATIBILITY_FILENAME: &str = "compatibility.ini";
@@ -31,11 +37,11 @@ const PROFILE_MARKER: &str = COMPATIBILITY_FILENAME;
 /// File that indicates a profile is currently in use.
 const PROFILE_LOCK_NAME: &str = "parent.lock";
 
-/// Default length of time between checking to see if we should launch Firefox
-/// Can be overwritten by setting the FX_NOTIFICATION_HELPER_LAUNCH_TIMEOUT_SECS
+/// Default length of time between checking if we need to restart the web socket
+/// Can be overwritten by setting the FX_NOTIFICATION_HELPER_CONNECTION_CHECK_TIMEOUT_SECS
 /// environment variable
-const DEFAULT_LAUNCH_TIMEOUT_SECS: u64 = 5 * 60;
-const LAUNCH_TIMEOUT_ENV_NAME: &str = "FX_NOTIFICATION_HELPER_LAUNCH_TIMEOUT_SECS";
+const DEFAULT_CONNECTION_CHECK_TIMEOUT_SECS: u64 = 60;
+const LAUNCH_TIMEOUT_ENV_NAME: &str = "FX_NOTIFICATION_HELPER_CONNECTION_CHECK_TIMEOUT_SECS";
 const LAST_PLATFORM_DIR_STR: &str = "LastPlatformDir=";
 
 #[derive(Parser)]
@@ -125,8 +131,9 @@ fn get_firefox_path(profile_path: &Path, executable_path: &Path) -> Option<PathB
     };
 }
 
-/// Launches <firefox_path> if <profile_path> is not currently in use by a running process
-fn maybe_launch_fx(profile_path: &Path, firefox_path: &Path) {
+/// Checks if Firefox is running with the profile at profile_path.
+/// returns: bool indicating if Firefox is running or not.
+fn is_firefox_running(profile_path: &Path) -> bool {
     let lock_path = profile_path.join(PROFILE_LOCK_NAME);
     if lock_path.is_file() {
         #[cfg(not(windows))]
@@ -146,12 +153,19 @@ fn maybe_launch_fx(profile_path: &Path, firefox_path: &Path) {
         if firefox_running {
             // This profile is currently in use, so we don't need to check it
             println!("Firefox is running");
-            return;
+            return true;
         }
     } else {
         println!("No lock file found at {}", lock_path.display());
     }
 
+    return false;
+}
+
+/// Launches firefox with the --receive-push-messages command line, and the
+/// --profile argument set to profile_path.
+/// Returns true on success, false on failure
+fn launch_firefox(profile_path: &Path, firefox_path: &Path) -> bool {
     println!("Launching firefox");
     let result = Command::new(firefox_path)
         .arg("--receive-push-messages")
@@ -161,8 +175,10 @@ fn maybe_launch_fx(profile_path: &Path, firefox_path: &Path) {
 
     if let Err(message) = result {
         eprintln!("Error launching Firefox: {message}");
-        return;
+        return false;
     }
+
+    return true;
 }
 
 fn get_interval_time() -> u64 {
@@ -172,14 +188,53 @@ fn get_interval_time() -> u64 {
                 if interval > 0 {
                     interval
                 } else {
-                    DEFAULT_LAUNCH_TIMEOUT_SECS
+                    DEFAULT_CONNECTION_CHECK_TIMEOUT_SECS
                 }
             }
-            Err(_) => DEFAULT_LAUNCH_TIMEOUT_SECS,
+            Err(_) => DEFAULT_CONNECTION_CHECK_TIMEOUT_SECS,
         };
     }
-    return DEFAULT_LAUNCH_TIMEOUT_SECS;
+    return DEFAULT_CONNECTION_CHECK_TIMEOUT_SECS;
 }
+
+fn handle_push_connection(uaid: &str, server_url: &str, profile_path: &Path) -> Result<bool, pushconnection::Error> {
+    let mut pushconnection = PushConnection::new();
+
+    println!("Connecting");
+    pushconnection.connect(&server_url)?;
+
+    println!("Connected");
+    if !pushconnection.send_hello(uaid)? {
+        return Ok(false);
+    }
+
+    loop {
+        let message = pushconnection.wait_for_message()?;
+        match message {
+            Event::Closed => {
+                pushconnection.close();
+                return Ok(false);
+            }
+            Event::Notification => {
+                pushconnection.close();
+                return Ok(true);
+            }
+            Event::Uaid(received_uaid) => {
+                println!("Got uaid: {received_uaid}");
+                if received_uaid != uaid {
+                    println!("Need to update {uaid} -> {received_uaid}");
+                    if let Err(err) = rewrite_preference_file_for_new_uaid(profile_path, &received_uaid) {
+                        eprintln!("Error rewriting preferences file: {:?}", err);
+                    };
+                }
+            }
+            Event::Other(message) => {
+                println!("Got unknown message: {message}");
+            }
+        }
+    }
+}
+
 /// Starts the notification work for `profile`, parks until another process asks
 /// it to stop, then tears the work down.
 fn run(profile: &Path, firefox_path: &Path) -> ExitCode {
@@ -207,12 +262,6 @@ fn run(profile: &Path, firefox_path: &Path) -> ExitCode {
     println!("Starting to fetch notifications 🦀 🦊");
     println!("profile: {}", profile.display());
 
-
-    // let mut task_profile_path = PathBuf::new();
-    // task_profile_path.push(profile);
-    // let mut task_firefox_path = PathBuf::new();
-    // task_firefox_path.push(firefox_path);
-
     let task_profile_path = profile.to_owned();
     let task_firefox_path = firefox_path.to_owned();
 
@@ -225,11 +274,24 @@ fn run(profile: &Path, firefox_path: &Path) -> ExitCode {
 
         println!("Starting check loop");
         loop {
-            println!("Waiting for {interval_time_ms}");
-            thread::sleep(duration);
-
             println!("Checking for Firefox");
-            maybe_launch_fx(&task_profile_path, &task_firefox_path);
+            if !is_firefox_running(&task_profile_path) {
+                if let Ok(Some((uaid, server_url))) = load_prefs(&task_profile_path) {
+                    println!("Starting push connection");
+
+                    match handle_push_connection(&uaid, &server_url, &task_profile_path) {
+                        Ok(true) => { println!("Notification received - starting Firefox");
+                            launch_firefox(&task_profile_path, &task_firefox_path); },
+                        Ok(false) => println!("No notification received"),
+                        Err(e) => eprintln!("Push connection failed: {e}")
+                    }
+                } else {
+                    eprintln!("Could not find uaid in prefs.js");
+                };
+            }
+
+            println!("Sleeping for {interval_time_ms}ms");
+            thread::sleep(duration);
         }
     });
 
@@ -239,9 +301,6 @@ fn run(profile: &Path, firefox_path: &Path) -> ExitCode {
         return ExitCode::FAILURE;
     }
 
-    // TODO: close the push connection so the worker's pending read returns,
-    // then join it here. Currently, we just detach the thread to account for
-    // the loop.
     drop(worker);
 
     ExitCode::SUCCESS

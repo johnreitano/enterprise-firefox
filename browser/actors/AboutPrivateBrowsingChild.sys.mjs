@@ -16,9 +16,11 @@ export class AboutPrivateBrowsingChild extends RemotePageChild {
     super.actorCreated();
     let window = this.contentWindow;
 
-    Cu.exportFunction(this.PrivateBrowsingRecordClick.bind(this), window, {
-      defineAs: "PrivateBrowsingRecordClick",
-    });
+    Cu.exportFunction(
+      this.PrivateBrowsingIsEnrolledInExperiment.bind(this),
+      window,
+      { defineAs: "PrivateBrowsingIsEnrolledInExperiment" }
+    );
     Cu.exportFunction(
       this.PrivateBrowsingShouldHideDefault.bind(this),
       window,
@@ -36,14 +38,10 @@ export class AboutPrivateBrowsingChild extends RemotePageChild {
     });
   }
 
-  PrivateBrowsingRecordClick(source) {
-    const metadata = lazy.NimbusFeatures.pbNewtab.getEnrollmentMetadata(
+  PrivateBrowsingIsEnrolledInExperiment() {
+    return !!lazy.NimbusFeatures.pbNewtab.getEnrollmentMetadata(
       lazy.EnrollmentType.EXPERIMENT
     );
-    if (metadata) {
-      Glean.aboutprivatebrowsing["click" + source].record();
-    }
-    return !!metadata;
   }
 
   PrivateBrowsingShouldHideDefault() {

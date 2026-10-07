@@ -1770,6 +1770,11 @@ nsresult nsSHistory::Reload(uint32_t aReloadFlags,
     return NS_OK;
   }
 
+  if (mIndex < 0) {
+    // We can't reload if we don't have entries, see bug 2074418.
+    return NS_ERROR_FAILURE;
+  }
+
   uint32_t loadType = PrepareReloadEntry(mEntries[mIndex], aReloadFlags);
 
   nsresult rv =

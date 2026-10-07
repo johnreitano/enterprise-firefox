@@ -26,15 +26,6 @@ native CookieRefPtr(RefPtr<mozilla::net::Cookie>);
 [ref] native CookieParserPtr(mozilla::net::CookieParser);
 
 /**
- * @see nsICookieService::runInTransaction
- */
-[scriptable, function, uuid(0fc41ffb-f1b7-42d9-9a42-8dc420c158c1)]
-interface nsICookieTransactionCallback : nsISupports
-{
-  void callback();
-};
-
-/**
  * nsICookieService
  *
  * Provides methods for setting and getting cookies in the context of a
@@ -147,19 +138,4 @@ interface nsICookieService : nsISupports
    */
   void setCookieStringFromHttp(in nsIURI aURI, in ACString aCookie,
                                in nsIChannel aChannel);
-
-  /*
-   * Run a set of operations and write the resulting changes to the underlying
-   * SQLite database as a single transaction, without waiting for the regular
-   * flush interval. Changes are batched anyway, so this only makes the write
-   * happen earlier.
-   * Example: test scripts that need to construct a large cookie database.
-   * Note that this is not atomic: if aCallback() fails halfway through, the
-   * changes it already made are kept, both in memory and on disk.
-   * @param aCallback
-   *        nsICookieTransactionCallback interface to call
-   * @throws NS_ERROR_FAILURE if aCallback() fails.
-   * @throws NS_ERROR_NOT_AVAILABLE if the connection is not established.
-   */
-   void runInTransaction(in nsICookieTransactionCallback aCallback);
 };

@@ -231,8 +231,10 @@ class AppWindow final : public nsIBaseWindow,
   NS_IMETHOD SizeShellTo(nsIDocShellTreeItem* aShellItem, int32_t aCX,
                          int32_t aCY);
   NS_IMETHOD ExitModalLoop(nsresult aStatus);
+  MOZ_CAN_RUN_SCRIPT
   NS_IMETHOD CreateNewChromeWindow(int32_t aChromeFlags,
                                    nsIAppWindow** _retval);
+  MOZ_CAN_RUN_SCRIPT
   NS_IMETHOD CreateNewContentWindow(int32_t aChromeFlags,
                                     nsIOpenWindowInfo* aOpenWindowInfo,
                                     nsIAppWindow** _retval);

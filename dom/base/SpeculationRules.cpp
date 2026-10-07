@@ -205,14 +205,25 @@ void SpeculationRules::EnactCandidates(nsIURI* aURL, Eagerness aTriggerLevel) {
       continue;
     }
 
+    nsCOMPtr<nsIURI> candidateUri;
+    if (NS_FAILED(NS_NewURI(getter_AddRefs(candidateUri), candidate.url))) {
+      continue;
+    }
+
+    nsIURI* documentUri = mDocument->GetDocumentURI();
+    if (bool equals = false;
+        documentUri &&
+        NS_SUCCEEDED(documentUri->EqualsExceptRef(candidateUri, &equals)) &&
+        equals) {
+      continue;
+    }
+
     if (aURL) {
       // Candidate URLs are serialized by the Rust URL parser, so they are
       // compared as URIs rather than as strings, to avoid relying on it and
       // nsIURI agreeing on a normal form.
-      nsCOMPtr<nsIURI> uri;
       bool equals = false;
-      if (NS_FAILED(NS_NewURI(getter_AddRefs(uri), candidate.url)) ||
-          NS_FAILED(aURL->Equals(uri, &equals)) || !equals) {
+      if (NS_FAILED(aURL->Equals(candidateUri, &equals)) || !equals) {
         continue;
       }
     }
@@ -236,12 +247,15 @@ void SpeculationRules::EnactCandidates(nsIURI* aURL, Eagerness aTriggerLevel) {
 
 void SpeculationRules::AddLink(Element* aElement) {
   mLinks.Insert(aElement);
-  ConsiderLoads();
+  if (!mRuleSetsFromScript.IsEmpty()) {
+    ConsiderLoads();
+  }
 }
 
 void SpeculationRules::RemoveLink(Element* aElement) {
   mLinks.Remove(aElement);
-  if (mDocument && mDocument->IsFullyActive()) {
+  if (!mRuleSetsFromScript.IsEmpty() && mDocument &&
+      mDocument->IsFullyActive()) {
     // Link elements are removed when a document is being cycle-collected; we
     // shouldn't bother firing the microtask in that case.
     ConsiderLoads();

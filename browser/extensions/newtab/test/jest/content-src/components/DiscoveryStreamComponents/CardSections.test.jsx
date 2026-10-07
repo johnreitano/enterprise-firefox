@@ -138,6 +138,50 @@ describe("<CardSections />", () => {
     expect(container.querySelector(".section-title").textContent).toBe("title");
   });
 
+  it("should send the rendered section order once until it changes", () => {
+    const secondSection = {
+      ...DEFAULT_PROPS.data.sections[0],
+      sectionKey: "second_key",
+    };
+    const data = {
+      sections: [DEFAULT_PROPS.data.sections[0], secondSection],
+    };
+    const orderActions = dispatch =>
+      dispatch.mock.calls.filter(
+        ([action]) => action.type === "CARD_SECTIONS_ORDER"
+      );
+
+    const dispatch = jest.fn();
+    const { rerender } = render(
+      <WrapWithProvider>
+        <CardSections dispatch={dispatch} {...DEFAULT_PROPS} data={data} />
+      </WrapWithProvider>
+    );
+    rerender(
+      <WrapWithProvider>
+        <CardSections dispatch={dispatch} {...DEFAULT_PROPS} data={data} />
+      </WrapWithProvider>
+    );
+    expect(orderActions(dispatch)).toHaveLength(1);
+    expect(orderActions(dispatch)[0][0].data).toEqual({
+      sections: ["section_key", "second_key"],
+    });
+
+    rerender(
+      <WrapWithProvider>
+        <CardSections
+          dispatch={dispatch}
+          {...DEFAULT_PROPS}
+          data={{ sections: [secondSection, DEFAULT_PROPS.data.sections[0]] }}
+        />
+      </WrapWithProvider>
+    );
+    expect(orderActions(dispatch)).toHaveLength(2);
+    expect(orderActions(dispatch)[1][0].data).toEqual({
+      sections: ["second_key", "section_key"],
+    });
+  });
+
   it("should skip a section with no items available for that section", () => {
     // Verify the section exists normally, so the next assertion is unlikely
     // to be a false positive.
@@ -323,6 +367,7 @@ describe("<CardSections />", () => {
       state
     );
 
+    dispatch.mockClear();
     // section_key_1 is not followed, so its button follows the section.
     fireEvent.click(container.querySelector(".section-follow moz-button"));
     // section_key_2 is followed, so its button unfollows the section.
@@ -1193,7 +1238,7 @@ describe("<CardSections /> rendering and placeholders", () => {
 
     const { container: baselineContainer } = render(
       <WrapWithProvider>
-        <CardSections {...sectionProps} />
+        <CardSections dispatch={dispatch} {...sectionProps} />
       </WrapWithProvider>
     );
     expect(baselineContainer.querySelectorAll("article.ds-card")).toHaveLength(
@@ -1202,7 +1247,11 @@ describe("<CardSections /> rendering and placeholders", () => {
 
     const { container } = render(
       <WrapWithProvider>
-        <CardSections {...sectionProps} spocsLoading={true} />
+        <CardSections
+          dispatch={dispatch}
+          {...sectionProps}
+          spocsLoading={true}
+        />
       </WrapWithProvider>
     );
     expect(container.querySelectorAll(".ds-card.placeholder")).toHaveLength(24);
@@ -1212,6 +1261,7 @@ describe("<CardSections /> rendering and placeholders", () => {
     const { container } = render(
       <WrapWithProvider>
         <CardSections
+          dispatch={dispatch}
           {...DEFAULT_PROPS}
           data={{
             ...DEFAULT_PROPS.data,

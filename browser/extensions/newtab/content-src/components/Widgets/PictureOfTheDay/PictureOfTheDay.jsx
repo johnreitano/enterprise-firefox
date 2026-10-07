@@ -361,7 +361,7 @@ const PictureOfTheDay = ({
                 ></moz-badge>
               )}
               <p
-                className="picture-of-the-day-source"
+                className="newtab-widget-title picture-of-the-day-source"
                 data-l10n-id="newtab-picture-header-main"
               ></p>
             </div>

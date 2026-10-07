@@ -152,6 +152,7 @@
 #include "mozilla/dom/PopupBlocker.h"
 #include "mozilla/dom/PrimitiveConversions.h"
 #include "mozilla/dom/Promise.h"
+#include "mozilla/dom/PushManager.h"
 #include "mozilla/dom/RootedDictionary.h"
 #include "mozilla/dom/ScriptLoader.h"
 #include "mozilla/dom/ScriptSettings.h"
@@ -1308,6 +1309,7 @@ void nsGlobalWindowInner::FreeInnerObjects() {
   mConsole = nullptr;
   mCookieStore = nullptr;
   mDocumentPiP = nullptr;
+  mPushManager = nullptr;
   mCloseWatcherManager = nullptr;
 
   mPaintWorklet = nullptr;
@@ -1504,6 +1506,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(nsGlobalWindowInner)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mConsole)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCookieStore)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDocumentPiP)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPushManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPaintWorklet)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mExternal)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mIntlUtils)
@@ -2168,15 +2171,7 @@ void nsGlobalWindowInner::GetEventTargetParent(EventChainPreVisitor& aVisitor) {
     case eMouseUp:
     case eDragEnd:
       if (aVisitor.mEvent->IsTrusted()) {
-        sMouseDown = false;
-        if (sDragServiceDisabled) {
-          nsCOMPtr<nsIDragService> ds =
-              do_GetService("@mozilla.org/widget/dragservice;1");
-          if (ds) {
-            sDragServiceDisabled = false;
-            ds->Unsuppress();
-          }
-        }
+        MouseButtonReleased();
       }
       break;
     default:
@@ -2184,6 +2179,22 @@ void nsGlobalWindowInner::GetEventTargetParent(EventChainPreVisitor& aVisitor) {
   }
 
   aVisitor.SetParentTarget(GetParentTarget(), true);
+}
+
+/* static */
+void nsGlobalWindowInner::MouseButtonReleased() {
+  if (!sMouseDown) {
+    return;
+  }
+  sMouseDown = false;
+  if (sDragServiceDisabled) {
+    nsCOMPtr<nsIDragService> ds =
+        do_GetService("@mozilla.org/widget/dragservice;1");
+    if (ds) {
+      sDragServiceDisabled = false;
+      ds->Unsuppress();
+    }
+  }
 }
 
 // Editor library types for about:blank compat workaround
@@ -7614,6 +7625,14 @@ DocumentPictureInPicture* nsGlobalWindowInner::DocumentPictureInPicture() {
   }
 
   return mDocumentPiP;
+}
+
+mozilla::dom::PushManager* nsGlobalWindowInner::GetPushManager(
+    JSContext* aCx, ErrorResult& aRv) {
+  if (!mPushManager) {
+    mPushManager = PushManager::Create(aCx, this, aRv);
+  }
+  return mPushManager;
 }
 
 bool nsGlobalWindowInner::IsSecureContext() const {

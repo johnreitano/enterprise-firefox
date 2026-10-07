@@ -6604,7 +6604,7 @@ nsresult EventStateManager::HandleMiddleClickPaste(
       return NS_ERROR_FAILURE;
     }
 
-    const nsRange* range = selection->GetRangeAt(0);
+    const dom::Range* range = selection->GetRangeAt(0);
     if (range) {
       nsINode* target = range->GetStartContainer();
       if (target && target->OwnerDoc()->IsInChromeDocShell()) {
@@ -6668,7 +6668,7 @@ nsresult EventStateManager::HandleMiddleClickPaste(
 
   // The selection may have been modified during reflow.  Therefore, we
   // should adjust event target to pass IsAcceptableInputEvent().
-  const nsRange* range = selection->GetRangeAt(0);
+  const dom::Range* range = selection->GetRangeAt(0);
   if (!range) {
     return NS_OK;
   }
@@ -7441,7 +7441,7 @@ nsresult EventStateManager::DoContentCommandReplaceTextEvent(
   }
 
   ContentEventHandler handler(mPresContext);
-  RefPtr<nsRange> range = handler.GetRangeFromFlatTextOffset(
+  RefPtr<dom::Range> range = handler.GetRangeFromFlatTextOffset(
       aEvent, aEvent->mSelection.mOffset,
       aEvent->mSelection.mReplaceSrcString.Length());
   if (NS_WARN_IF(!range)) {

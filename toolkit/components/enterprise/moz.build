@@ -17,6 +17,7 @@ EXTRA_JS_MODULES.enterprise += [
     "modules/EnterpriseEndpoints.sys.mjs",
     "modules/EnterpriseOSInfo.sys.mjs",
     "modules/EnterpriseStorageEncryption.sys.mjs",
+    "modules/ForcedQuitHandler.sys.mjs",
     "modules/RelaunchEnforcer.sys.mjs",
     "modules/StartupPolicies.sys.mjs",
     "modules/Updates.sys.mjs",

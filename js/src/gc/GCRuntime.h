@@ -924,6 +924,8 @@ class GCRuntime {
   void traceRuntimeForMajorGC(JSTracer* trc, AutoGCSession& session);
   void traceRuntimeAtoms(JSTracer* trc);
   void traceRuntimeCommon(JSTracer* trc, TraceOrMarkRuntime traceOrMark);
+  void traceIncomingCrossCompartmentEdgesForZoneGC(JSTracer* trc,
+                                                   EdgeSelector whichEdges);
   void traceEmbeddingBlackRoots(JSTracer* trc);
   void traceEmbeddingGrayRoots(JSTracer* trc);
   IncrementalProgress traceEmbeddingGrayRoots(JSTracer* trc,

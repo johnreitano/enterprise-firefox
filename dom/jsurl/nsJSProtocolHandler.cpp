@@ -337,6 +337,20 @@ nsresult JSURLInputStream::EvaluateScript(
       }
     }
 
+    // https://html.spec.whatwg.org/#evaluate-a-javascript:-url
+    // Step 12. Let policyContainer be targetNavigable's active document's
+    //          policy container.
+    //
+    // A document created from the string this script evaluates to inherits the
+    // target document's policy container, not the initiating document's one
+    // that docshell stored on the loadinfo for the check above. Store an actual
+    // copy so that modifications done by the new document (such as its meta
+    // CSP) don't propagate back into the target document.
+    RefPtr policyContainerToInherit = mozilla::MakeRefPtr<PolicyContainer>();
+    policyContainerToInherit->InitFromOther(
+        PolicyContainer::Cast(targetDoc->GetPolicyContainer()));
+    loadInfo->SetPolicyContainerToInherit(policyContainerToInherit);
+
     // If the original channel's nsILoadInfo has a PermissionsPolicyInfo,
     // copy it to the new channel.
     if (nsCOMPtr<nsIChannel> originalChannel = targetDoc->GetChannel()) {

@@ -51,7 +51,8 @@ add_task(async function test_check_form_autofill_module_detect() {
   // only enables the all-regions rollout on pre-release channels.
   Assert.equal(
     Services.prefs.getCharPref("extensions.formautofill.addresses.supported"),
-    ["release", "esr"].includes(AppConstants.MOZ_UPDATE_CHANNEL)
+    ["release", "esr"].includes(AppConstants.MOZ_UPDATE_CHANNEL) ||
+      AppConstants.MOZ_ENTERPRISE
       ? "detect"
       : "on"
   );

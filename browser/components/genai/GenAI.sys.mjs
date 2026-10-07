@@ -433,7 +433,7 @@ export const GenAI = {
       ...extraContext,
       entry,
       provider: lazy.chatProvider,
-      tabTitle: (tab?._labelIsContentTitle && tab?.label) || "",
+      tabTitle: (tab?.labelIsContentTitle && tab.label) || "",
       url: uri?.asciiHost + uri?.filePath,
       window,
     };
@@ -482,14 +482,7 @@ export const GenAI = {
       panel.querySelector(id).iconSrc = src;
     }
 
-    const setAIButtonAriaLabel = (chatProviderName = "localhost") => {
-      document.l10n.setAttributes(aiActionButton, "genai-shortcut-button-2", {
-        provider: chatProviderName,
-      });
-    };
-
-    const initialChatProvider = this.chatProviders.get(lazy.chatProvider);
-    setAIButtonAriaLabel(initialChatProvider?.name);
+    document.l10n.setAttributes(aiActionButton, "genai-shortcut-button-3");
 
     const searchActionButton = panel.querySelector("#search-action-button");
 
@@ -543,9 +536,15 @@ export const GenAI = {
       panel.hidePopup();
     };
     aiActionButton.setAttribute("type", buttonDefaultState);
-    chatShortcutsOptionsPanel.addEventListener("popuphidden", () =>
-      aiActionButton.setAttribute("type", buttonDefaultState)
-    );
+    aiActionButton.ariaHasPopup = "menu";
+    aiActionButton.ariaExpanded = "false";
+    chatShortcutsOptionsPanel.addEventListener("popupshown", () => {
+      aiActionButton.ariaExpanded = "true";
+    });
+    chatShortcutsOptionsPanel.addEventListener("popuphidden", () => {
+      aiActionButton.setAttribute("type", buttonDefaultState);
+      aiActionButton.ariaExpanded = "false";
+    });
     chatShortcutsOptionsPanel.firstChild.id = "ask-chat-shortcuts";
 
     // Helper to show rounded warning numbers
@@ -598,10 +597,6 @@ export const GenAI = {
       );
       const showWarning = this.isContextTooLong(panel.selectionData.selection);
       const chatProvider = this.chatProviders.get(lazy.chatProvider);
-
-      if (initialChatProvider !== chatProvider?.name) {
-        setAIButtonAriaLabel(chatProvider?.name);
-      }
 
       // Show warning if selection is too long
       if (showWarning) {
@@ -812,10 +807,15 @@ export const GenAI = {
         const screenX = data.screenXDevPx / devicePixelRatio;
         const screenY = screenYBase + bottomPadding;
 
+        const isRTL = Services.locale.isAppLocaleRTL;
+        const xOffset = isRTL
+          ? browser.screenX + browser.getBoundingClientRect().width - screenX
+          : screenX - browser.screenX;
+
         shortcutPanel.openPopup(
           browser,
           "before_start",
-          screenX - browser.screenX,
+          xOffset,
           screenY - browser.screenY
         );
         break;

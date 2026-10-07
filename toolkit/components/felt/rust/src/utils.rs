@@ -2,15 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use nserror::NS_OK;
+use nserror::{nsresult, NS_ERROR_NOT_AVAILABLE, NS_OK};
 use nsstring::{nsACString, nsCString};
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, LazyLock, OnceLock, RwLock};
 use std::{ffi::CString, future::Future};
 use xpcom::interfaces::{nsICookie, nsICookieManager, nsIObserverService, nsIPrefBranch};
 use xpcom::RefPtr;
 
-use log::trace;
+use log::{error, trace};
 #[cfg(target_os = "linux")]
 use std::os::raw::c_char;
 
@@ -26,7 +27,7 @@ extern "C" {
     );
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 extern "C" {
     fn felt_activate_app();
 }
@@ -83,6 +84,27 @@ pub static TOKEN_EXPIRY_SKEW: i64 = 5 * 60;
 pub static TOKENS: LazyLock<Arc<RwLock<Tokens>>> =
     LazyLock::new(|| Arc::new(RwLock::new(Default::default())));
 pub static CONSOLE_URL: OnceLock<Arc<String>> = OnceLock::new();
+
+pub static BROWSER_PID: AtomicU32 = AtomicU32::new(0);
+
+/// On Windows, grant the browsing child to bring itself to the front once.
+/// On all platforms, errors if the browser never sent its pid.
+pub fn allow_browser_foreground() -> Result<(), nsresult> {
+    let pid = BROWSER_PID.load(Ordering::Relaxed);
+    if pid == 0 {
+        error!("allow_browser_foreground(): no browser pid, cannot grant the foreground right");
+        return Err(NS_ERROR_NOT_AVAILABLE);
+    }
+    #[cfg(target_os = "windows")]
+    if unsafe { winapi::um::winuser::AllowSetForegroundWindow(pid) } == 0 {
+        let err = unsafe { winapi::um::errhandlingapi::GetLastError() };
+        error!(
+            "allow_browser_foreground(): AllowSetForegroundWindow({}) failed: {}",
+            pid, err
+        );
+    }
+    Ok(())
+}
 
 pub fn inject_one_cookie(cookie: nsICookieWrapper) {
     trace!("inject_one_cookie() cookie:{:?}", cookie.clone());
@@ -255,7 +277,7 @@ pub fn open_url_in_firefox(url: String, disposition: i32, focus_hint: Option<Foc
             }
         }
         // Widget interaction needs to be on the main thread.
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
         unsafe {
             felt_activate_app();
         }

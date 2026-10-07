@@ -272,6 +272,7 @@ nsresult txMozillaXMLOutput::endElement() MOZ_CAN_RUN_SCRIPT_BOUNDARY {
     } else if (nsIContent::RequiresDoneAddingChildren(
                    element->NodeInfo()->NamespaceID(),
                    element->NodeInfo()->NameAtom())) {
+      nsAutoScriptBlocker scriptBlocker;
       element->DoneAddingChildren(true);
     }
   }

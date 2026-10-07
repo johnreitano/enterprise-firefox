@@ -61,7 +61,7 @@
 #include "nsString.h"
 #include "nsXULElement.h"
 #ifdef DEBUG
-#  include "nsRange.h"
+#  include "mozilla/dom/Range.h"
 #endif
 
 #include "ChildIterator.h"

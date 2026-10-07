@@ -16,7 +16,8 @@
   --aitab-hero-bloom-height: 140%;
   --aitab-hero-bloom-width: 220%;
 
-  --aitab-hero-radius: 128px;
+  --aitab-title-max-width: 600px;
+  --aitab-subtitle-max-width: 934px;
 
   @media (prefers-color-scheme: dark) {
     --aitab-hero-bloom-hold: 0%;
@@ -66,18 +67,17 @@ aitab-page-actions {
 .aitab-title-subtext {
   line-height: 1;
   margin: 0 auto;
+}
 
+.aitab-title {
   /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
-  max-width: 900px;
-
-  @media (max-width: 900px) {
-    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
-    max-width: 934px;
-  }
+  max-width: var(--aitab-title-max-width);
 }
 
 .aitab-title-subtext {
   opacity: var(--opacity-deemphasized);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  max-width: var(--aitab-subtitle-max-width);
 }
 
 ai-grouped-chip-container {

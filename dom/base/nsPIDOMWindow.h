@@ -1009,6 +1009,7 @@ class nsPIDOMWindowOuter : public mozIDOMWindowProxy {
    *
    * Outer windows only.
    */
+  MOZ_CAN_RUN_SCRIPT
   virtual nsresult OpenNoNavigate(const nsACString& aUrl,
                                   const nsAString& aName,
                                   const nsAString& aOptions,
@@ -1047,10 +1048,12 @@ class nsPIDOMWindowOuter : public mozIDOMWindowProxy {
   // aLoadState will be passed on through to the windowwatcher.
   // aForceNoOpener will act just like a "noopener" feature in aOptions except
   //                will not affect any other window features.
+  MOZ_CAN_RUN_SCRIPT
   virtual nsresult Open(const nsACString& aUrl, const nsAString& aName,
                         const nsAString& aOptions,
                         nsDocShellLoadState* aLoadState, bool aForceNoOpener,
                         mozilla::dom::BrowsingContext** _retval) = 0;
+  MOZ_CAN_RUN_SCRIPT
   virtual nsresult OpenDialog(const nsACString& aUrl, const nsAString& aName,
                               const nsAString& aOptions, nsIArray* aArguments,
                               mozilla::dom::BrowsingContext** _retval) = 0;

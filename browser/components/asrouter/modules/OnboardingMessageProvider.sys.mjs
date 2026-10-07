@@ -1778,7 +1778,8 @@ const BASE_MESSAGES = () => [
       ],
       lifetime: 12,
     },
-    targeting: "doesAppNeedPrivatePin",
+    targeting:
+      "doesAppNeedPrivatePin && !'browser.privateWindowRedesign.enabled'|preferenceValue",
   },
   {
     id: "PB_NEWTAB_RELAY_PROMO",
@@ -1797,23 +1798,10 @@ const BASE_MESSAGES = () => [
       promoTitleEnabled: true,
       promoButton: {
         action: {
-          type: "MULTI_ACTION",
+          type: "OPEN_URL",
           data: {
-            actions: [
-              {
-                type: "OPEN_URL",
-                data: {
-                  args: "https://relay.firefox.com/?utm_medium=referral&utm_source=firefox-desktop&utm_campaign=pbw&utm_content=prevent-inbox-spam-global",
-                  where: "tabshifted",
-                },
-              },
-              {
-                type: "BLOCK_MESSAGE",
-                data: {
-                  id: "PB_NEWTAB_RELAY_PROMO",
-                },
-              },
-            ],
+            args: "https://relay.firefox.com/?utm_medium=referral&utm_source=firefox-desktop&utm_campaign=pbw&utm_content=prevent-inbox-spam-global",
+            where: "tabshifted",
           },
         },
       },
@@ -1828,7 +1816,8 @@ const BASE_MESSAGES = () => [
       ],
       lifetime: 12,
     },
-    targeting: "'browser.privateWindowRedesign.enabled'|preferenceValue",
+    targeting:
+      "'browser.privateWindowRedesign.enabled'|preferenceValue && !isRelayFreeTier && !relayEmailMasksCount",
   },
   {
     id: "PRIVATE_WINDOW_BASICS_SPOTLIGHT",
@@ -2020,7 +2009,7 @@ const BASE_MESSAGES = () => [
                 type: "OPEN_URL",
                 navigate: true,
                 data: {
-                  args: "https://support.mozilla.org/1/firefox/%VERSION%/%OS%/%LOCALE%/common-myths-about-private-browsing",
+                  args: "https://support.mozilla.org/%LOCALE%/kb/private-browsing-use-firefox-without-history",
                   where: "tabshifted",
                 },
               },
@@ -2363,14 +2352,14 @@ const BASE_MESSAGES = () => [
     // an OS-level prompt, in lieu of the AW_EASY_SETUP pin checkbox.
     id: "PIN_FIREFOX_TASKBAR_WIN_OS_PROMPT",
     template: "action_only",
-    profileScope: "single",
     skip_in_tests: "it silently triggers a real OS-level pin request",
     content: {
       action: {
         type: "PIN_FIREFOX_TO_TASKBAR",
       },
     },
-    targeting: `source == 'startup' && !previousSessionEnd && doesAppNeedPin && ${WIN_OS_PIN_PROMPT_ENABLED} && (unhandledCampaignAction != 'PIN_FIREFOX_TO_TASKBAR') && (unhandledCampaignAction != 'PIN_AND_DEFAULT')`,
+    // `profileGroupProfileCount == 0` used to ensure this only shows on the first profile, to be replaced with "profileScope: 'single' when bug 2074258 is fixed
+    targeting: `source == 'startup' && !previousSessionEnd && profileGroupProfileCount == 0 && doesAppNeedPin && ${WIN_OS_PIN_PROMPT_ENABLED} && (unhandledCampaignAction != 'PIN_FIREFOX_TO_TASKBAR') && (unhandledCampaignAction != 'PIN_AND_DEFAULT')`,
     trigger: {
       id: "defaultBrowserCheck",
     },
@@ -2388,14 +2377,14 @@ const BASE_MESSAGES = () => [
     // consent surface at all.
     id: "SET_DEFAULT_MAC_AND_WINDOWS_OS_PROMPT",
     template: "action_only",
-    profileScope: "single",
     skip_in_tests: "it silently triggers a real OS-level set default request",
     content: {
       action: {
         type: "SET_DEFAULT_BROWSER",
       },
     },
-    targeting: `source == 'newtab' && !previousSessionEnd && 'browser.shell.checkDefaultBrowser'|preferenceValue && !isDefaultBrowser && ${SET_DEFAULT_OS_PROMPT_ENABLED} && (unhandledCampaignAction != 'SET_DEFAULT_BROWSER') && (unhandledCampaignAction != 'PIN_AND_DEFAULT')`,
+    // `profileGroupProfileCount == 0` used to ensure this only shows on the first profile, to be replaced with "profileScope: 'single' when bug 2074258 is fixed
+    targeting: `source == 'newtab'  && profileGroupProfileCount == 0 && !previousSessionEnd && 'browser.shell.checkDefaultBrowser'|preferenceValue && !isDefaultBrowser && ${SET_DEFAULT_OS_PROMPT_ENABLED} && (unhandledCampaignAction != 'SET_DEFAULT_BROWSER') && (unhandledCampaignAction != 'PIN_AND_DEFAULT')`,
     trigger: {
       id: "defaultBrowserCheck",
     },

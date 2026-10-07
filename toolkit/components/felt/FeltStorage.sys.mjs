@@ -36,6 +36,35 @@ export const FeltStorage = {
     await this._feltStorage.load();
   },
 
+  async beginSession(email) {
+    this._feltStorage.data.activeSessionEmail = email || "";
+    await this._feltStorage._save();
+  },
+
+  async endSession() {
+    delete this._feltStorage.data.activeSessionEmail;
+    await this._feltStorage._save();
+  },
+
+  async recoverInterruptedSession() {
+    if (!Object.hasOwn(this._feltStorage.data, "activeSessionEmail")) {
+      return false;
+    }
+    const email = this._feltStorage.data.activeSessionEmail;
+    if (email) {
+      delete this._feltStorage.data.lockingTokens?.[email];
+    } else {
+      delete this._feltStorage.data.lockingTokens;
+    }
+    delete this._feltStorage.data.activeSessionEmail;
+    await this._feltStorage._save();
+    return true;
+  },
+
+  async flush() {
+    await this._feltStorage._save();
+  },
+
   /**
    * Gets the email that was used to signin the last time (if available)
    *

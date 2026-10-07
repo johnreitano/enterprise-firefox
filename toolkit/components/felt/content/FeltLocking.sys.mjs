@@ -97,6 +97,7 @@ export const FeltLocking = {
         }
 
         // Only the refresh token is available here; force a refresh below.
+        await lazy.FeltStorage.beginSession(email);
         Services.felt.setTokens("", lockingToken, 0);
         try {
           tokenData = await lazy.ConsoleClient.refreshTokens({ posture });
@@ -126,6 +127,7 @@ export const FeltLocking = {
               `tryUnlock: transient failure resuming from token, keeping it: ${err}`
             );
           }
+          await lazy.FeltStorage.endSession();
           return false;
         }
 

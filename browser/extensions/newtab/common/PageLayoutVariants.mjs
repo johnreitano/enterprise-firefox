@@ -27,6 +27,7 @@ export const PAGE_LAYOUT_VARIANTS = {
   SPACES_BUTTONS_TOP: "spaces-buttons-top",
   SPACES_BUTTONS_BOTTOM: "spaces-buttons-bottom",
   SPACES_THEMATIC_V1: "spaces-thematic-v1",
+  SPACES_FLOATING_ARROWS: "spaces-floating-arrows",
   // @experiment(remove) { bug 2066527 }
   AUTO_MINIMIZE_WIDGETS: "auto-minimize-widgets",
   // @experiment(remove) { bug 2069496 }
@@ -157,11 +158,15 @@ const SPACES_CLASSES = {
     "spaces-buttons-bottom",
     "spaces-thematic",
   ],
+  [PAGE_LAYOUT_VARIANTS.SPACES_FLOATING_ARROWS]: [
+    "spaces",
+    "spaces-floating-arrows",
+  ],
 };
 
 export const SPACES_PAGE_LAYOUTS = Object.keys(SPACES_CLASSES);
 
-// Tablist order. Stories leads so an unaware user lands where they expect.
+// Default order. Stories leads so an unaware user lands where they expect.
 export const SPACE_IDS = {
   STORIES: "stories",
   WIDGETS: "widgets",
@@ -170,6 +175,29 @@ export const SPACE_IDS = {
 };
 
 export const PREF_SPACES_CONFIG = "pageLayouts.spacesConfig";
+export const PREF_SPACES_ORDER = "pageLayouts.spacesOrder";
+
+/**
+ * The V1 spaces' order: trainhopConfig as an array of ids, else the pref as
+ * comma-separated ids, else SPACE_IDS order. Unknown ids are dropped, and a
+ * space the order leaves out is not shown.
+ *
+ * @param {object} prefs - current pref values from the Redux store
+ * @returns {string[]}
+ */
+export function resolveFeatureSpacesOrder(prefs) {
+  const trainhop = prefs?.trainhopConfig?.pageLayouts?.spacesOrder;
+  const pref = prefs?.[PREF_SPACES_ORDER];
+  let raw = [];
+  if (Array.isArray(trainhop)) {
+    raw = trainhop;
+  } else if (typeof pref === "string") {
+    raw = pref.split(",").map(id => id.trim());
+  }
+  const ids = Object.values(SPACE_IDS);
+  const order = [...new Set(raw)].filter(id => ids.includes(id));
+  return order.length ? order : ids;
+}
 
 // Where the Firefox Profiles avatar icons live. Those are a filled background
 // circle plus a knocked-out glyph, so they need the opposite fill and stroke
@@ -331,6 +359,19 @@ export function isSpacesAssigned(prefs) {
 export function isSpacesThematicAssigned(prefs) {
   return (
     resolvePageLayoutVariant(prefs) === PAGE_LAYOUT_VARIANTS.SPACES_THEMATIC_V1
+  );
+}
+
+/**
+ * Whether the floating arrows variant is assigned, populated or not.
+ *
+ * @param {object} prefs - current pref values from the Redux store
+ * @returns {boolean}
+ */
+export function isSpacesArrowsAssigned(prefs) {
+  return (
+    resolvePageLayoutVariant(prefs) ===
+    PAGE_LAYOUT_VARIANTS.SPACES_FLOATING_ARROWS
   );
 }
 
@@ -570,15 +611,15 @@ function resolvePopulatedThematicSpaces(prefs, sectionKeys) {
 }
 
 /**
- * The V1 spaces that have something to show, in tablist order. Being enabled is
- * not enough for two of them, and no override crosses that floor -- an empty
- * space is worse than a missing one.
+ * The V1 spaces that have something to show, in the resolved order. Being
+ * enabled is not enough for two of them, and no override crosses that floor --
+ * an empty space is worse than a missing one.
  *
  * @param {object} prefs - current pref values from the Redux store
  * @returns {string[]}
  */
 function resolvePopulatedFeatureSpaces(prefs) {
-  return Object.values(SPACE_IDS).filter(id => {
+  return resolveFeatureSpacesOrder(prefs).filter(id => {
     if (!isSpaceEnabled(id, prefs)) {
       return false;
     }

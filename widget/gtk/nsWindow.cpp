@@ -3536,12 +3536,8 @@ void nsWindow::DispatchPanGesture(PanGestureInput& aPanInput) {
   }
 
   WidgetWheelEvent event = aPanInput.ToWidgetEvent(this);
-  if (!mAPZC) {
-    if (MayStartSwipeForNonAPZ(aPanInput)) {
-      return;
-    }
-  } else {
-    event = MayStartSwipeForAPZ(aPanInput, result);
+  if (mAPZC) {
+    event = MayStartSwipe(aPanInput, result);
   }
 
   ProcessUntransformedAPZEvent(&event, result);
@@ -4021,7 +4017,10 @@ gboolean nsWindow::OnTouchEvent(GdkEventTouch* aEvent) {
       SetLastPointerDownEvent((GdkEvent*)aEvent);
       // check to see if we should rollup
       if (CheckForRollup(aEvent->x_root, aEvent->y_root, false, false)) {
-        return FALSE;
+        // Consume the press as the popup manager asked. TRUE also stops
+        // gtk_widget_real_touch_event() from replaying it as a button press
+        // that would reopen the popup (bug 2067688).
+        return TRUE;
       }
       msg = eTouchStart;
       break;

@@ -1064,15 +1064,8 @@ WebGLExtensionTextureHalfFloatLinear::WebGLExtensionTextureHalfFloatLinear(
 // -
 
 bool WebGLExtensionTextureNorm16::IsSupported(const WebGLContext* const webgl) {
-  if (!StaticPrefs::webgl_enable_draft_extensions()) return false;
-  if (!webgl->IsWebGL2()) return false;
-
-  const auto& gl = webgl->gl;
-
-  // ANGLE's support is broken in our checkout.
-  if (gl->IsANGLE()) return false;
-
-  return gl->IsSupported(gl::GLFeature::texture_norm16);
+  gl::GLContext* gl = webgl->GL();
+  return webgl->IsWebGL2() && gl->IsSupported(gl::GLFeature::texture_norm16);
 }
 
 WebGLExtensionTextureNorm16::WebGLExtensionTextureNorm16(WebGLContext* webgl)
@@ -1097,7 +1090,6 @@ WebGLExtensionTextureNorm16::WebGLExtensionTextureNorm16(WebGLContext* webgl)
     fua.AddTexUnpack(&usage, pi, dui);
 
     fua.AllowSizedTexFormat(format.sizedFormat, &usage);
-    fua.AllowUnsizedTexFormat(pi, &usage);
 
     if (renderable) {
       usage.SetRenderable();

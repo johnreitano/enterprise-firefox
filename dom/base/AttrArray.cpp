@@ -294,35 +294,6 @@ void AttrArray::NodeInfoChanged(nsNodeInfoManager* aManager) {
   }
 }
 
-void AttrArray::Compact() {
-  if (!HasImpl()) {
-    return;
-  }
-
-  Impl* impl = GetImpl();
-  if (!impl->mAttrCount && !impl->mMappedAttributeBits) {
-    Clear();
-    return;
-  }
-
-  // Nothing to do.
-  if (impl->mAttrCount == impl->mCapacity) {
-    return;
-  }
-
-  // Extract the real pointer for realloc
-  Impl* oldImpl = mImpl.release();
-
-  Impl* newImpl = static_cast<Impl*>(
-      realloc(oldImpl, Impl::AllocationSizeForAttributes(oldImpl->mAttrCount)));
-  if (!newImpl) {
-    SetImpl(oldImpl);
-    return;
-  }
-  newImpl->mCapacity = newImpl->mAttrCount;
-  SetImpl(newImpl);
-}
-
 nsresult AttrArray::EnsureCapacityToClone(const AttrArray& aOther) {
   MOZ_ASSERT(!HasImpl(),
              "AttrArray::EnsureCapacityToClone requires the array be empty "

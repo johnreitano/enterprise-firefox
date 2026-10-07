@@ -436,7 +436,9 @@ function Weather({ dispatch, size, widgetEnabledMap }) {
       <div className="widget-title-bar">
         <div className="widget-title">
           {!showOptInState && !searchActive && (
-            <h3>{weatherData.locationData.city}</h3>
+            <h3 className="newtab-widget-title">
+              {weatherData.locationData.city}
+            </h3>
           )}
         </div>
         {!searchActive && renderContextMenu()}

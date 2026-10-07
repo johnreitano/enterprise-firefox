@@ -189,6 +189,27 @@ let ShellServiceInternal = {
   },
 
   /**
+   * Asynchronously determines whether Firefox is the default browser.
+   *
+   * New callers should prefer this method over isDefaultBrowser(). The
+   * synchronous version may be removed once existing callers have been
+   * migrated to the asynchronous API. See bug 2074009.
+   *
+   */
+  isDefaultBrowserAsync(startupCheck, forAllTypes) {
+    // If this is the first browser window, maintain internal state that we've
+    // checked this session (so that subsequent window opens don't show the
+    // default browser dialog).
+    if (startupCheck) {
+      this._checkedThisSession = true;
+    }
+    if (this.shellService) {
+      return this.shellService.isDefaultBrowserAsync(forAllTypes);
+    }
+    return false;
+  },
+
+  /**
    * Check if UserChoice is impossible.
    *
    * Separated for easy stubbing in tests.

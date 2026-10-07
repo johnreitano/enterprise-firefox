@@ -1,6 +1,6 @@
 toolkit.jar:
 %  content global %content/global/ contentaccessible=yes
-*  content/global/license.html
+   content/global/license.html
    content/global/xul.css
    content/global/autocomplete.css
    content/global/aboutAbout.js
@@ -90,6 +90,8 @@ toolkit.jar:
    content/global/bindings/spinner.js          (widgets/spinner.js)
    content/global/bindings/timekeeper.js       (widgets/timekeeper.js)
    content/global/bindings/timepicker.js       (widgets/timepicker.js)
+   content/global/elements/accesskey-check.mjs                (widgets/accesskey-check.mjs)
+   content/global/elements/auto-accesskey.mjs                 (widgets/auto-accesskey.mjs)
    content/global/elements/autocomplete-input.js              (widgets/autocomplete-input.js)
    content/global/elements/autocomplete-popup.js              (widgets/autocomplete-popup.js)
    content/global/elements/autocomplete-richlistitem.js       (widgets/autocomplete-richlistitem.js)

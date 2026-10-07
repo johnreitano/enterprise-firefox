@@ -425,6 +425,7 @@ class PlacesViewBase {
           is: "places-popup",
         });
         popup._placesNode = PlacesUtils.asContainer(aPlacesNode);
+        popup.setAttribute("accesskey-conflicts-bug", "2073900");
 
         if (!this._nativeView) {
           popup.setAttribute("placespopup", "true");
@@ -1173,6 +1174,7 @@ class PlacesToolbar extends PlacesViewBase {
         popup.setAttribute("placespopup", "true");
         popup.toggleAttribute("nonnative", true);
         popup.classList.add("toolbar-menupopup");
+        popup.setAttribute("accesskey-conflicts-bug", "2073900");
         button.appendChild(popup);
         popup._placesNode = PlacesUtils.asContainer(aChild);
         popup.setAttribute("context", "placesContext");

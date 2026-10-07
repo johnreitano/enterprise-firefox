@@ -50,11 +50,6 @@ git = "https://github.com/jamienicol/gl-rs"
 rev = "71c792dbfe0ec5caeb242fc90937e19098386342"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/jamienicol/gleam?rev=68ca4e5cc31135b843af07ff213a94b9ddce64cf"]
-git = "https://github.com/jamienicol/gleam"
-rev = "68ca4e5cc31135b843af07ff213a94b9ddce64cf"
-replace-with = "vendored-sources"
-
 [source."git+https://github.com/jfkthame/mapped_hyph.git?rev=eff105f6ad7ec9b79816cfc1985a28e5340ad14b"]
 git = "https://github.com/jfkthame/mapped_hyph.git"
 rev = "eff105f6ad7ec9b79816cfc1985a28e5340ad14b"
@@ -70,9 +65,9 @@ git = "https://github.com/mozilla/audioipc"
 rev = "d3c9825"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/mozilla/authenticator-rs?tag=v0.6.0"]
+[source."git+https://github.com/mozilla/authenticator-rs?tag=v0.6.1"]
 git = "https://github.com/mozilla/authenticator-rs"
-tag = "v0.6.0"
+tag = "v0.6.1"
 replace-with = "vendored-sources"
 
 [source."git+https://github.com/mozilla/cubeb-coreaudio-rs?rev=840f69c1b3f95accd582555e10abcef8ee67514b"]
@@ -115,9 +110,9 @@ git = "https://github.com/mozilla/midir.git"
 rev = "54759f681f3b523e120d047adec2bb1a97152017"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/mozilla/mls-platform-api?tag=0.42.0"]
+[source."git+https://github.com/mozilla/mls-platform-api?tag=0.42.1"]
 git = "https://github.com/mozilla/mls-platform-api"
-tag = "0.42.0"
+tag = "0.42.1"
 replace-with = "vendored-sources"
 
 [source."git+https://github.com/mozilla/mp4parse-rust?rev=f0c80783227a1fb46f34cb04e10607045eac4297"]
@@ -125,9 +120,9 @@ git = "https://github.com/mozilla/mp4parse-rust"
 rev = "f0c80783227a1fb46f34cb04e10607045eac4297"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/mozilla/neqo?tag=v0.31.1"]
+[source."git+https://github.com/mozilla/neqo?tag=v0.32.0"]
 git = "https://github.com/mozilla/neqo"
-tag = "v0.31.1"
+tag = "v0.32.0"
 replace-with = "vendored-sources"
 
 [source."git+https://github.com/mozilla/nss-rs"]

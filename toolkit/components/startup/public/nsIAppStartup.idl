@@ -12,7 +12,7 @@ interface nsIAppStartup : nsISupports
     /**
      * Create the hidden window.
      */
-    [noscript]
+    [can_run_script, noscript]
     void createHiddenWindow();
 
     /**

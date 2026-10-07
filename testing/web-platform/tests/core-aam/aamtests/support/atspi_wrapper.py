@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Optional, List, Dict
+from typing import Any, Callable, Optional, List, Dict
 
 import gi
 
@@ -16,7 +16,7 @@ DOCUMENT_ROLES = [Atspi.Role.DOCUMENT_WEB, Atspi.Role.DOCUMENT_FRAME]
 DOCUMENT_URL_ATTRIBUTES = ["DocURL", "URI"]
 
 
-class AtspiWrapper(ApiWrapper[Atspi.Accessible]):
+class AtspiWrapper(ApiWrapper[Atspi.Accessible, Atspi.Event]):
 
     @property
     def api_name(self) -> str:
@@ -44,6 +44,28 @@ class AtspiWrapper(ApiWrapper[Atspi.Accessible]):
                 relations_dict[name].append(attributes.get("id", "[unknown id]"))
 
         return relations_dict
+
+    def get_interface(self, node, interface_name):
+        """ Retrieves an interface object based on the provided name.
+
+        :returns: An interface object returned by corresponding Accessible API.
+        """
+        interface_map = {
+            # NOTE: Please add new ATK/ATSPI interfaces and their corresponding
+            # Accessible API functions here as needed for testing.
+            "AtkTable": Atspi.Accessible.get_table_iface,
+            "AtkTableCell": Atspi.Accessible.get_table_cell,
+        }
+
+        if interface_name not in interface_map:
+            raise ValueError(
+                f"Unknown or unsupported interface: '{interface_name}'. "
+                f"If this is a valid interface, please register it in the "
+                f"`interface_map` inside `atspi_wrapper.py`."
+            )
+
+        get_interface_fn = interface_map[interface_name]
+        return get_interface_fn(node)
 
     def get_state_list_helper(self, node: Atspi.Accessible) -> List[str]:
         """
@@ -222,3 +244,37 @@ class AtspiWrapper(ApiWrapper[Atspi.Accessible]):
                 stack.append(child)
 
         return None
+
+    def expect_event(
+        self, event_name: str, dom_id: str, action: Callable[[], None]
+    ) -> Atspi.Event:
+        """See `ApiWrapper.expect_event()`."""
+        matched: List[Atspi.Event] = []
+
+        def callback(event: Atspi.Event) -> None:
+            attributes = Atspi.Accessible.get_attributes(event.source)
+            if attributes.get("id") != dom_id:
+                return
+            matched.append(event)
+
+        listener = Atspi.EventListener.new(callback)
+        listener.register(event_name)
+
+        try:
+            # Main loop context.
+            context = GLib.MainContext.default()
+            def get_event() -> Optional[Atspi.Event]:
+                # Check if events are ready to be processed.
+                while context.iteration(False):
+                    pass
+                return matched[0] if matched else None
+
+            action()
+
+            return self._poll_for(
+                get_event,
+                f"Timed out waiting for AT-SPI event '{event_name}'"
+                f" on node with id '{dom_id}'",
+            )
+        finally:
+            listener.deregister(event_name)

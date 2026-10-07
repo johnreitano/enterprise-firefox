@@ -509,8 +509,10 @@ export var ReportBrokenSite = new (class ReportBrokenSite {
         false
       );
     } else {
-      // enable the send-more-info link on pre-release builds.
-      hidden = ["release", "esr"].includes(AppConstants.MOZ_UPDATE_CHANNEL);
+      // enable the send-more-info link on (non-enterprise) pre-release builds.
+      hidden =
+        ["release", "esr"].includes(AppConstants.MOZ_UPDATE_CHANNEL) ||
+        AppConstants.MOZ_ENTERPRISE;
     }
     state.sendMoreInfoButton.hidden = hidden;
   }

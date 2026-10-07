@@ -429,10 +429,10 @@ class nsPresContext : public nsISupports,
   mozilla::ScreenIntCoord GetKeyboardHeight() const;
 
   /**
-   * Returns true if the software keyboard is hidden or
-   * the document is `interactive-widget=resizes-content` mode.
+   * Returns true if the software keyboard is visible and the document is
+   * `interactive-widget=overlays-content` mode.
    */
-  bool IsKeyboardHiddenOrResizesContentMode() const;
+  bool IsKeyboardVisibleOnOverlaysContent() const;
 
   /**
    * Returns the maximum height of the dynamic toolbar if the toolbar state is

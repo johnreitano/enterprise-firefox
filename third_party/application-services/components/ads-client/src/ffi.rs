@@ -5,13 +5,10 @@
 
 pub mod error;
 pub mod telemetry;
-
-use std::sync::Arc;
-#[cfg(test)]
-use std::sync::Weak;
-
-use crate::client::config::{AdsCacheConfig, AdsClientConfig, AdsStoreConfig};
-use crate::client::{AdsClient, ContextIdProvider};
+#[cfg(feature = "stateful")]
+use crate::client::config::AdsStoreConfig;
+use crate::client::config::{AdsCacheConfig, AdsClientConfig};
+use crate::client::AdsClient;
 use crate::ffi::telemetry::MozAdsTelemetryWrapper;
 use crate::http_cache::CachePolicy;
 use crate::mars::ad_request::{
@@ -26,36 +23,12 @@ use crate::AdsClientUrl;
 use crate::MozAdsClient;
 use parking_lot::Mutex;
 use std::collections::HashMap;
+use std::sync::Arc;
+#[cfg(test)]
+use std::sync::Weak;
 
 pub use error::{AdsClientApiResult, MozAdsClientApiError};
 pub use telemetry::MozAdsTelemetry;
-
-// TODO: Temporary workaround for HNT requirements — do not use for new integrations.
-// Context ID management should remain internal to the ads client and this interface should be removed.
-#[uniffi::export(with_foreign)]
-pub trait MozAdsContextIdProvider: Send + Sync {
-    fn context_id(&self) -> String;
-}
-
-struct MozAdsContextIdProviderWrapper(Arc<dyn MozAdsContextIdProvider>);
-
-impl MozAdsContextIdProviderWrapper {
-    fn new(provider: Arc<dyn MozAdsContextIdProvider>) -> Self {
-        Self(provider)
-    }
-}
-
-impl ContextIdProvider for MozAdsContextIdProviderWrapper {
-    fn context_id(&self) -> context_id::ApiResult<String> {
-        Ok(self.0.context_id())
-    }
-}
-
-impl From<MozAdsContextIdProviderWrapper> for Box<dyn ContextIdProvider> {
-    fn from(wrapper: MozAdsContextIdProviderWrapper) -> Self {
-        Box::new(wrapper)
-    }
-}
 
 #[derive(Default, uniffi::Record)]
 pub struct MozAdsRequestOptions {
@@ -108,7 +81,6 @@ pub struct MozAdsClientBuilder(Mutex<MozAdsClientBuilderInner>);
 #[derive(Default)]
 struct MozAdsClientBuilderInner {
     cache_config: Option<MozAdsCacheConfig>,
-    context_id_provider: Option<Arc<dyn MozAdsContextIdProvider>>,
     environment: Option<MozAdsEnvironment>,
     store_config: Option<MozAdsStoreConfig>,
     telemetry: Option<Arc<dyn MozAdsTelemetry>>,
@@ -136,13 +108,9 @@ impl MozAdsClientBuilder {
             .unwrap_or_else(MozAdsTelemetryWrapper::noop);
         let client_config = AdsClientConfig {
             cache_config: inner.cache_config.clone().map(Into::into),
-            context_id_provider: inner
-                .context_id_provider
-                .clone()
-                .map(MozAdsContextIdProviderWrapper::new)
-                .map(Into::into),
             environment: inner.environment.clone().unwrap_or_default().into(),
             telemetry: telemetry.clone(),
+            #[cfg(feature = "stateful")]
             store_config: inner.store_config.clone().map(Into::into),
         };
         let client = AdsClient::new(client_config);
@@ -160,14 +128,6 @@ impl MozAdsClientBuilder {
 
     pub fn store_config(self: Arc<Self>, store_config: MozAdsStoreConfig) -> Arc<Self> {
         self.0.lock().store_config = Some(store_config);
-        self
-    }
-
-    pub fn context_id_provider(
-        self: Arc<Self>,
-        provider: Arc<dyn MozAdsContextIdProvider>,
-    ) -> Arc<Self> {
-        self.0.lock().context_id_provider = Some(provider);
         self
     }
 
@@ -265,8 +225,8 @@ pub struct MozAdsImage {
     pub block_key: String,
     pub callbacks: MozAdsCallbacks,
     pub format: String,
-    pub image_url: String,
-    pub url: String,
+    pub image_url: AdsClientUrl,
+    pub url: AdsClientUrl,
 }
 
 #[derive(Debug, PartialEq, uniffi::Record)]
@@ -277,12 +237,12 @@ pub struct MozAdsSpoc {
     pub domain: String,
     pub excerpt: String,
     pub format: String,
-    pub image_url: String,
+    pub image_url: AdsClientUrl,
     pub ranking: MozAdsSpocRanking,
     pub sponsor: String,
     pub sponsored_by_override: Option<String>,
     pub title: String,
-    pub url: String,
+    pub url: AdsClientUrl,
 }
 
 #[derive(Debug, PartialEq, uniffi::Record)]
@@ -303,9 +263,9 @@ pub struct MozAdsTile {
     pub block_key: String,
     pub callbacks: MozAdsCallbacks,
     pub format: String,
-    pub image_url: String,
+    pub image_url: AdsClientUrl,
     pub name: String,
-    pub url: String,
+    pub url: AdsClientUrl,
 }
 
 impl From<AdCallbacks> for MozAdsCallbacks {
@@ -481,6 +441,7 @@ impl From<MozAdsCacheConfig> for AdsCacheConfig {
     }
 }
 
+#[cfg(feature = "stateful")]
 impl From<MozAdsStoreConfig> for AdsStoreConfig {
     fn from(config: MozAdsStoreConfig) -> Self {
         Self {

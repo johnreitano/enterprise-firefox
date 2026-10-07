@@ -124,13 +124,6 @@ add_setup(async function () {
     `http://example.com`
   );
 
-  if (!AppConstants.MOZ_ENTERPRISE) {
-    Services.prefs.setBoolPref(
-      "browser.newtabpage.activity-stream.telemetry.structuredIngestion",
-      false
-    );
-  }
-
   // We need a default search engine set up for rendering the search input.
   await SearchTestUtils.installSearchExtension(
     {

@@ -199,9 +199,6 @@ fail-if = [
 ["browser_net_security-error.js"]
 
 ["browser_net_security-icon-click.js"]
-fail-if = [
-  "a11y_checks", # Bug 1849028 clicked element may not be focusable and/or labeled
-]
 
 ["browser_net_security-redirect.js"]
 
@@ -218,16 +215,10 @@ fail-if = [
 ["browser_net_send-beacon.js"]
 
 ["browser_net_server_timings.js"]
-fail-if = [
-  "a11y_checks", # Bug 1849028 clicked element may not be focusable and/or labeled
-]
 
 ["browser_net_service-worker-status.js"]
 
 ["browser_net_service-worker-timings.js"]
-fail-if = [
-  "a11y_checks", # Bug 1849028 clicked element may not be focusable and/or labeled
-]
 
 ["browser_net_set-cookie-same-site.js"]
 

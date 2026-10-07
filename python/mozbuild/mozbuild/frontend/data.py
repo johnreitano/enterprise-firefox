@@ -1155,6 +1155,17 @@ class Sources(BaseSources):
         )
 
 
+class Headers(ContextDerived):
+    """Represents headers to be handled during the build."""
+
+    def __init__(self, context, static_files, generated_files, canonical_suffix):
+        super().__init__(context)
+        self.static_files = sorted(static_files)
+        self.generated_files = sorted(generated_files)
+        self.files = self.static_files + self.generated_files
+        self.canonical_suffix = canonical_suffix
+
+
 class PgoGenerateOnlySources(BaseSources):
     """Represents files to be compiled during the build.
 
@@ -1408,7 +1419,9 @@ class DeclaredLicenseNotice(ContextDerived):
     reproduced in about:license.
 
     ``id`` doubles as the anchor on the generated page. ``text_path``
-    is the absolute path of the file holding the verbatim notice. ``paths`` are
+    is the absolute path of the file holding the verbatim notice, named either
+    by the declaration's ``text`` field or, for a vendored library, by the
+    ``origin.license-file`` of its ``moz.yaml``. ``paths`` are
     the topsrcdir-relative paths this notice is attributed to, taken verbatim
     from the declaration's own ``paths`` field, which is topsrcdir-relative for
     that reason; a ``LICENSED_UNDER`` naming this id contributes its own
@@ -1426,6 +1439,8 @@ class DeclaredLicenseNotice(ContextDerived):
         "spdx",
         "url",
         "paths",
+        "subcomponent",
+        "acknowledgement",
     )
 
     def __init__(
@@ -1438,15 +1453,20 @@ class DeclaredLicenseNotice(ContextDerived):
         spdx=None,
         url=None,
         paths=(),
+        subcomponent=False,
+        acknowledgement=None,
     ):
         ContextDerived.__init__(self, context)
         if not title:
             raise LicenseError(f'LICENSES["{id}"] requires a title.')
         if not text_path:
-            raise LicenseError(f'LICENSES["{id}"] requires a text file.')
+            raise LicenseError(
+                f'LICENSES["{id}"] requires a text file: set `text`, or declare '
+                "`origin.license-file` in the moz.yaml covering this directory."
+            )
         if not os.path.exists(text_path):
             raise LicenseError(
-                f'LICENSES["{id}"].text names a file that does not exist: {text_path}'
+                f'LICENSES["{id}"] names a text file that does not exist: {text_path}'
             )
         self.id = id
         self.title = title
@@ -1455,6 +1475,8 @@ class DeclaredLicenseNotice(ContextDerived):
         self.spdx = spdx
         self.url = url
         self.paths = list(paths)
+        self.subcomponent = subcomponent
+        self.acknowledgement = acknowledgement
 
     def asdict(self):
         return {name: getattr(self, name) for name in self.__slots__}

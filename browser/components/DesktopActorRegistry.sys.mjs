@@ -477,6 +477,22 @@ let JSWINDOWACTORS = {
     remoteTypes: ["privilegedabout"],
   },
 
+  MiniWindow: {
+    parent: {
+      esModuleURI:
+        "moz-src:///browser/components/miniwindow/MiniWindowParent.sys.mjs",
+    },
+    child: {
+      esModuleURI:
+        "moz-src:///browser/components/miniwindow/MiniWindowChild.sys.mjs",
+      // TODO: These actors will be responsible for handling
+      // events later down the stack.
+    },
+    enablePreference: "browser.mini-window.enabled",
+    allFrames: false,
+    safeForUntrustedWebProcess: true,
+  },
+
   CustomKeys: {
     parent: {
       esModuleURI:
@@ -851,6 +867,7 @@ let JSWINDOWACTORS = {
       events: {
         "Screenshots:Close": {},
         "Screenshots:Copy": {},
+        "Screenshots:MiniWindow": {},
         "Screenshots:Download": {},
         "Screenshots:HidePanel": {},
         "Screenshots:OverlaySelection": {},

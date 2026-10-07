@@ -823,7 +823,8 @@ TimerThread::Run() {
 
       // Determine when we should wake up.
       const auto [wakeupTime, wakeupTolerance] = ComputeWakeupTimeFromTimers();
-      mIntendedWakeupTime = wakeupTime;
+      mLatestIntendedWakeupTime =
+          wakeupTime.IsNull() ? TimeStamp{} : wakeupTime + wakeupTolerance;
       waitTolerance = wakeupTolerance;
 
       // About to sleep - let's make note of how many timers we processed and
@@ -832,6 +833,7 @@ TimerThread::Run() {
 
 #if TIMER_THREAD_STATISTICS
       CollectTimersFiredStatistics(timersFiredThisWakeup);
+      mIntendedWakeupTime = wakeupTime;
 #endif
 
       // Determine how long to sleep for. Grab TimeStamp::Now() at the last
@@ -850,7 +852,10 @@ TimerThread::Run() {
                   ("waiting for %f\n", waitFor.ToMilliseconds()));
       }
     } else {
+      mLatestIntendedWakeupTime = TimeStamp{};
+#if TIMER_THREAD_STATISTICS
       mIntendedWakeupTime = TimeStamp{};
+#endif
       // Sleep for 0.1 seconds while not firing timers.
       // NOTE: Re-evaluate this behavior. Why do we wake up ten times a second
       // to do nothing?
@@ -909,9 +914,10 @@ nsresult TimerThread::AddTimer(nsTimerImpl* aTimer,
       StaticPrefs::timer_maximum_firing_delay_tolerance_ms());
   const TimeDuration firingDelay = ComputeAcceptableFiringDelay(
       aTimer->mDelay, minTimerDelay, maxTimerDelay);
+  // The thread may sleep until the end of the window it handed to the monitor.
   const bool firingBeforeNextWakeup =
-      mIntendedWakeupTime.IsNull() ||
-      (aTimer->mTimeout + firingDelay < mIntendedWakeupTime);
+      mLatestIntendedWakeupTime.IsNull() ||
+      (aTimer->mTimeout + firingDelay < mLatestIntendedWakeupTime);
   const bool wakeUpTimerThread =
       mWaiting && (firingBeforeNextWakeup || aTimer->mDelay.IsZero());
 

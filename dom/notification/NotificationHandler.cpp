@@ -73,10 +73,11 @@ nsresult OpenWindowFor(nsIPrincipal* aPrincipal, const nsCString& aURL) {
 
   NS_DispatchToCurrentThread(NS_NewRunnableFunction(
       "OpenWindowFor",
-      [info = std::move(info), url = aURL, origin = std::move(origin)]() {
-        (void)ClientOpenWindow(
-            nullptr, ClientOpenWindowArgs(info, Nothing(), url, origin));
-      }));
+      [info = std::move(info), url = aURL, origin = std::move(origin)]()
+          MOZ_CAN_RUN_SCRIPT_BOUNDARY_LAMBDA {
+            (void)ClientOpenWindow(
+                nullptr, ClientOpenWindowArgs(info, Nothing(), url, origin));
+          }));
   return NS_OK;
 }
 

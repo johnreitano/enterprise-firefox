@@ -217,6 +217,7 @@ treeherder:
         'Wgpu': 'WebGPU standalone'
         'cpp': 'C/C++ checks'
         'pedantic': 'pedantic checks'
+        'legal': 'Licensing and legal checks'
         'text': 'Check on texts'
         'misc': 'Misc checks'
         'js': 'JavaScript checks'
@@ -623,6 +624,36 @@ partner-urls:
 # message and raises the priority to get results as quickly as possible.
 task-priority:
     by-project:
+        # Enterprise has no project branch of its own, so it keys off the head
+        # ref to mirror the mozilla-* priorities above. On worker pools shared
+        # with the gecko trust domain (the macOS hardware, mainly) every tier
+        # drops one notch below its gecko counterpart, so Enterprise never
+        # starves Firefox out of a pool it does not own.
+        'enterprise-(firefox|thunderbird)':
+            by-shared-worker:
+                'true':
+                    by-head-ref:
+                        'enterprise-release': 'very-high'
+                        'enterprise-beta':
+                            by-shipping:
+                                'true': 'high'
+                                'default': 'very-low'
+                        'enterprise-main': 'low'
+                        'default': 'lowest'
+                'default':
+                    by-head-ref:
+                        'enterprise-release': 'highest'
+                        'enterprise-beta':
+                            by-shipping:
+                                'true': 'very-high'
+                                'default': 'low'
+                        'enterprise-main': 'medium'
+                        'default': 'very-low'
+        # Try pushes ignore the head ref: they are never shipping work.
+        'enterprise-firefox-try':
+            by-shared-worker:
+                'true': 'lowest'
+                'default': 'very-low'
         'mozilla-release': 'highest'
         'mozilla-esr.*':
             by-shipping:
@@ -885,6 +916,11 @@ workers:
             os: macosx
             worker-type: 'gecko-{alias}'
         t-osx-1500-m-vms:
+            provisioner: releng-hardware
+            implementation: generic-worker
+            os: macosx
+            worker-type: 'gecko-{alias}'
+        t-osx-2700-m4:
             provisioner: releng-hardware
             implementation: generic-worker
             os: macosx

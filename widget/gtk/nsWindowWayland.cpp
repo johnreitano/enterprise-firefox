@@ -96,10 +96,12 @@ bool nsWindowWayland::CreateRestoreSession(bool aRestoreWindow) {
     return false;
   }
 
-  // If we have old profile / workspace ID just replace it by
+  // If we have old profile / workspace ID or it's empty just replace it by
   // UUID to avoid protocol error crash (Bug 2059617).
-  nsresult ret;
-  (void)mWorkspaceID.ToInteger(&ret);
+  nsresult ret = NS_OK;
+  if (!mWorkspaceID.IsEmpty()) {
+    (void)mWorkspaceID.ToInteger(&ret);
+  }
   if (NS_SUCCEEDED(ret)) {
     mWorkspaceID = GenerateWorkspaceID();
     aRestoreWindow = false;
@@ -215,6 +217,12 @@ void nsWindowWayland::WaylandDragWorkaround(GdkEventButton* aEvent) {
   NS_WARNING(
       "Quit unfinished Wayland Drag and Drop operation. Buggy Wayland "
       "compositor?");
+
+  // Nothing was dropped anywhere, so report the drag as cancelled. Without
+  // this the dragend event carries the session defaults (dropEffect "none",
+  // not cancelled, end point 0,0), which the tab strip reads as "dropped
+  // outside the window" and detaches the tab (bug 2001075).
+  currentDragSession->UserCancelled();
   currentDragSession->EndDragSession(true, 0);
 }
 

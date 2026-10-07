@@ -1603,7 +1603,6 @@ extern "C" {
     );
     fn wgpu_parent_queue_submit(
         parent: WebGPUParentPtr,
-        device_id: id::DeviceId,
         queue_id: id::QueueId,
         command_buffer_ids: *const id::CommandBufferId,
         command_buffer_ids_length: usize,
@@ -1806,7 +1805,10 @@ impl Global {
                 &desc,
                 wgt::TextureUses::UNINITIALIZED,
                 texture_id,
-                /* cleared */ false,
+                // NOTE: We want `false`, but we can't yet, because
+                // upstream's API isn't quite right yet.
+                /* cleared */
+                true,
             )
         };
         if let Some(err) = error {
@@ -2058,7 +2060,10 @@ impl Global {
                 &desc,
                 wgt::TextureUses::UNINITIALIZED,
                 texture_id,
-                /* cleared */ false,
+                // NOTE: We want `false`, but we can't yet, because
+                // upstream's API isn't quite right yet.
+                /* cleared */
+                true,
             );
             if let Some(err) = error {
                 let msg =
@@ -2779,14 +2784,12 @@ unsafe fn process_message(
             wgpu_parent_buffer_unmap(global.owner, device_id, buffer_id, flush);
         }
         Message::QueueSubmit(
-            device_id,
             queue_id,
             command_buffer_ids,
             texture_ids,
             external_texture_source_ids,
         ) => wgpu_parent_queue_submit(
             global.owner,
-            device_id,
             queue_id,
             command_buffer_ids.as_ptr(),
             command_buffer_ids.len(),
@@ -3112,9 +3115,8 @@ pub struct VkSemaphoreHandle(pub u64);
 /// closure.
 #[cfg(target_os = "linux")]
 fn enqueue_signal_semaphores_destruction(
-    global: &Global,
-    device_id: id::DeviceId,
-    queue_id: id::QueueId,
+    queue: &Arc<wgc::device::queue::Queue>,
+    device: Arc<wgc::device::Device>,
     handles: &[VkSemaphoreHandle],
     submission_errored: bool,
 ) {
@@ -3128,9 +3130,6 @@ fn enqueue_signal_semaphores_destruction(
         .iter()
         .map(|handle| vk::Semaphore::from_raw(handle.0))
         .collect();
-
-    let device = global.resolve_device_id(device_id);
-    let queue = global.resolve_queue_id(queue_id);
 
     if submission_errored {
         // Unregister the pending signals so that a later submission on this
@@ -3170,24 +3169,27 @@ fn enqueue_signal_semaphores_destruction(
 #[no_mangle]
 pub unsafe extern "C" fn wgpu_server_queue_submit(
     global: &Global,
-    device_id: id::DeviceId,
     queue_id: id::QueueId,
     command_buffer_ids: FfiSlice<'_, id::CommandBufferId>,
     signal_semaphores: FfiSlice<'_, VkSemaphoreHandle>,
 ) -> u64 {
-    global.device_push_error_scope(device_id, ErrorFilter::Validation);
+    use wgc::resource::ParentDevice as _;
+
+    let queue = global.resolve_queue_id(queue_id);
+    let device = queue.device();
+
+    device.push_error_scope(ErrorFilter::Validation);
     let submission_index = global.queue_submit(queue_id, command_buffer_ids.as_slice());
-    let error = global.device_pop_error_scope(device_id).unwrap();
+    let error = device.pop_error_scope().unwrap();
     let submission_succeeded = error.is_none();
     if let Some(error) = error {
-        global.device_handle_error(device_id, error, None, "Queue::submit");
+        device.handle_error(error, None, "Queue::submit");
     }
 
     #[cfg(target_os = "linux")]
     enqueue_signal_semaphores_destruction(
-        global,
-        device_id,
-        queue_id,
+        &queue,
+        device.clone(),
         signal_semaphores.as_slice(),
         !submission_succeeded,
     );
@@ -3214,14 +3216,15 @@ pub struct SubmittedWorkDoneClosure {
 #[cfg(target_os = "linux")]
 pub extern "C" fn wgpu_vksemaphore_create_signal_semaphore(
     global: &Global,
-    device_id: id::DeviceId,
     queue_id: id::QueueId,
     out_fd: *mut i32,
 ) -> VkSemaphoreHandle {
     use ash::vk::Handle as _;
+    use wgc::resource::ParentDevice as _;
 
-    let device = global.resolve_device_id(device_id);
     let queue = global.resolve_queue_id(queue_id);
+    let device = queue.device().clone();
+
     let hal_device =
         unsafe { device.as_hal::<wgc::api::Vulkan>() }.expect("Vulkan backend device on linux");
     let hal_queue =
@@ -3329,13 +3332,15 @@ pub unsafe extern "C" fn wgpu_server_device_import_texture_from_shared_handle(
 #[no_mangle]
 pub unsafe extern "C" fn wgpu_server_device_wait_fence_from_shared_handle(
     global: &Global,
-    device_id: id::DeviceId,
     queue_id: id::QueueId,
     fence_handle: *mut core::ffi::c_void,
     fence_value: u64,
 ) -> bool {
-    let device = global.resolve_device_id(device_id);
+    use wgc::resource::ParentDevice as _;
+
     let queue = global.resolve_queue_id(queue_id);
+    let device = queue.device().clone();
+
     let hal_device =
         unsafe { device.as_hal::<wgc::api::Dx12>() }.expect("D3D12 backend device on windows");
     let hal_queue =
@@ -3583,7 +3588,10 @@ mod macos {
                     &desc,
                     wgt::TextureUses::UNINITIALIZED,
                     texture_id,
-                    /* cleared */ false,
+                    // NOTE: We want `false`, but we can't yet, because
+                    // upstream's API isn't quite right yet.
+                    /* cleared */
+                    true,
                 )
             };
             if let Some(err) = error {

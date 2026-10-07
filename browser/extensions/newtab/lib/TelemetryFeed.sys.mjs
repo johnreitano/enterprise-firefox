@@ -746,8 +746,8 @@ export class TelemetryFeed {
    * addSession - Start tracking a new session
    *
    * @param  {string} id the portID of the open session
-   * @param  {string} the URL being loaded for this session (optional)
-   * @return {obj}    Session object
+   * @param  {string} url The URL being loaded for this session (optional)
+   * @return {object}    Session object
    */
   addSession(id, url) {
     // XXX refactor to use setLoadTriggerInfo or saveSessionPerfData
@@ -903,7 +903,7 @@ export class TelemetryFeed {
    * Known gap: dragging the tab to another window gives it a new <browser>, so
    * the session stops qualifying, and accruing, for the rest of its life.
    *
-   * @param  {obj} session a session from this.sessions
+   * @param  {object} session a session from this.sessions
    * @param  {Window|null} [activeWindow] the frontmost window, read if omitted
    * @returns {boolean}
    */
@@ -963,7 +963,7 @@ export class TelemetryFeed {
    * newtab becomes visible. Without this, a visit shorter than one interval
    * would see no notification and record nothing.
    *
-   * @param  {obj} session a session from this.sessions
+   * @param  {object} session a session from this.sessions
    */
   #startDwellClockIfActive(session) {
     if (
@@ -979,7 +979,7 @@ export class TelemetryFeed {
    * Stop a session's stopwatch, crediting time up to `cutoff`. Clamped at zero,
    * so a run that started after `cutoff` adds nothing instead of subtracting.
    *
-   * @param  {obj} session a session from this.sessions
+   * @param  {object} session a session from this.sessions
    * @param  {number} [cutoff] a this.now() timestamp, defaulting to now
    */
   #stopDwellClock(session, cutoff = this.now()) {
@@ -994,7 +994,7 @@ export class TelemetryFeed {
    * handleNewTabInit - Handle NEW_TAB_INIT, which creates a new session and sets the a flag
    *                    for session.perf based on whether or not this new tab is preloaded
    *
-   * @param  {obj} action the Action object
+   * @param  {object} action the Action object
    */
   handleNewTabInit(action) {
     const session = this.addSession(
@@ -1013,7 +1013,7 @@ export class TelemetryFeed {
    * Handle NEW_TAB_SCROLL, which records the deepest scroll threshold passed
    * so far in a session. The scroll metrics are set from it in endSession.
    *
-   * @param  {obj} action the Action object
+   * @param  {object} action the Action object
    */
   handleNewTabScroll(action) {
     const session = this.sessions.get(au.getPortIdOfSender(action));
@@ -1043,7 +1043,7 @@ export class TelemetryFeed {
       type,
       position,
       source,
-      advertiser: advertiser_name,
+      advertiser_name,
       tile_id,
       visible_topsites,
       frecency_boosted = false,
@@ -1161,8 +1161,8 @@ export class TelemetryFeed {
           position: action.data.position,
           is_pinned: !!action.data.isPinned,
           visible_topsites,
-          smart_scores: JSON.stringify(action.data.smartScores),
-          smart_weights: JSON.stringify(action.data.smartWeights),
+          smart_scores: JSON.stringify(action.data.smart_scores),
+          smart_weights: JSON.stringify(action.data.smart_weights),
           ...(action.data.is_ad_eligible_position &&
           isAdEligiblePositionSupported()
             ? { is_ad_eligible_position: true }
@@ -1177,8 +1177,8 @@ export class TelemetryFeed {
           position: action.data.position,
           is_pinned: !!action.data.isPinned,
           visible_topsites,
-          smart_scores: JSON.stringify(action.data.smartScores),
-          smart_weights: JSON.stringify(action.data.smartWeights),
+          smart_scores: JSON.stringify(action.data.smart_scores),
+          smart_weights: JSON.stringify(action.data.smart_weights),
         });
         break;
 
@@ -1233,8 +1233,8 @@ export class TelemetryFeed {
         Glean.topsites.edit.record({
           newtab_visit_id: session.session_id,
           position: action.data.action_position,
-          has_title_changed: action.data.hasTitleChanged,
-          has_url_changed: action.data.hasURLChanged,
+          has_title_changed: action.data.has_title_changed,
+          has_url_changed: action.data.has_url_changed,
         });
         break;
       }
@@ -1301,10 +1301,12 @@ export class TelemetryFeed {
    * Occasionally replaces a content item with another that is in the feed.
    *
    * @param {*} item
+   * @param {object} session The session the event belongs to. When it has
+   *   sectionPositions, only items from rendered sections can be swapped in.
    * @returns Same item, but another item occasionally based on probablility setting.
    * Sponsored items are unchanged
    */
-  randomizeOrganicContentEvent(item) {
+  randomizeOrganicContentEvent(item, session) {
     if (item.is_sponsored) {
       return item; // Don't alter spocs
     }
@@ -1337,7 +1339,11 @@ export class TelemetryFeed {
     if (lazy.NewTabContentPing.decideWithProbability(p)) {
       return item;
     }
-    const allRecs = this.getAllRecommendations(); // Number of recommendations has changed
+    const sectionPositions = session?.sectionPositions;
+    let allRecs = this.getAllRecommendations(); // Number of recommendations has changed
+    if (sectionPositions) {
+      allRecs = allRecs.filter(rec => sectionPositions.has(rec.section));
+    }
     if (!allRecs.length) {
       return item;
     }
@@ -1363,7 +1369,7 @@ export class TelemetryFeed {
       randomItem.section
     ) {
       resultItem.section = randomItem.section;
-      resultItem.section_position = randomItem.section_position;
+      resultItem.section_position = sectionPositions?.get(randomItem.section);
       resultItem.layout_name = this.getAllSections().find(
         section => section.sectionKey === randomItem.section
       )?.layout?.name;
@@ -1466,7 +1472,7 @@ export class TelemetryFeed {
           }
           this.recordOrQueueEvent(
             "click",
-            this.randomizeOrganicContentEvent(gleanData),
+            this.randomizeOrganicContentEvent(gleanData, session),
             session.session_id,
             () => {
               Glean.pocket.click.record({
@@ -1887,6 +1893,15 @@ export class TelemetryFeed {
       case at.TOPIC_SELECTION_USER_SAVE:
         this.handleTopicSelectionUserEvent(action);
         break;
+      case at.CARD_SECTIONS_ORDER: {
+        const session = this.sessions.get(au.getPortIdOfSender(action));
+        if (session) {
+          session.sectionPositions = new Map(
+            action.data.sections.map((sectionKey, i) => [sectionKey, i])
+          );
+        }
+        break;
+      }
       case at.BLOCK_SECTION:
       // Intentional fall-through
       case at.CARD_SECTION_IMPRESSION:

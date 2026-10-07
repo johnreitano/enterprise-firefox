@@ -107,6 +107,7 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
   void OnMemoryPressure() override;
   void OnBeforePaintTransaction() override;
   void OnDidPaintTransaction() override;
+  void OnWindowDestroy() override;
   layers::PersistentBufferProvider* GetBufferProvider() override;
 
   Maybe<layers::SurfaceDescriptor> GetFrontBuffer(

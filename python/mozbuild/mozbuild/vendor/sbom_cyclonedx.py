@@ -21,14 +21,21 @@ from cyclonedx.model import (
     XsUri,
 )
 from cyclonedx.model.bom import Bom, BomMetaData
-from cyclonedx.model.component import Component, ComponentEvidence, ComponentType
+from cyclonedx.model.component import (
+    Component,
+    ComponentEvidence,
+    ComponentScope,
+    ComponentType,
+)
 from cyclonedx.model.component_evidence import Occurrence
+from cyclonedx.model.lifecycle import LifecyclePhase, PredefinedLifecycle
 from cyclonedx.output import make_outputter
 from cyclonedx.schema import OutputFormat, SchemaVersion
 from packageurl import PackageURL
 
 ROOT_BOM_REF = "root"
 SERIAL_NAMESPACE_URL = "https://github.com/mozilla-firefox/firefox/"
+BUILD_TOOLING_SERIAL_SUFFIX = "#build-tooling"
 
 COMPONENT_TYPES = {
     "library": ComponentType.LIBRARY,
@@ -90,7 +97,7 @@ def _make_purl(record):
     )
 
 
-def _make_component(record, factory, unrecognized=None):
+def _make_component(record, factory, unrecognized=None, scope=None):
     component = Component(
         name=record["name"],
         type=COMPONENT_TYPES[record.get("type", "library")],
@@ -102,6 +109,7 @@ def _make_component(record, factory, unrecognized=None):
             HashType(alg=HashAlgorithm(alg), content=content)
             for alg, content in record.get("hashes", ())
         ],
+        scope=scope,
     )
 
     # Where the component was found in the tree. A notice-derived component
@@ -131,16 +139,17 @@ def _make_component(record, factory, unrecognized=None):
         component.external_references.add(
             ExternalReference(type=ExternalReferenceType.VCS, url=XsUri(record["vcs"]))
         )
-    product, bz_component = record["bugzilla"]
-    component.external_references.add(
-        ExternalReference(
-            type=ExternalReferenceType.ISSUE_TRACKER,
-            url=XsUri(
-                "https://bugzilla.mozilla.org/enter_bug.cgi"
-                f"?product={product}&component={bz_component}"
-            ),
+    if record["bugzilla"]:
+        product, bz_component = record["bugzilla"]
+        component.external_references.add(
+            ExternalReference(
+                type=ExternalReferenceType.ISSUE_TRACKER,
+                url=XsUri(
+                    "https://bugzilla.mozilla.org/enter_bug.cgi"
+                    f"?product={product}&component={bz_component}"
+                ),
+            )
         )
-    )
 
     for key, value in sorted(record["properties"].items()):
         component.properties.add(Property(name=key, value=value))
@@ -153,23 +162,37 @@ def build_bom(
     product_version,
     source_revision,
     timestamp,
+    product_notices=(),
+    product_name="Firefox",
     dependencies=None,
     unrecognized=None,
+    build_tooling=False,
 ):
     """Assemble a Bom. All non-determinism is injected by the caller.
+
+    ``product_notices`` are license notices that about:license reproduces
+    without naming a path, the MPL and the bundled spellchecking dictionaries
+    among them. They belong to the product as a whole rather than to any one
+    component, so they land on the root.
+
+    ``product_name`` names the root component. The same shippable builds that
+    generate an SBOM include GeckoView, so the caller passes the configuration's
+    own application name rather than letting the desktop default stand.
 
     ``unrecognized``, if given, collects the license values that are neither
     an SPDX id nor an expression and so end up as free text.
 
     ``dependencies`` maps a record's bom_ref to the bom_refs it depends on, for
-    the parts of the tree that know their own graph. Anything no other
-    component depends on hangs off the root, so the result is a tree rather
-    than one flat ring of siblings.
+    the parts of the tree that know their own graph -- Cargo.lock today.
+    Anything no other component depends on hangs off the root, so the result is
+    a tree rather than one flat ring of siblings.
+
+    ``build_tooling`` makes it the build tooling document: see licensing.md.
     """
     factory = LicenseFactory()
 
     root = Component(
-        name="Firefox",
+        name=product_name,
         type=ComponentType.APPLICATION,
         bom_ref=ROOT_BOM_REF,
         version=product_version,
@@ -177,7 +200,26 @@ def build_bom(
     if source_revision:
         root.properties.add(Property(name="moz:source.revision", value=source_revision))
 
-    metadata = BomMetaData(component=root, timestamp=timestamp)
+    if product_notices:
+        root.properties.add(
+            Property(
+                name="moz:license.notice-ids",
+                value=",".join(sorted(n["id"] for n in product_notices)),
+            )
+        )
+        for value in sorted({n["spdx"] for n in product_notices if n["spdx"]}):
+            root.licenses.add(_make_license(factory, value, unrecognized=unrecognized))
+
+    lifecycles = None
+    if build_tooling:
+        # post-build because the test harnesses are in scope as much as the
+        # compilers: they run once the product is built.
+        lifecycles = [
+            PredefinedLifecycle(LifecyclePhase.PRE_BUILD),
+            PredefinedLifecycle(LifecyclePhase.BUILD),
+            PredefinedLifecycle(LifecyclePhase.POST_BUILD),
+        ]
+    metadata = BomMetaData(component=root, timestamp=timestamp, lifecycles=lifecycles)
     metadata.tools.components.add(
         Component(
             name="mach sbom",
@@ -189,19 +231,33 @@ def build_bom(
     # A stable serial number keyed to the source revision: reproducible for a
     # given checkout, still distinct between revisions.
     serial = uuid.uuid5(
-        uuid.NAMESPACE_URL, SERIAL_NAMESPACE_URL + (source_revision or "unknown")
+        uuid.NAMESPACE_URL,
+        SERIAL_NAMESPACE_URL
+        + (source_revision or "unknown")
+        + (BUILD_TOOLING_SERIAL_SUFFIX if build_tooling else ""),
     )
 
     bom = Bom(serial_number=serial, metadata=metadata)
     components = {}
     for record in records:
-        component = _make_component(record, factory, unrecognized)
+        component = _make_component(
+            record,
+            factory,
+            unrecognized,
+            scope=ComponentScope.EXCLUDED if build_tooling else None,
+        )
         components[record["bom_ref"]] = component
         bom.components.add(component)
 
     dependencies = dependencies or {}
+    # An edge from something the document leaves out, a tooling crate in the
+    # product document for instance, must not unhook its target from the root.
     depended_on = {
-        ref for targets in dependencies.values() for ref in targets if ref in components
+        ref
+        for source, targets in dependencies.items()
+        if source in components
+        for ref in targets
+        if ref in components
     }
     for ref, targets in sorted(dependencies.items()):
         if ref not in components:

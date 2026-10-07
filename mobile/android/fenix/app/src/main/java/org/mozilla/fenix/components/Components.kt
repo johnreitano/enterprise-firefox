@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import mozilla.components.concept.ai.controls.AIFeatureBlock
 import mozilla.components.concept.ai.controls.AIFeatureRegistry
+import mozilla.components.concept.integrity.RequestHashProvider
 import mozilla.components.feature.addons.AddonManager
 import mozilla.components.feature.addons.amo.AMOAddonsProvider
 import mozilla.components.feature.addons.migration.DefaultSupportedAddonsChecker
@@ -30,6 +31,7 @@ import mozilla.components.lib.ai.controls.default
 import mozilla.components.lib.crash.store.CrashAction
 import mozilla.components.lib.crash.store.CrashMiddleware
 import mozilla.components.lib.integrity.googleplay.GooglePlayIntegrityClient
+import mozilla.components.lib.integrity.googleplay.IntegrityConsumer
 import mozilla.components.lib.llm.mlpa.MlpaTokenStorage
 import mozilla.components.lib.publicsuffixlist.PublicSuffixList
 import mozilla.components.service.fxrelay.eligibility.RelayEligibilityStore
@@ -360,9 +362,8 @@ class Components(
                         SetupChecklistTelemetryMiddleware(),
                         ReviewPromptMiddleware(
                                 continuousOnboardingInProgress = {
-                                    val continuousOnboardingCompleted =
-                                        settings.seventhDayOnboardingCompletedTimestamp != -1L
-                                    settings.continuousOnboardingFeatureEnabled && !continuousOnboardingCompleted
+                                    settings.continuousOnboardingFeatureEnabled &&
+                                        !settings.continuousOnboardingCompleted
                                 },
                                 shouldShowCustomPrompt = {
                                     settings.customReviewPromptUiEnabled && settings.isTelemetryEnabled
@@ -383,16 +384,18 @@ class Components(
             }
     }
 
+    val lensImageUploader by lazyMonitored {
+        LensImageUploader(
+            context = context,
+            client = core.client,
+            userAgent = core.engine.settings.userAgentString ?: "",
+        )
+    }
+
     val lensImageSearch by lazyMonitored {
         LensImageSearch(
             appStore = appStore,
-            uploader = {
-                LensImageUploader(
-                    context = context,
-                    client = core.client,
-                    userAgent = core.engine.settings.userAgentString ?: "",
-                )
-            },
+            uploader = { lensImageUploader },
             browserUseCases = { useCases.fenixBrowserUseCases },
         )
     }
@@ -428,7 +431,7 @@ class Components(
         GooglePlayIntegrityClient.create(
             context = context,
             projectNumberToken = BuildConfig.GPS_INTEGRITY_TOKEN,
-            requestHashProvider = clientUUID,
+            requestHashProvider = RequestHashProvider { clientUUID.generateHash() },
         )
     }
 
@@ -443,9 +446,21 @@ class Components(
     val settingsIndexer by lazyMonitored {
         DefaultFenixSettingsIndexer(
             context = context,
+            preferenceFileInformationList =
+                DefaultFenixSettingsIndexer.defaultPreferenceFileInformationList(
+                    includeAutofillPreferences = settings.isAutofillSupported
+                ),
             additionalProviders =
                 settingsSearchProviders(summarizationFeatureConfiguration = core.summarizeFeatureSettings),
+            excludedPreferenceKeys = ::createSettingsIndexerExclusions,
         )
+    }
+
+    private fun createSettingsIndexerExclusions(): Set<String> = buildSet {
+        if (!settings.isAutofillSupported) {
+            add(context.getString(R.string.pref_key_passwords))
+            add(context.getString(R.string.pref_key_credit_cards))
+        }
     }
 
     val ipProtectionPromptRepository by lazyMonitored {
@@ -521,12 +536,12 @@ class Components(
             client = core.client,
             storage = MlpaTokenStorage.sharedPrefs(context),
             fxaTokenProvider = backgroundServices.accountManager.accessTokenProvider,
-            integrityClient = integrityClient,
+            integrityClient = integrityClient.forConsumer(IntegrityConsumer.Summarize),
             userIdProvider = clientUUID,
         )
     }
 
-    val clientUUID by lazyMonitored { ClientUUID.build(context) }
+    val clientUUID by lazyMonitored { ClientUuid.build(context) }
 
     val ipProtection by lazyMonitored {
         IPProtection(

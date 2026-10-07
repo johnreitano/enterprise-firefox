@@ -42,6 +42,9 @@ run-if = ["enterprise"]
 ["test_extensions.js"]
 skip-if = ["enterprise"] # Applies Extensions, unsupported on enterprise (x-compatibility)
 
+["test_extensions_uninstall.js"]
+skip-if = ["enterprise"] # Applies Extensions, unsupported on enterprise (x-compatibility)
+
 ["test_extensionsettings.js"]
 
 ["test_extensionsettings_blocked_permissions.js"]

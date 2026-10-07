@@ -34,7 +34,6 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -69,6 +68,7 @@ import kotlinx.coroutines.flow.map
 import mozilla.components.browser.state.action.TabListAction
 import mozilla.components.browser.state.state.createTab
 import mozilla.components.browser.state.store.BrowserStore
+import mozilla.components.compose.base.button.IconButton
 import mozilla.components.compose.base.modifier.thenConditional
 import mozilla.components.compose.base.theme.PreviewThemeProvider
 import mozilla.components.compose.base.theme.Theme
@@ -272,11 +272,11 @@ private fun TabStripContent(
                 onMove = onMove,
             )
 
-            IconButton(onClick = onAddTabClick) {
+            IconButton(onClick = onAddTabClick, contentDescription = stringResource(R.string.add_tab)) {
                 Icon(
                     painter = painterResource(iconsR.drawable.mozac_ic_plus_24),
                     tint = MaterialTheme.colorScheme.onSurface,
-                    contentDescription = stringResource(R.string.add_tab),
+                    contentDescription = null,
                 )
             }
         }
@@ -482,6 +482,7 @@ private fun TabItem(
             if (state.isCloseButtonVisible) {
                 IconButton(
                     onClick = { onCloseTabClick(state.id, state.isPrivate) },
+                    contentDescription = stringResource(id = R.string.close_tab_title, state.title),
                     modifier =
                         if (state.isSelected) {
                             Modifier.semantics {}
@@ -497,11 +498,7 @@ private fun TabItem(
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             },
-                        contentDescription =
-                            stringResource(
-                                id = R.string.close_tab_title,
-                                state.title,
-                            ),
+                        contentDescription = null,
                     )
                 }
             } else {

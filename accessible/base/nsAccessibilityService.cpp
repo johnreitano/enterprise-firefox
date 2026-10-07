@@ -1306,7 +1306,8 @@ LocalAccessible* nsAccessibilityService::CreateAccessible(
     if (!frame->StyleVisibility()->IsVisible() || frame->StyleUI()->IsInert()) {
       return nullptr;
     }
-  } else if (nsCoreUtils::CanCreateAccessibleWithoutFrame(content)) {
+  } else if (nsCoreUtils::CanCreateAccessibleWithoutFrame(content,
+                                                          aIsSubtreeHidden)) {
     // display:contents element doesn't have a frame, but retains the
     // semantics. All its children are unaffected.
     const nsRoleMapEntry* roleMapEntry = nullptr;
@@ -1362,9 +1363,13 @@ LocalAccessible* nsAccessibilityService::CreateAccessible(
     }
     return newAcc;
   } else {
-    if (aIsSubtreeHidden) {
-      *aIsSubtreeHidden = true;
-    }
+    // No frame, and this content can't get an Accessible without one.
+    // CanCreateAccessibleWithoutFrame() has already set aIsSubtreeHidden
+    // appropriately: true if nothing in this subtree could ever be exposed
+    // (e.g. display: none or content-visibility: hidden), or left as-is (false)
+    // if a descendant might still be exposed despite this element not being
+    // creatable (e.g. an inert ancestor with a descendant which is not inert,
+    // such as an open modal dialog).
     return nullptr;
   }
 

@@ -290,6 +290,10 @@ add_task(
       "boolean",
       "isDefaultBrowser must be of the right type."
     );
+    Assert.equal(
+      typeof Glean.browser.defaultAtLaunch.testGetValue(),
+      "boolean"
+    );
 
     // Make sure pref-flipping doesn't overwrite the browser default state.
     const PREF_TEST = "toolkit.telemetry.test.pref1";

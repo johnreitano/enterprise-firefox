@@ -56,7 +56,6 @@ class nsISupports;
 class nsITransferable;
 class nsITransaction;
 class nsIWidget;
-class nsRange;
 
 namespace mozilla {
 class AlignStateAtSelection;
@@ -80,6 +79,7 @@ class DragEvent;
 class Element;
 class EventTarget;
 class HTMLBRElement;
+class Range;
 }  // namespace dom
 
 namespace widget {
@@ -206,6 +206,15 @@ class EditorBase : public nsIEditor,
   already_AddRefed<DataTransfer> CreateDataTransferForPaste(
       EventMessage aEventMessage,
       nsIClipboard::ClipboardType aClipboardType) const;
+
+  /**
+   * Create a DataTransfer object whose data comes from aTransferable rather
+   * than from a clipboard.  Used when pasting a transferable which was handed
+   * to us directly, e.g. by the macOS Services mechanism, so that the paste
+   * event exposes the data being pasted instead of the clipboard contents.
+   */
+  already_AddRefed<DataTransfer> CreateDataTransferForPaste(
+      EventMessage aEventMessage, nsITransferable* aTransferable) const;
 
   /**
    * Fast non-refcounting editor root element accessor
@@ -722,7 +731,7 @@ class EditorBase : public nsIEditor,
    *                            called by system.
    */
   MOZ_CAN_RUN_SCRIPT nsresult ReplaceTextAsAction(
-      const nsAString& aString, nsRange* aReplaceRange,
+      const nsAString& aString, dom::Range* aReplaceRange,
       AllowBeforeInputEventCancelable aAllowBeforeInputEventCancelable,
       PreventSetSelection aPreventSetSelection = PreventSetSelection::No,
       nsIPrincipal* aPrincipal = nullptr);
@@ -788,10 +797,16 @@ class EditorBase : public nsIEditor,
    * @param aPrincipal          Set subject principal if it may be called by
    *                            JS.  If set to nullptr, will be treated as
    *                            called by system.
+   * @param aDataTransfer       If set, used for the "paste" event and for
+   *                            inserting the content.  Otherwise, one is
+   *                            created from aTransferable.  Note that creating
+   *                            it consumes the input streams in aTransferable,
+   *                            so it must only be created once.
    */
   MOZ_CAN_RUN_SCRIPT nsresult PasteTransferableAsAction(
       nsITransferable* aTransferable, DispatchPasteEvent aDispatchPasteEvent,
-      nsIPrincipal* aPrincipal = nullptr);
+      nsIPrincipal* aPrincipal = nullptr,
+      DataTransfer* aDataTransfer = nullptr);
 
   /**
    * PasteAsQuotationAsAction() pastes content in clipboard as quotation.
@@ -841,7 +856,7 @@ class EditorBase : public nsIEditor,
     RefPtr<RangeItem> mSelectedRange;
 
     // Computing changed range while we're handling sub actions.
-    RefPtr<nsRange> mChangedRange;
+    RefPtr<dom::Range> mChangedRange;
 
     // XXX In strict speaking, mCachedPendingStyles isn't enough to cache
     //     inline styles because inline style can be specified with "style"
@@ -2770,7 +2785,7 @@ class EditorBase : public nsIEditor,
   [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<CaretPoint, nsresult>
   DeleteRangeWithTransaction(nsIEditor::EDirection aDirectionAndAmount,
                              nsIEditor::EStripWrappers aStripWrappers,
-                             nsRange& aRangeToDelete);
+                             dom::Range& aRangeToDelete);
 
   /**
    * DeleteRangesWithTransaction() removes content in aRangesToDelete or content
@@ -2819,7 +2834,7 @@ class EditorBase : public nsIEditor,
    */
   already_AddRefed<DeleteContentTransactionBase>
   CreateTransactionForCollapsedRange(
-      const nsRange& aCollapsedRange,
+      const dom::Range& aCollapsedRange,
       HowToHandleCollapsedRange aHowToHandleCollapsedRange);
 
   /**
@@ -2912,8 +2927,8 @@ class EditorBase : public nsIEditor,
    * it's not canceled.
    */
   [[nodiscard]] MOZ_CAN_RUN_SCRIPT virtual nsresult HandlePasteTransferable(
-      AutoEditActionDataSetter& aEditActionData,
-      nsITransferable& aTransferable) = 0;
+      AutoEditActionDataSetter& aEditActionData, nsITransferable& aTransferable,
+      DataTransfer* aDataTransfer) = 0;
 
  private:
   nsCOMPtr<nsISelectionController> mSelectionController;

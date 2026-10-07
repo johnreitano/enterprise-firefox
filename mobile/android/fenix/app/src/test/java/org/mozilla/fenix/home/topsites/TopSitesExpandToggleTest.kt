@@ -19,6 +19,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import kotlin.math.abs
 import mozilla.components.compose.base.theme.Theme
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -156,6 +157,26 @@ class TopSitesExpandToggleTest {
         composeTestRule.onNodeWithTag(TopSitesTestTag.EXPAND_TOGGLE).performClick()
 
         assertTrue(clicked)
+    }
+
+    @Test
+    fun `GIVEN titles that fit on one line WHEN rendered THEN the toggle sits 8dp below the last row`() {
+        setTopSitesContent(count = MORE_THAN_PHONE_FITS, isExpandToggleEnabled = true, isExpanded = false)
+
+        val lastRowBottom =
+            composeTestRule.onAllNodesWithTag(TopSitesTestTag.TOP_SITE_ITEM_ROOT).fetchSemanticsNodes().maxOf {
+                it.boundsInRoot.bottom
+            }
+        val toggleTop =
+            composeTestRule.onNodeWithTag(TopSitesTestTag.EXPAND_TOGGLE).fetchSemanticsNode().boundsInRoot.top
+        val expectedGap = with(composeTestRule.density) { 8.dp.toPx() }
+        val tolerance = with(composeTestRule.density) { 1.dp.toPx() }
+        val actualGap = toggleTop - lastRowBottom
+
+        assertTrue(
+            "Expected the toggle to sit ${expectedGap}px below the last row, but it sat ${actualGap}px below it",
+            abs(actualGap - expectedGap) <= tolerance,
+        )
     }
 
     private fun setStatefulTopSitesContent(

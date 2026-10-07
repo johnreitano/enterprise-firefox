@@ -934,6 +934,10 @@ void DocAccessible::AttributeChanged(dom::Element* aElement,
                                      int32_t aNameSpaceID, nsAtom* aAttribute,
                                      AttrModType aModType,
                                      const nsAttrValue* aOldValue) {
+  if (!HasLoadState(eTreeConstructed)) {
+    // We haven't built the initial tree yet, so there's nothing to mutate.
+    return;
+  }
   if (sIsAttrElementChanging) {
     // See the comment above the definition of sIsAttrElementChanging.
     return;
@@ -2295,6 +2299,12 @@ void DocAccessible::UpdateDocRoleMapEntry() {
 
   const uint8_t oldRoleMapEntryIndex = mRoleMapEntryIndex;
   SetRoleMapEntry(entry);
+  // Some code (e.g. LocalAccessible::ContainerWidget) assumes that mContent
+  // must be set if there is an ARIA role. If there is a root element, mContent
+  // should already be set by the time this is called. If there is an ARIA role,
+  // there must be a root element, since the ARIA role comes from the root or
+  // the body.
+  MOZ_ASSERT(!entry || mContent);
   if (mIPCDoc && mRoleMapEntryIndex != oldRoleMapEntryIndex) {
     mIPCDoc->SendRoleChangedEvent(mRoleMapEntryIndex);
   }
@@ -3253,13 +3263,8 @@ void DocAccessible::ARIAActiveDescendantIDMaybeMoved(
 }
 
 bool DocAccessible::IsRootContent(nsINode* aNode) const {
-  // The root element can be replaced or removed while the document is live.
-  // This means until mContent is re-synced by UpdateRootElement, it can
-  // still be the detached, former root.
-  MOZ_ASSERT(!mContent || !mContent->IsInComposedDoc() ||
-                 mDocumentNode->GetRootElement() == mContent,
-             "The doc acc should be bound to the root element");
-  return mContent == aNode;
+  return mContent && mDocumentNode->GetRootElement() == mContent &&
+         mContent == aNode;
 }
 
 bool DocAccessible::IsBodyElement(const nsINode* aNode) const {

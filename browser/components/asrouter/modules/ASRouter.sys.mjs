@@ -2491,7 +2491,12 @@ export class _ASRouter {
     return this.loadMessagesFromAllProviders();
   }
 
-  async sendPBNewTabMessage({ hideDefault }) {
+  async sendPBNewTabMessage({ hideDefault, introPlaying }) {
+    // Nothing shows alongside the intro; it is offered again next time.
+    if (introPlaying) {
+      return { message: null };
+    }
+
     let message = null;
     const PromoInfo = {
       VPN: { enabledPref: "browser.vpn_promo.enabled" },
@@ -2619,6 +2624,15 @@ export class _ASRouter {
     { browser, template, ...trigger },
     skipLoadingMessages = false
   ) {
+    // mini windows are stripped-down, always-on-top windows that never
+    // participate in the messaging system.
+    if (
+      browser?.documentGlobal?.document?.documentElement.hasAttribute(
+        "mini-window"
+      )
+    ) {
+      return { message: {} };
+    }
     lazy.ASRouterPreferences.console.debug("entering sendTriggerMessage");
     lazy.ASRouterPreferences.console.debug("trigger.id = ", trigger.id);
     if (!skipLoadingMessages) {

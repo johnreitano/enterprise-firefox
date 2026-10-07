@@ -102,7 +102,7 @@ const renderListSwitcherOrTitle = ({
     return (
       <div className="lists-switcher">
         <span
-          className="lists-title"
+          className="newtab-widget-title lists-title"
           {...(selectedLabel
             ? {}
             : {
@@ -142,7 +142,7 @@ const renderListSwitcherOrTitle = ({
 
   return (
     <span
-      className="lists-title"
+      className="newtab-widget-title lists-title"
       {...(selectedLabel
         ? {}
         : {

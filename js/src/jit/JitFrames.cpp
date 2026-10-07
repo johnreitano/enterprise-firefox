@@ -83,6 +83,20 @@ static uint32_t NumArgAndLocalSlots(const InlineFrameIterator& frame) {
   return CountArgSlots(script, frame.maybeCalleeTemplate()) + script->nfixed();
 }
 
+#ifdef JS_HW_SHADOW_STACK
+// Advance the tracked shadow stack pointer by one entry if it matches the
+// native JIT frame. This ensures that we unwind the shadow stack only for
+// native stack frames corresponding to real calls.
+static void MaybeUnwindShadowStackEntry(CommonFrameLayout* frame,
+                                        ResumeFromException* rfe) {
+  if (rfe->shadowStackPointer &&
+      *rfe->shadowStackPointer ==
+          reinterpret_cast<uintptr_t>(frame->returnAddress())) {
+    rfe->shadowStackPointer++;
+  }
+}
+#endif
+
 static TrampolineNative TrampolineNativeForFrame(
     JSRuntime* rt, TrampolineNativeFrameLayout* layout) {
   JSFunction* nativeFun = CalleeTokenToFunction(layout->calleeToken());
@@ -762,6 +776,21 @@ void HandleException(ResumeFromException* rfe) {
   }
 
   JitFrameIter iter(activation, /* mustUnwindActivation = */ true);
+
+#ifdef JS_HW_SHADOW_STACK
+  if (rfe->shadowStackPointer && iter.isJSJit() &&
+      iter.asJSJit().isUnwoundJitExit()) {
+    uintptr_t returnAddress =
+        reinterpret_cast<uintptr_t>(iter.asJSJit().current()->returnAddress());
+    if (*rfe->shadowStackPointer != returnAddress) {
+      // An already-unwound frame can leave one extra shadow stack entry, for
+      // example when DebugEpilogue discards its VM exit frame.
+      MOZ_RELEASE_ASSERT(rfe->shadowStackPointer[1] == returnAddress);
+      rfe->shadowStackPointer++;
+    }
+  }
+#endif
+
   CommonFrameLayout* prevJitFrame = nullptr;
   while (!iter.done()) {
     if (iter.isWasm()) {
@@ -857,6 +886,13 @@ void HandleException(ResumeFromException* rfe) {
 
     prevJitFrame = frame.current();
     ++iter;
+#ifdef JS_HW_SHADOW_STACK
+    if (!iter.done()) {
+      // Unwind the topmost entry on the shadow stack if it corresponds to the
+      // native-stack frame we just processed.
+      MaybeUnwindShadowStackEntry(prevJitFrame, rfe);
+    }
+#endif
   }
 
   // Return to C++ code by returning to the activation's JS or Wasm entry frame.

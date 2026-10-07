@@ -205,6 +205,10 @@ export const MODEL_FEATURES = Object.freeze({
   AGENT_MONITOR: "agent-monitor",
   // search agent
   SEARCH_ANSWER_GENERATION: "search-answer-generation",
+  // Exa /answers service. Not Remote Settings-backed — the model and service
+  // type are pinned by the search flow — so it has no FEATURE_MAJOR_VERSIONS
+  // entry; it only names the engine and its telemetry.
+  SEARCH_ANSWERS: "search-answers",
   // aitab structured-page generation
   AITAB: "aitab",
 });
@@ -218,6 +222,7 @@ export const SERVICE_TYPES = Object.freeze({
   AI: "ai",
   MEMORIES: "memories",
   AGENT: "agent",
+  SW_ANSWER: "sw-answer",
 });
 
 /**

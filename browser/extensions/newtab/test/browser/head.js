@@ -1,6 +1,7 @@
 "use strict";
 
 ChromeUtils.defineESModuleGetters(this, {
+  AboutNewTab: "resource:///modules/AboutNewTab.sys.mjs",
   DiscoveryStreamFeed: "resource://newtab/lib/DiscoveryStreamFeed.sys.mjs",
   ObjectUtils: "resource://gre/modules/ObjectUtils.sys.mjs",
   PlacesTestUtils: "resource://testing-common/PlacesTestUtils.sys.mjs",
@@ -19,23 +20,33 @@ function pushPrefs(...prefs) {
   return SpecialPowers.pushPrefEnv({ set: prefs });
 }
 
-// Toggle the feed off and on as a workaround to read the new prefs.
-async function toggleTopsitesPref() {
-  await pushPrefs([
-    "browser.newtabpage.activity-stream.feeds.system.topsites",
-    false,
-  ]);
-  await pushPrefs([
-    "browser.newtabpage.activity-stream.feeds.system.topsites",
-    true,
-  ]);
+/**
+ * Wait until `url` is in the parent's top sites row, asking TopSitesFeed to
+ * rebuild and broadcast the row on every try. The retry is for more than the
+ * refresh's own latency: refresh() rebuilds from a module-level list that only
+ * the feed's default.sites observer fills, so an early try can compute the row
+ * the test just replaced. The caches are expired because clearPinnedTopSites
+ * unpins through NewTabUtils rather than through the feed.
+ */
+async function refreshTopSites(url) {
+  // onBrowserReady() assigns activityStream asynchronously.
+  await AboutNewTab.activityStreamPromise;
+  await TestUtils.waitForCondition(async () => {
+    const feed = AboutNewTab.activityStream.store.feeds.get(
+      "feeds.system.topsites"
+    );
+    feed.frecentCache.expire();
+    feed.pinnedCache.expire();
+    await feed.refresh({ broadcast: true });
+    return AboutNewTab.getTopSites().some(row => row?.url === url);
+  }, `Wait for ${url} in the top sites row`);
 }
 
 // The sites setDefaultTopSites configures, in the order they fill the grid.
 const DEFAULT_TOP_SITES = [
   "https://www.youtube.com/",
   "https://www.facebook.com/",
-  "https://www.amazon.com/",
+  "https://www.baidu.com/",
   "https://www.reddit.com/",
   "https://www.wikipedia.org/",
   "https://twitter.com/",
@@ -51,11 +62,17 @@ async function setDefaultTopSites() {
     "browser.newtabpage.activity-stream.default.sites",
     DEFAULT_TOP_SITES.join(","),
   ]);
-  await toggleTopsitesPref();
   await pushPrefs([
     "browser.newtabpage.activity-stream.improvesearch.topSiteSearchShortcuts",
     true,
   ]);
+  // The shortcuts to pin are region-derived, and Baidu is only listed for CN,
+  // so ask for it explicitly rather than depending on the test's region.
+  await pushPrefs([
+    "browser.newtabpage.activity-stream.improvesearch.topSiteSearchShortcuts.searchEngines",
+    "baidu",
+  ]);
+  await refreshTopSites(DEFAULT_TOP_SITES[0]);
   return DEFAULT_TOP_SITES;
 }
 
@@ -90,7 +107,7 @@ async function setTestTopSites() {
     "browser.newtabpage.activity-stream.default.sites",
     TEST_TOP_SITE,
   ]);
-  await toggleTopsitesPref();
+  await refreshTopSites(TEST_TOP_SITE);
   return TEST_TOP_SITE;
 }
 

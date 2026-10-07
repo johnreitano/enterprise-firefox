@@ -56,7 +56,6 @@ import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import mozilla.components.browser.state.action.ContentAction
 import mozilla.components.browser.state.action.SystemPermissionRequestAction
 import mozilla.components.browser.state.selector.findCustomTab
@@ -241,6 +240,7 @@ import org.mozilla.fenix.settings.biometric.BiometricPromptFeature
 import org.mozilla.fenix.settings.downloads.DownloadLocationManager
 import org.mozilla.fenix.snackbar.FenixSnackbarDelegate
 import org.mozilla.fenix.snackbar.SnackbarBinding
+import org.mozilla.fenix.tabgroups.TabGroupsStrip
 import org.mozilla.fenix.tabstray.ext.toDisplayTitle
 import org.mozilla.fenix.tabstray.redux.state.Page
 import org.mozilla.fenix.theme.FirefoxTheme
@@ -293,6 +293,10 @@ abstract class BaseBrowserFragment :
     private var _findInPageLauncher: (() -> Unit)? = null
     private val findInPageLauncher: () -> Unit
         get() = _findInPageLauncher!!
+
+    @Suppress("VariableNaming") private var _readerMenuController: DefaultReaderModeController? = null
+    protected val readerMenuController: DefaultReaderModeController
+        get() = _readerMenuController!!
 
     protected val readerViewFeature = ViewBoundFeatureWrapper<ReaderViewFeature>()
     protected val thumbnailsFeature = ViewBoundFeatureWrapper<BrowserThumbnails>()
@@ -528,7 +532,7 @@ abstract class BaseBrowserFragment :
                 putExtra(HomeActivity.OPEN_TO_BROWSER, true)
             }
 
-        val readerMenuController =
+        _readerMenuController =
             DefaultReaderModeController(
                 readerViewFeature,
                 binding.readerViewControlsBar,
@@ -905,6 +909,7 @@ abstract class BaseBrowserFragment :
             getBottomToolbarHeight(
                 includeTabStripIfAvailable = customTabSessionId == null,
                 includeNavBarIfEnabled = customTabSessionId == null,
+                includeTabGroupsStrip = customTabSessionId == null,
             )
 
         downloadFeature.onDownloadStopped = { downloadState, _, downloadJobStatus ->
@@ -1120,28 +1125,28 @@ abstract class BaseBrowserFragment :
                                 requireComponents.emailMasksRepository.dismissCfr()
                             }
 
-                            override suspend fun onEmailMaskClick(generatedFor: String) =
-                                withContext(Dispatchers.IO) {
-                                    EmailMask.promptClicked.record()
+                            override suspend fun onEmailMaskClick(generatedFor: String): String? {
 
-                                    val relay = requireComponents.relayFeatureIntegration
-                                    // For this phase, we'll also use the generatedFor value for the description.
-                                    val created = relay.getOrCreateNewMask(generatedFor, generatedFor)
+                                EmailMask.promptClicked.record()
 
-                                    if (created == null) {
-                                        // Record failure telemetry
-                                        EmailMask.getOrCreateFailed.record()
-                                        // Log failure
-                                        val errorMessage = getString(R.string.email_masks_error_retrieving_masks)
+                                val relay = requireComponents.relayFeatureIntegration
+                                // For this phase, we'll also use the generatedFor value for the description.
+                                val created = relay.getOrCreateNewMask(generatedFor, generatedFor)
 
-                                        appStore.dispatch(AppAction.SnackbarAction.ShowSnackbar(errorMessage))
-                                        return@withContext null
-                                    }
+                                if (created == null) {
+                                    // Record failure telemetry
+                                    EmailMask.getOrCreateFailed.record()
+                                    // Log failure
+                                    val errorMessage = getString(R.string.email_masks_error_retrieving_masks)
 
-                                    EmailMask.autofillSuccess.record()
-
-                                    created.fullAddress
+                                    appStore.dispatch(AppAction.SnackbarAction.ShowSnackbar(errorMessage))
+                                    return null
                                 }
+
+                                EmailMask.autofillSuccess.record()
+
+                                return created.fullAddress
+                            }
                         },
                     isEmailMaskFeatureEnabled = { context.components.settings.isEmailMaskFeatureEnabled },
                     isSuggestEmailMaskEnabled = { requireComponents.emailMasksRepository.isSuggestionEnabled() },
@@ -1193,6 +1198,11 @@ abstract class BaseBrowserFragment :
                             requireContext(),
                             singleMediaPicker,
                             multipleMediaPicker,
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                AndroidPhotoPicker.allHdrCapabilities()
+                            } else {
+                                null
+                            },
                         ),
                 ),
             owner = this,
@@ -1274,7 +1284,11 @@ abstract class BaseBrowserFragment :
                             this.getTopToolbarHeight(includeTabStrip)
                         },
                         getBottomToolbarHeightValue = { includeTabStrip, includeNavBar ->
-                            this.getBottomToolbarHeight(includeTabStrip, includeNavBar)
+                            this.getBottomToolbarHeight(
+                                includeTabStripIfAvailable = includeTabStrip,
+                                includeNavBarIfEnabled = includeNavBar,
+                                includeTabGroupsStrip = includeNavBar,
+                            )
                         },
                     )
                     .apply {
@@ -1484,6 +1498,7 @@ abstract class BaseBrowserFragment :
                 customTabSessionId = customTabSessionId,
                 hideWhenKeyboardShown = true,
                 tabStripContent = { buildTabStrip(appStore, settings) },
+                tabGroupsStripContent = { buildTabGroupsStrip() },
             )
 
         // set the summarize CFR binding only for regular, non-custom tabs
@@ -1513,6 +1528,7 @@ abstract class BaseBrowserFragment :
             settings = settings,
             customTabSession = customTabSessionId?.let { store.state.findCustomTab(it) },
             tabStripContent = buildTabStrip(appStore, settings),
+            tabGroupsStripContent = buildTabGroupsStrip(),
             searchSuggestionsContent = { modifier ->
                 (awesomeBarComposable ?: buildAwesomeBar(activity, toolbarStore, modifier)).SearchSuggestions()
             },
@@ -1594,6 +1610,8 @@ abstract class BaseBrowserFragment :
             )
         }
     }
+
+    private fun buildTabGroupsStrip(): @Composable () -> Unit = { TabGroupsStrip() }
 
     private fun buildAwesomeBar(
         activity: HomeActivity,
@@ -2212,6 +2230,7 @@ abstract class BaseBrowserFragment :
             getBottomToolbarHeight(
                 includeTabStripIfAvailable = customTabSessionId == null,
                 includeNavBarIfEnabled = customTabSessionId == null,
+                includeTabGroupsStrip = customTabSessionId == null,
             )
 
         return topToolbarHeight to bottomToolbarHeight
@@ -2380,6 +2399,7 @@ abstract class BaseBrowserFragment :
             getBottomToolbarHeight(
                 includeTabStripIfAvailable = customTabSessionId == null,
                 includeNavBarIfEnabled = customTabSessionId == null,
+                includeTabGroupsStrip = customTabSessionId == null,
             )
 
         initializeEngineView(
@@ -2408,6 +2428,7 @@ abstract class BaseBrowserFragment :
         emailMaskBar = null
 
         _findInPageLauncher = null
+        _readerMenuController = null
 
         _bottomToolbarContainerView = null
         _browserToolbar = null

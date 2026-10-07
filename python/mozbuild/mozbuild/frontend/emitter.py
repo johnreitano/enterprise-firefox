@@ -28,8 +28,6 @@ from .data import (
     ChromeManifestEntry,
     ComputedFlags,
     ConfigFileSubstitution,
-    DeclaredLicensedPaths,
-    DeclaredLicenseNotice,
     Defines,
     DirectoryTraversal,
     Exports,
@@ -38,6 +36,7 @@ from .data import (
     FinalTargetFiles,
     FinalTargetPreprocessedFiles,
     GeneratedFile,
+    Headers,
     HostDefines,
     HostLibrary,
     HostProgram,
@@ -1102,7 +1101,6 @@ class TreeMetadataEmitter(LoggingMixin):
             deps = list(extra_link_deps)
             for linkable in link_targets:
                 linkable.extra_link_deps = deps
-
         # Only emit sources if we have linkables defined in the same context.
         # Note the linkables are not emitted in this function, but much later,
         # after aggregation (because of e.g. USE_LIBS processing).
@@ -1123,7 +1121,13 @@ class TreeMetadataEmitter(LoggingMixin):
         sources = defaultdict(list)
         gen_sources = defaultdict(list)
         all_flags = {}
-        for symbol in ("SOURCES", "HOST_SOURCES", "UNIFIED_SOURCES", "WASM_SOURCES"):
+        for symbol in (
+            "SOURCES",
+            "HOST_SOURCES",
+            "UNIFIED_SOURCES",
+            "WASM_SOURCES",
+            "SOURCE_HEADERS",
+        ):
             srcs = sources[symbol]
             gen_srcs = gen_sources[symbol]
             context_srcs = context.get(symbol, [])
@@ -1196,6 +1200,7 @@ class TreeMetadataEmitter(LoggingMixin):
             ".c": set(),
             ".m": set(),
             ".mm": set(),
+            ".h": set([".h", ".H", ".hh", ".hpp"]),
             ".cpp": set([".cc", ".cxx"]),
             ".S": set(),
         }
@@ -1209,9 +1214,10 @@ class TreeMetadataEmitter(LoggingMixin):
 
         # A map from moz.build variables to the canonical suffixes of file
         # kinds that can be listed therein.
-        all_suffixes = list(suffix_map.keys())
+        source_suffixes = [s for s in suffix_map.keys() if s != ".h"]
         varmap = dict(
-            SOURCES=(Sources, all_suffixes),
+            SOURCES=(Sources, source_suffixes),
+            SOURCE_HEADERS=(Headers, [".h"]),
             HOST_SOURCES=(HostSources, [".c", ".cpp"]),
             UNIFIED_SOURCES=(UnifiedSources, [".c", ".mm", ".m", ".cpp"]),
         )
@@ -1832,32 +1838,18 @@ class TreeMetadataEmitter(LoggingMixin):
                     context,
                 )
 
+        if not context.config.substs.get("COMPILE_ENVIRONMENT"):
+            return
+
         yield XPIDLModule(context, xpidl_module, context["XPIDL_SOURCES"])
 
     def _process_licenses(self, context):
-        licensed_under = context.get("LICENSED_UNDER")
-        for license_id in licensed_under or []:
-            paths = [
-                mozpath.normpath(mozpath.join(context.relsrcdir, path))
-                for path in licensed_under[license_id].paths
-            ]
-            yield DeclaredLicensedPaths(context, license_id, paths)
+        from mozbuild.licenses import from_context as licenses_from_context
 
-        for license_id in context.get("LICENSES") or []:
-            fields = context["LICENSES"][license_id]
-            try:
-                yield DeclaredLicenseNotice(
-                    context,
-                    license_id,
-                    fields.title,
-                    SourcePath(context, fields.text).full_path if fields.text else None,
-                    notice=fields.notice or None,
-                    spdx=fields.spdx or None,
-                    url=fields.url or None,
-                    paths=fields.paths or (),
-                )
-            except LicenseError as error:
-                raise SandboxValidationError(str(error), context)
+        try:
+            yield from licenses_from_context(context)
+        except LicenseError as error:
+            raise SandboxValidationError(str(error), context)
 
     def _process_generated_files(self, context):
         # The link reads whatever EXTRA_LINK_DEPS names, so a generated file

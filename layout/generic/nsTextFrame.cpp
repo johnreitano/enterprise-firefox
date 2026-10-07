@@ -36,6 +36,7 @@
 #include "mozilla/TextUtils.h"
 #include "mozilla/dom/CharacterDataBuffer.h"
 #include "mozilla/dom/PerformanceMainThread.h"
+#include "mozilla/dom/Range.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/intl/Bidi.h"
 #include "mozilla/intl/Segmenter.h"
@@ -63,7 +64,6 @@
 #include "nsLineLayout.h"
 #include "nsPlaceholderFrame.h"
 #include "nsPresContext.h"
-#include "nsRange.h"
 #include "nsRubyFrame.h"
 #include "nsSplittableFrame.h"
 #include "nsString.h"
@@ -7289,7 +7289,8 @@ bool nsTextFrame::PaintTextWithSelectionColors(
       RefPtr<ComputedStyle> selectionStyle =
           aParams.textPaintStyle->GetComputedStyleForSelectionPseudo(
               selectionTypes[index], highlightName);
-      if (selectionStyle && selectionStyle->HasAuthorSpecifiedTextShadow()) {
+      if (selectionStyle &&
+          selectionStyle->HasAuthorOrUserSpecifiedTextShadow()) {
         // text-shadow was explicitly specified (including "none")
         hasSelectionShadow = true;
         Span<const StyleSimpleShadow> shadowSpan =

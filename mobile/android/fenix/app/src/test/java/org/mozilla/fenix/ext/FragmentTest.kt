@@ -66,6 +66,7 @@ class FragmentTest {
         every { mockContext.resources.getDimensionPixelSize(R.dimen.browser_microsurvey_height) } returns 131
         every { mockContext.resources.getDimensionPixelSize(R.dimen.browser_navbar_height) } returns 60
         every { mockContext.resources.getDimensionPixelSize(R.dimen.browser_navbar_height_small) } returns 48
+        every { settings.tabGroupsStripEnabled } returns false
     }
 
     @Test
@@ -166,6 +167,18 @@ class FragmentTest {
         val bottomToolbarHeight = fragment.getBottomToolbarHeight()
 
         assertEquals(64, bottomToolbarHeight)
+    }
+
+    @Test
+    fun `GIVEN the composable toolbar and tab groups strip are shown at bottom WHEN getBottomToolbarHeight THEN returns the combined height`() {
+        every { mockContext.resources } returns testContext.resources
+        every { settings.toolbarPosition } returns ToolbarPosition.BOTTOM
+        every { settings.isTabStripEnabled } returns false
+        every { settings.tabGroupsStripEnabled } returns true
+
+        val bottomToolbarHeight = fragment.getBottomToolbarHeight()
+
+        assertEquals(112, bottomToolbarHeight)
     }
 
     @Test

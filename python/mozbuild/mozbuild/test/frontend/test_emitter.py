@@ -19,6 +19,7 @@ from mozbuild.frontend.data import (
     Exports,
     FinalTargetPreprocessedFiles,
     GeneratedFile,
+    Headers,
     HostProgram,
     HostRustLibrary,
     HostRustProgram,
@@ -2056,6 +2057,21 @@ class TestEmitterBasic(unittest.TestCase):
             set(["-DFOO", '-DBAZ="abcd"', "-UQUX", "-DBAR=7", "-DVALUE=xyz"]),
         )
 
+    def test_source_headers(self):
+        reader = self.reader("reader-source-headers")
+        objs = self.read_topsrcdir(reader)
+        headers = [
+            header for obj in objs if isinstance(obj, Headers) for header in obj.files
+        ]
+        self.assertEqual(
+            headers,
+            [
+                mozpath.join(reader.config.topsrcdir, "exported.h"),
+                mozpath.join(reader.config.topsrcdir, "header.h"),
+                mozpath.join(reader.config.topsrcdir, "installed.h"),
+            ],
+        )
+
     def test_licenses(self):
         reader = self.reader("licenses")
         objs = self.read_topsrcdir(reader)
@@ -2074,6 +2090,8 @@ class TestEmitterBasic(unittest.TestCase):
         mylib = notices["mylib"]
         self.assertEqual(mylib.notice, "Copyright 2026 Somebody.")
         self.assertEqual(mylib.paths, ["extra/path"])
+        self.assertEqual(mylib.acknowledgement, "Portions are copyright Somebody.")
+        self.assertIsNone(mit.acknowledgement)
 
         self.assertEqual([o.id for o in coverage], ["MIT"])
         self.assertEqual(coverage[0].relsrcdir, "lib")
@@ -2088,6 +2106,17 @@ class TestEmitterBasic(unittest.TestCase):
     def test_licenses_missing_text_file(self):
         reader = self.reader("licenses-missing-text-file")
         with self.assertRaisesRegex(SandboxValidationError, "does not exist"):
+            self.read_topsrcdir(reader)
+
+    def test_licenses_no_text_file_at_all(self):
+        # No `text`, and no moz.yaml above it naming one either.
+        reader = self.reader("licenses-no-text")
+        with self.assertRaisesRegex(SandboxValidationError, "requires a text file"):
+            self.read_topsrcdir(reader)
+
+    def test_licenses_declared_twice_in_one_file(self):
+        reader = self.reader("licenses-declared-twice")
+        with self.assertRaisesRegex(SandboxValidationError, "declared twice here"):
             self.read_topsrcdir(reader)
 
 

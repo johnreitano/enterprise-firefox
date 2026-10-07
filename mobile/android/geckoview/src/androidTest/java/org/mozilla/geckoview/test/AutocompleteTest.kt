@@ -51,6 +51,14 @@ class AutocompleteTest : BaseSessionTest() {
     // Controls how long a selection prompt is kept open after its field blurs.
     private val dismissDelayPref = "geckoview.autocomplete.selection_dismiss_delay_ms"
 
+    private fun waitForFill(session: GeckoSession, selector: String) {
+        session
+            .evaluatePromiseJS(
+                "new Promise(resolve => { const check = () => document.querySelector('$selector').value ? resolve() : setTimeout(check, 10); check(); })"
+            )
+            .value
+    }
+
     // This is a utility to delete previous credit card and address information.
     // Some credit card tests may not use fetched data since pop up is opened
     // before fetching it.
@@ -323,6 +331,7 @@ class AutocompleteTest : BaseSessionTest() {
         // Focus on the name input field.
         mainSession.evaluateJS("document.querySelector('#name').focus()")
         sessionRule.waitForResult(selectHandled)
+        waitForFill(mainSession, "#name")
 
         assertThat(
             "Filled name should match",
@@ -858,6 +867,7 @@ class AutocompleteTest : BaseSessionTest() {
         // Focus on the given name input field.
         mainSession.evaluateJS("document.querySelector('#givenName').focus()")
         sessionRule.waitForResult(selectHandled)
+        waitForFill(mainSession, "#streetAddress")
 
         assertThat(
             "Filled given name should match",
@@ -2092,6 +2102,9 @@ class AutocompleteTest : BaseSessionTest() {
 
         mainSession.loadTestPath(FORMS3_HTML_PATH)
         mainSession.waitForPageStop()
+        if (autofillEnabled) {
+            waitForFill(mainSession, "#pass1")
+        }
         mainSession.evaluateJS("document.querySelector('#form1').submit()")
 
         if (autofillEnabled) {
@@ -2472,6 +2485,7 @@ class AutocompleteTest : BaseSessionTest() {
         // Focus on the username input field.
         session3.evaluateJS("document.querySelector('#user1').focus()")
         sessionRule.waitForResult(selectHandled)
+        waitForFill(session3, "#user1")
 
         assertThat(
             "Filled username should match",
@@ -2749,6 +2763,7 @@ class AutocompleteTest : BaseSessionTest() {
         // Focus on the username input field.
         session3.evaluateJS("document.querySelector('#user1').focus()")
         sessionRule.waitForResult(selectHandled)
+        waitForFill(session3, "#user1")
 
         assertThat(
             "Filled username should match",
@@ -2938,6 +2953,7 @@ class AutocompleteTest : BaseSessionTest() {
         mainSession.evaluateJS("document.querySelector('#user1').value = '$user1'")
         mainSession.evaluateJS("document.querySelector('#pass1').focus()")
         sessionRule.waitForResult(selectHandled)
+        waitForFill(mainSession, "#passConfirm")
 
         assertThat(
             "Filled username should match",
@@ -3211,6 +3227,7 @@ class AutocompleteTest : BaseSessionTest() {
         // focus on username.
         mainSession.evaluateJS("document.querySelector('#user1').focus()")
         sessionRule.waitForResult(selectHandled)
+        waitForFill(mainSession, "#user1")
 
         assertThat(
             "Filled username should match",

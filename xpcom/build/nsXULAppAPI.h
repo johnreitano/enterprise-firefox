@@ -203,6 +203,7 @@ struct BootstrapConfig;
  * @note           If the binary is linked against the standalone XPCOM glue,
  *                 XPCOMGlueStartup() should be called before this method.
  */
+MOZ_CAN_RUN_SCRIPT_BOUNDARY
 int XRE_main(int argc, char* argv[], const mozilla::BootstrapConfig& aConfig);
 
 /**

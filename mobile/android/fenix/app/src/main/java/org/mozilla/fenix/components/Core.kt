@@ -10,11 +10,9 @@ import androidx.annotation.VisibleForTesting
 import androidx.core.content.ContextCompat
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import mozilla.components.browser.domains.autocomplete.BaseDomainAutocompleteProvider
 import mozilla.components.browser.domains.autocomplete.ShippedDomainsProvider
 import mozilla.components.browser.engine.gecko.GeckoEngine
@@ -419,15 +417,13 @@ class Core(
                 // Install the "icons" WebExtension to automatically load icons for every visited website.
                 icons.install(engine, this)
 
-                CoroutineScope(Dispatchers.Main).launch {
+                applicationScope.launch {
                     val providerList =
-                        withContext(Dispatchers.IO) {
-                            SerpTelemetryRepository(
-                                    collectionName = COLLECTION_NAME,
-                                    remoteSettingsService = context.components.remoteSettingsService.value,
-                                )
-                                .updateProviderList()
-                        }
+                        SerpTelemetryRepository(
+                                collectionName = COLLECTION_NAME,
+                                remoteSettingsService = context.components.remoteSettingsService.value,
+                            )
+                            .updateProviderList()
                     // Install the "ads" WebExtension to get the links in an partner page.
                     adsTelemetry.install(engine, this@apply, providerList)
                     // Install the "cookies" WebExtension and tracks user interaction with SERPs.

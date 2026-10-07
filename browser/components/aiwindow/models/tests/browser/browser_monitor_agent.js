@@ -17,7 +17,7 @@ const { MockEngineManager } = ChromeUtils.importESModule(
   "resource://testing-common/AIWindowTestUtils.sys.mjs"
 );
 
-const { MonitorAgent, NOTIFICATION_ACTIONS, NOTIFICATION_REASONS } =
+const { MonitorAgent, NOTIFICATION_ACTIONS, NOTIFICATION_TYPES } =
   ChromeUtils.importESModule(
     "moz-src:///browser/components/aiwindow/models/agents/MonitorAgent.sys.mjs"
   );
@@ -48,40 +48,6 @@ const {
 const { IntervalSchedule } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/agents/Schedule.sys.mjs"
 );
-
-const { MockRegistrar } = ChromeUtils.importESModule(
-  "resource://testing-common/MockRegistrar.sys.mjs"
-);
-
-/**
- * Replaces the platform alerts service with a mock that records shown alerts
- * and their observers, so tests can simulate action-button clicks.
- *
- * @returns {{ alerts: object[], observers: object[], cleanup: () => void }}
- */
-function mockAlertsService() {
-  const alerts = [];
-  const observers = [];
-  const service = {
-    QueryInterface: ChromeUtils.generateQI(["nsIAlertsService"]),
-    showAlert(alert, observer) {
-      alerts.push(alert);
-      observers.push(observer);
-    },
-    closeAlert() {},
-  };
-  const cid = MockRegistrar.register("@mozilla.org/alerts-service;1", service);
-  return {
-    alerts,
-    observers,
-    // Drops the creation notification so tests can count run notifications
-    reset: () => {
-      alerts.length = 0;
-      observers.length = 0;
-    },
-    cleanup: () => MockRegistrar.unregister(cid),
-  };
-}
 
 /**
  * Builds a fake nsIAlertAction that the notification observer can query, used
@@ -249,6 +215,7 @@ add_task(async function test_run_single_url_monitor() {
       1,
       "The monitor was created"
     );
+    await MonitorAgent._waitForSnapshotForTesting(monitor.id);
 
     // run the monitor now and check that the extracted page content is included in the prompt sent to the mock LLM
     const runPromise = MonitorAgent.runNow(monitor.id);
@@ -348,6 +315,7 @@ add_task(async function test_run_multiple_urls_monitor() {
       1,
       "The monitor was created"
     );
+    await MonitorAgent._waitForSnapshotForTesting(monitor.id);
 
     // run the monitor now and check that the extracted page content is included in the prompt sent to the mock LLM
     const runPromise = MonitorAgent.runNow(monitor.id);
@@ -436,6 +404,7 @@ add_task(
         [url],
         "Tell me when the widget price drops below 10 dollars."
       );
+      await MonitorAgent._waitForSnapshotForTesting(monitor.id);
       const runPromise = MonitorAgent.runNow(monitor.id);
       const { respond } = await mockEngineManager.captureRequest({
         purpose: PURPOSES.MONITOR,
@@ -952,87 +921,41 @@ add_task(async function test_createMonitor_returns_id() {
     );
 
     // Test telemetry was recorded
-    const events = Glean.smartWindow.monitorCreate.testGetValue();
-    Assert.ok(events, "monitor_create event was recorded");
-    Assert.equal(events.length, 1, "One monitor_create event was recorded");
+    const submits = Glean.smartWindow.agenticActionCreateSubmit.testGetValue();
+    Assert.equal(submits?.length, 1, "One create_submit event was recorded");
     Assert.equal(
-      events[0].extra.source,
+      submits[0].extra.source,
       "test",
-      "monitor_create event has correct source"
+      "create_submit event has correct source"
     );
     Assert.equal(
-      events[0].extra.urls,
+      submits[0].extra.urls,
       "1",
-      "monitor_create event has correct url count"
+      "create_submit event has correct url count"
+    );
+    const completes =
+      Glean.smartWindow.agenticActionCreateComplete.testGetValue();
+    Assert.equal(completes?.length, 1, "One create_complete was recorded");
+    Assert.equal(
+      completes[0].extra.success,
+      "true",
+      "create_complete event reports success"
     );
     Assert.equal(
-      events[0].extra.action_id,
+      completes[0].extra.source,
+      "test",
+      "create_complete event has correct source"
+    );
+    Assert.equal(
+      completes[0].extra.urls,
+      "1",
+      "create_complete event has correct url count"
+    );
+    Assert.equal(
+      completes[0].extra.action_id,
       id,
-      "monitor_create event carries the monitor id"
+      "create_complete event carries the monitor id"
     );
-  } finally {
-    await resetMonitorAgentForTesting();
-  }
-});
-
-add_task(async function test_limit_number_of_active_monitors() {
-  const watchUrls = Array.from(
-    { length: 2 },
-    (_, i) => `https://example.com/page${i}`
-  );
-  const createMonitor = () =>
-    MonitorAgent.createMonitor({
-      prompt: "Check if any product price is below $300.",
-      watchUrls,
-      schedule: { type: "interval", hours: 1 },
-      source: "test",
-    });
-  const activeCount = async () =>
-    (await MonitorAgent.listMonitors()).filter(m => m.enabled).length;
-  const limitError = error =>
-    error.code === MONITOR_ERROR_CODES.ACTIVE_LIMIT &&
-    error.limit === TOTAL_NUM_MONITORS &&
-    /Cannot have more than \d+ active monitors\./.test(error.message);
-
-  try {
-    await resetMonitorAgentForTesting();
-    const ids = [];
-    for (let i = 0; i < TOTAL_NUM_MONITORS; i++) {
-      ids.push(await createMonitor());
-    }
-    await Assert.rejects(
-      createMonitor(),
-      limitError,
-      `Creating past ${TOTAL_NUM_MONITORS} active monitors should be rejected`
-    );
-    Assert.equal(await activeCount(), TOTAL_NUM_MONITORS);
-
-    // Pausing a monitor frees a slot: paused monitors don't count.
-    await MonitorAgent.pauseMonitor(ids[0], true);
-    Assert.equal(await activeCount(), TOTAL_NUM_MONITORS - 1);
-    const extraId = await createMonitor();
-    Assert.equal(
-      (await MonitorAgent.listMonitors()).length,
-      TOTAL_NUM_MONITORS + 1,
-      "Paused monitors can exceed the active limit"
-    );
-    Assert.equal(await activeCount(), TOTAL_NUM_MONITORS);
-
-    // Resuming the paused monitor would exceed the active limit.
-    await Assert.rejects(
-      MonitorAgent.pauseMonitor(ids[0], false),
-      limitError,
-      "Resuming past the active limit should be rejected"
-    );
-    const paused = (await MonitorAgent.listMonitors()).find(
-      m => m.id === ids[0]
-    );
-    Assert.ok(!paused.enabled, "Rejected resume leaves the monitor paused");
-
-    // Pausing another monitor makes room to resume.
-    await MonitorAgent.pauseMonitor(extraId, true);
-    await MonitorAgent.pauseMonitor(ids[0], false);
-    Assert.equal(await activeCount(), TOTAL_NUM_MONITORS);
   } finally {
     await resetMonitorAgentForTesting();
   }
@@ -1065,6 +988,7 @@ add_task(async function test_monitor_only_watches_http_urls() {
       source: "test",
     });
     const [monitor] = await MonitorAgent.listMonitors();
+    await MonitorAgent._waitForSnapshotForTesting(monitor.id);
 
     Assert.deepEqual(
       monitor.watchUrls,
@@ -1190,14 +1114,14 @@ add_task(async function test_pauseMonitor() {
 add_task(async function test_active_and_paused_action_gauges() {
   const assertGauges = (active, paused, message) => {
     Assert.equal(
-      Glean.smartWindow.monitorActiveCount.testGetValue(),
+      Glean.smartWindow.agentActiveActions.monitor.testGetValue(),
       active,
-      `${message}: monitor_active_count`
+      `${message}: agent_active_actions`
     );
     Assert.equal(
-      Glean.smartWindow.monitorPausedCount.testGetValue(),
+      Glean.smartWindow.agentPausedActions.monitor.testGetValue(),
       paused,
-      `${message}: monitor_paused_count`
+      `${message}: agent_paused_actions`
     );
   };
 
@@ -1307,11 +1231,15 @@ async function createNotifyingMonitor(alertsMock, title = "Sneaker deal") {
 
 add_task(async function test_notification_shown_when_run_fails() {
   const alertsMock = mockAlertsService();
+  const openedUrls = [];
+  const originalOpen = MonitorAgent._openWatchedUrl;
+  MonitorAgent._openWatchedUrl = u => openedUrls.push(u);
 
   try {
     await resetMonitorAgentForTesting();
-    Services.fog.testResetFOG();
     const id = await createNotifyingMonitor(alertsMock);
+    // Creating records a display event of its own; count only the run's.
+    Services.fog.testResetFOG();
 
     const failed = TestUtils.topicObserved(
       MONITOR_RUN_FAILED_TOPIC,
@@ -1341,14 +1269,40 @@ add_task(async function test_notification_shown_when_run_fails() {
       "A failure notification carries the same actions as a match"
     );
 
-    const sendEvents = Glean.smartWindow.monitorNotificationSend.testGetValue();
-    Assert.equal(sendEvents.length, 1, "One notification send event");
+    const displayEvents =
+      Glean.smartWindow.agenticActionNotificationDisplay.testGetValue();
+    Assert.equal(displayEvents.length, 1, "One notification display event");
     Assert.equal(
-      sendEvents[0].extra.reason,
-      NOTIFICATION_REASONS.RUN_FAILED,
-      "The send is attributed to the failed check, not to a match"
+      displayEvents[0].extra.notification_type,
+      NOTIFICATION_TYPES.RUN_FAILED,
+      "The display is attributed to the failed check, not to a match"
     );
+    Assert.equal(
+      displayEvents[0].extra.outcome,
+      undefined,
+      "A failed check reports no outcome"
+    );
+
+    // Clicking the body opens the watched page, as for a match, and the close
+    // event repeats which notification it was.
+    alertsMock.observers[0].observe(null, "alertclickcallback", "");
+    Assert.deepEqual(
+      openedUrls,
+      ["https://example.com/product"],
+      "Clicking the failure notification body opens the watched URL"
+    );
+    const closeEvents =
+      Glean.smartWindow.agenticActionNotificationClose.testGetValue();
+    Assert.equal(closeEvents.length, 1, "One notification close event");
+    Assert.equal(closeEvents[0].extra.reason, "open_url");
+    Assert.equal(
+      closeEvents[0].extra.notification_type,
+      NOTIFICATION_TYPES.RUN_FAILED,
+      "The close is attributed to the failed check"
+    );
+    Assert.equal(closeEvents[0].extra.action_id, id);
   } finally {
+    MonitorAgent._openWatchedUrl = originalOpen;
     alertsMock.cleanup();
     await MonitorAgent._resetForTesting();
   }
@@ -1456,6 +1410,7 @@ add_task(async function test_notification_shown_when_condition_met() {
     });
     const { id } = (await MonitorAgent.listMonitors()).at(-1);
     alertsMock.reset();
+    Services.fog.testResetFOG(); // Drop the creation notification's events
 
     await notifyMonitor(id, {
       conditionMet: true,
@@ -1468,22 +1423,28 @@ add_task(async function test_notification_shown_when_condition_met() {
       "A desktop notification is shown when the condition is met"
     );
 
-    // Test notification send telemetry was recorded
+    // Test notification display telemetry was recorded
     const notificationEvents =
-      Glean.smartWindow.monitorNotificationSend.testGetValue();
-    Assert.ok(
-      notificationEvents,
-      "monitor_notification_send event was recorded"
-    );
+      Glean.smartWindow.agenticActionNotificationDisplay.testGetValue();
     Assert.equal(
-      notificationEvents.length,
+      notificationEvents?.length,
       1,
-      "One notification send event was recorded"
+      "One notification display event was recorded"
     );
     Assert.equal(
       notificationEvents[0].extra.action_id,
       id,
-      "Notification send event carries the monitor id"
+      "Notification display event carries the monitor id"
+    );
+    Assert.equal(
+      notificationEvents[0].extra.notification_type,
+      "condition_met",
+      "Notification display event is the condition-met notification"
+    );
+    Assert.equal(
+      notificationEvents[0].extra.outcome,
+      "true",
+      "Notification display event reports the met condition"
     );
     const alert = alertsMock.alerts[0];
     Assert.equal(
@@ -1671,20 +1632,29 @@ add_task(async function test_notification_body_click_opens_watched_url() {
       "Clicking the notification body opens the watched URL"
     );
 
-    // Test notification click telemetry was recorded
+    // Test notification close telemetry was recorded
     const clickEvents =
-      Glean.smartWindow.monitorNotificationClick.testGetValue();
-    Assert.ok(clickEvents, "Notification click events were recorded");
-    Assert.equal(clickEvents.length, 1, "One click event was recorded");
+      Glean.smartWindow.agenticActionNotificationClose.testGetValue();
+    Assert.equal(clickEvents?.length, 1, "One close event was recorded");
     Assert.equal(
-      clickEvents[0].extra.click_type,
+      clickEvents[0].extra.reason,
       "open_url",
-      "Click type is open_url"
+      "Close reason is open_url"
+    );
+    Assert.equal(
+      clickEvents[0].extra.notification_type,
+      "condition_met",
+      "Close event is for the condition-met notification"
+    );
+    Assert.equal(
+      clickEvents[0].extra.outcome,
+      "true",
+      "Close event reports the met condition"
     );
     Assert.equal(
       clickEvents[0].extra.action_id,
       id,
-      "Notification click event carries the monitor id"
+      "Notification close event carries the monitor id"
     );
   } finally {
     MonitorAgent._openWatchedUrl = originalOpen;
@@ -1729,15 +1699,14 @@ add_task(async function test_notification_snooze_action_defers_next_run() {
     const monitor = (await MonitorAgent.listMonitors()).find(m => m.id === id);
     Assert.ok(monitor.enabled, "Snoozed monitor stays enabled");
 
-    // Test notification click telemetry was recorded for snooze
+    // Test notification close telemetry was recorded for snooze
     const clickEvents =
-      Glean.smartWindow.monitorNotificationClick.testGetValue();
-    Assert.ok(clickEvents, "Notification click events were recorded");
-    Assert.equal(clickEvents.length, 1, "One click event was recorded");
+      Glean.smartWindow.agenticActionNotificationClose.testGetValue();
+    Assert.equal(clickEvents?.length, 1, "One close event was recorded");
     Assert.equal(
-      clickEvents[0].extra.click_type,
+      clickEvents[0].extra.reason,
       "snooze",
-      "Click type is snooze"
+      "Close reason is snooze"
     );
   } finally {
     alertsMock.cleanup();
@@ -1828,15 +1797,14 @@ add_task(async function test_notification_dismiss_action_mutes_notifications() {
     const monitor = (await MonitorAgent.listMonitors()).find(m => m.id === id);
     Assert.ok(monitor.enabled, "Dismissed monitor keeps running");
 
-    // Test notification click telemetry was recorded for dismiss
+    // Test notification close telemetry was recorded for dismiss
     const clickEvents =
-      Glean.smartWindow.monitorNotificationClick.testGetValue();
-    Assert.ok(clickEvents, "Notification click events were recorded");
-    Assert.equal(clickEvents.length, 1, "One click event was recorded");
+      Glean.smartWindow.agenticActionNotificationClose.testGetValue();
+    Assert.equal(clickEvents?.length, 1, "One close event was recorded");
     Assert.equal(
-      clickEvents[0].extra.click_type,
+      clickEvents[0].extra.reason,
       "dismiss",
-      "Click type is dismiss"
+      "Close reason is dismiss"
     );
 
     await notifyMonitor(id, { conditionMet: true });
@@ -1871,14 +1839,12 @@ add_task(
 
     try {
       await resetMonitorAgentForTesting();
-      await createMonitorWatching([url], "Tell me when the price drops.");
-
-      // the capture runs in the background after creation, poll the store so
-      // both the capture and its persistence are covered
-      const stored = await TestUtils.waitForCondition(async () => {
-        const [record] = await MonitorStore.listMonitors();
-        return record?.initialSnapshot ?? null;
-      }, "The initial snapshot is captured and persisted after creation");
+      const { id } = await createMonitorWatching(
+        [url],
+        "Tell me when the price drops."
+      );
+      await MonitorAgent._waitForSnapshotForTesting(id);
+      const [{ initialSnapshot: stored }] = await MonitorStore.listMonitors();
 
       Assert.ok(
         stored.pageContent.includes("The price is $299"),
@@ -1942,10 +1908,7 @@ add_task(async function test_initial_snapshot_refresh_on_definition_edit() {
       "Tell me when the price drops."
     );
 
-    const firstSnapshot = await TestUtils.waitForCondition(async () => {
-      const [record] = await MonitorStore.listMonitors();
-      return record?.initialSnapshot ?? null;
-    }, "The initial snapshot is captured after creation");
+    const firstSnapshot = await MonitorAgent._waitForSnapshotForTesting(id);
     Assert.ok(
       firstSnapshot.pageContent.includes("The price is $299"),
       "The initial snapshot is the first page's content"
@@ -1967,13 +1930,12 @@ add_task(async function test_initial_snapshot_refresh_on_definition_edit() {
       title: "New title",
       monitorPrompt: "Tell me when the price drops below $200.",
     });
-    const editSnapshot = await TestUtils.waitForCondition(async () => {
-      const [record] = await MonitorStore.listMonitors();
-      return record?.initialSnapshot &&
-        record.initialSnapshot.capturedAt !== firstSnapshot.capturedAt
-        ? record.initialSnapshot
-        : null;
-    }, "A title/prompt edit re-captures the snapshot");
+    const editSnapshot = await MonitorAgent._waitForSnapshotForTesting(id);
+    Assert.notEqual(
+      editSnapshot.capturedAt,
+      firstSnapshot.capturedAt,
+      "A title/prompt edit replaces the snapshot"
+    );
     Assert.ok(
       editSnapshot.pageContent.includes("The price is $299"),
       "The edit-time snapshot is of the same, unchanged watch URL"
@@ -1981,12 +1943,7 @@ add_task(async function test_initial_snapshot_refresh_on_definition_edit() {
 
     // changing the watch URLs invalidates and re-captures the snapshot
     await MonitorAgent.updateMonitor(id, { watchUrls: [url2] });
-    const secondSnapshot = await TestUtils.waitForCondition(async () => {
-      const [record] = await MonitorStore.listMonitors();
-      return record?.initialSnapshot?.pageContent.includes("The price is $399")
-        ? record.initialSnapshot
-        : null;
-    }, "The snapshot is re-captured for the new watch URL");
+    const secondSnapshot = await MonitorAgent._waitForSnapshotForTesting(id);
     Assert.ok(
       !secondSnapshot.pageContent.includes("The price is $299"),
       "The re-captured snapshot no longer contains the old page's content"
@@ -2030,12 +1987,7 @@ add_task(async function test_mid_capture_url_edit_cancels_stale_snapshot() {
     // edit the watch URLs while the first capture is still hanging
     await MonitorAgent.updateMonitor(id, { watchUrls: [editedUrl] });
 
-    const snapshot = await TestUtils.waitForCondition(async () => {
-      const [record] = await MonitorStore.listMonitors();
-      return record?.initialSnapshot?.pageContent.includes("The price is $399")
-        ? record.initialSnapshot
-        : null;
-    }, "The snapshot captured after the edit is of the new watch URL");
+    const snapshot = await MonitorAgent._waitForSnapshotForTesting(id);
 
     // release the stalled request; the canceled first capture must not
     // replace the baseline that belongs to the edited URLs
@@ -2181,10 +2133,28 @@ add_task(async function test_notification_shown_once_on_create() {
       0,
       "Creation notification has no snooze or dismiss actions"
     );
+    const displayEvents =
+      Glean.smartWindow.agenticActionNotificationDisplay.testGetValue();
+    Assert.equal(displayEvents?.length, 1, "Creation records one display");
     Assert.equal(
-      Glean.smartWindow.monitorNotificationSend.testGetValue(),
+      displayEvents[0].extra.notification_type,
+      "created",
+      "The display event is the creation notification"
+    );
+    Assert.equal(
+      displayEvents[0].extra.action_id,
+      id,
+      "The display event carries the monitor id"
+    );
+    Assert.equal(
+      displayEvents[0].extra.execution_seq,
+      "0",
+      "No run has happened at creation time"
+    );
+    Assert.equal(
+      displayEvents[0].extra.outcome,
       undefined,
-      "Creation does not record the condition-met notification event"
+      "The creation notification reports no outcome"
     );
 
     await MonitorAgent.updateMonitor(id, {
@@ -2214,6 +2184,11 @@ add_task(async function test_notification_shown_once_on_create() {
       1,
       "Restoring monitors on startup does not notify again"
     );
+    Assert.equal(
+      Glean.smartWindow.agenticActionNotificationDisplay.testGetValue().length,
+      1,
+      "Edits, pauses and restarts record no further display events"
+    );
   } finally {
     alertsMock.cleanup();
     await MonitorAgent._resetForTesting();
@@ -2229,7 +2204,8 @@ add_task(async function test_creation_notification_click_opens_tasks_page() {
 
   try {
     await resetMonitorAgentForTesting();
-    await MonitorAgent.createMonitor({
+    Services.fog.testResetFOG();
+    const id = await MonitorAgent.createMonitor({
       prompt: "Check if the product price is below $300.",
       watchUrls: ["https://example.com/product"],
       pageTitle: "Sneaker deal",
@@ -2248,6 +2224,29 @@ add_task(async function test_creation_notification_click_opens_tasks_page() {
       openedUrls,
       ["about:smartwindowtasks"],
       "Clicking the creation notification opens the tasks page"
+    );
+    const closeEvents =
+      Glean.smartWindow.agenticActionNotificationClose.testGetValue();
+    Assert.equal(closeEvents?.length, 1, "The click records one close event");
+    Assert.equal(
+      closeEvents[0].extra.reason,
+      "open_tasks",
+      "The close reason is open_tasks"
+    );
+    Assert.equal(
+      closeEvents[0].extra.notification_type,
+      "created",
+      "The close event is for the creation notification"
+    );
+    Assert.equal(
+      closeEvents[0].extra.action_id,
+      id,
+      "The close event carries the monitor id"
+    );
+    Assert.equal(
+      closeEvents[0].extra.outcome,
+      undefined,
+      "The creation notification close reports no outcome"
     );
   } finally {
     MonitorAgent._openWatchedUrl = originalOpen;
@@ -2331,10 +2330,12 @@ add_task(async function test_expired_monitor_is_paused_on_startup_restore() {
       !Number.isNaN(Date.parse(monitor.expiry.expiredAt)),
       "The expiry carries a valid timestamp"
     );
+    const pauseEvents = Glean.smartWindow.agenticActionPause.testGetValue();
+    Assert.equal(pauseEvents?.length, 1, "Expiring records a pause event");
     Assert.equal(
-      Glean.smartWindow.monitorDisable.testGetValue()?.length,
-      1,
-      "Expiring records a monitor_disable event"
+      pauseEvents[0].extra.reason,
+      "no_match",
+      "The pause carries the expiry reason"
     );
 
     Assert.equal(alertsMock.alerts.length, 1, "The user is notified once");
@@ -2391,12 +2392,12 @@ add_task(async function test_expired_monitor_is_paused_on_startup_restore() {
       "Resuming restarts the active period from now"
     );
     const clickEvents =
-      Glean.smartWindow.monitorNotificationClick.testGetValue();
+      Glean.smartWindow.agenticActionNotificationClose.testGetValue();
     Assert.equal(clickEvents?.length, 1, "One click event was recorded");
-    Assert.equal(clickEvents[0].extra.click_type, "resume");
+    Assert.equal(clickEvents[0].extra.reason, "resume");
     Assert.equal(
-      clickEvents[0].extra.reason,
-      NOTIFICATION_REASONS.EXPIRED,
+      clickEvents[0].extra.notification_type,
+      NOTIFICATION_TYPES.EXPIRED,
       "The click is attributed to the monitor pausing itself"
     );
 

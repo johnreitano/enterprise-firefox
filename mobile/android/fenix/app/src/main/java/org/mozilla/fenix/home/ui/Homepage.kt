@@ -70,7 +70,6 @@ import org.mozilla.fenix.home.collections.migration.CollectionsMigrationCardActi
 import org.mozilla.fenix.home.collections.migration.CollectionsMigrationCardAction.ViewTabGroupsClicked
 import org.mozilla.fenix.home.fake.FakeHomepagePreview
 import org.mozilla.fenix.home.interactor.HomepageInteractor
-import org.mozilla.fenix.home.pocket.ui.PocketSection
 import org.mozilla.fenix.home.recentsyncedtabs.view.RecentSyncedTab
 import org.mozilla.fenix.home.recenttabs.RecentTab
 import org.mozilla.fenix.home.recenttabs.interactor.RecentTabInteractor
@@ -181,7 +180,9 @@ internal fun Homepage(
                 is HeaderState.Normal -> {
                     HomepageHeader(
                         browsingMode = state.browsingMode,
+                        showStoriesButton = headerState.showStoriesButton,
                         browsingModeChanged = browsingModeChanged,
+                        onStoriesTapped = { interactor.onDiscoverMoreClicked() },
                     )
                 }
             }
@@ -299,22 +300,6 @@ internal fun Homepage(
                                 interactor = interactor,
                                 onCollectionsMigrationCardAction = onCollectionsMigrationCardAction,
                             )
-
-                            if (pocketState != null) {
-                                Spacer(
-                                    modifier =
-                                        if (isMinimalLayout()) {
-                                            Modifier.weight(1f)
-                                        } else {
-                                            Modifier.padding(top = 72.dp)
-                                        }
-                                )
-
-                                PocketSection(
-                                    state = pocketState,
-                                    interactor = interactor,
-                                )
-                            }
 
                             Spacer(Modifier.height(bottomPadding.dp))
 
@@ -635,12 +620,11 @@ private fun HomepagePreview() {
                         bookmarks = FakeHomepagePreview.bookmarks(),
                         recentlyVisited = FakeHomepagePreview.recentHistory(),
                         collectionsState = CollectionsState.Gone,
-                        pocketState = FakeHomepagePreview.pocketState(),
                         showPrivacyReport = true,
                         longfoxEnabled = false,
                         showLongfoxAnimation = false,
                         trackersBlockedCount = 754,
-                        headerState = HeaderState.Normal,
+                        headerState = HeaderState.Normal(showStoriesButton = true),
                         middleSearchState = MiddleSearchState(searchBarVisible = true, searchBarEnabled = false),
                         firstFrameDrawn = true,
                         setupChecklistState = null,
@@ -678,12 +662,11 @@ private fun HomepageBannerPreview() {
                         bookmarks = FakeHomepagePreview.bookmarks(),
                         recentlyVisited = FakeHomepagePreview.recentHistory(),
                         collectionsState = CollectionsState.Gone,
-                        pocketState = FakeHomepagePreview.pocketState(),
                         showPrivacyReport = true,
                         longfoxEnabled = false,
                         showLongfoxAnimation = false,
                         trackersBlockedCount = 754,
-                        headerState = HeaderState.Normal,
+                        headerState = HeaderState.Normal(showStoriesButton = true),
                         middleSearchState = MiddleSearchState(searchBarVisible = true, searchBarEnabled = false),
                         firstFrameDrawn = true,
                         setupChecklistState = null,
@@ -712,12 +695,11 @@ private fun HomepagePreviewCollections() {
                         nimbusMessage = null,
                         recentlyVisited = FakeHomepagePreview.recentHistory(),
                         collectionsState = FakeHomepagePreview.collectionState(),
-                        pocketState = FakeHomepagePreview.pocketState(),
                         showPrivacyReport = true,
                         longfoxEnabled = false,
                         showLongfoxAnimation = false,
                         trackersBlockedCount = 754,
-                        headerState = HeaderState.Normal,
+                        headerState = HeaderState.Normal(showStoriesButton = true),
                         middleSearchState = MiddleSearchState(searchBarVisible = true, searchBarEnabled = false),
                         firstFrameDrawn = true,
                         setupChecklistState = null,
@@ -746,12 +728,11 @@ private fun HomepageCollectionsMigrationCardPreview() {
                         nimbusMessage = null,
                         recentlyVisited = FakeHomepagePreview.recentHistory(),
                         collectionsState = CollectionsState.MigrationCard,
-                        pocketState = FakeHomepagePreview.pocketState(),
                         showPrivacyReport = true,
                         longfoxEnabled = false,
                         showLongfoxAnimation = false,
                         trackersBlockedCount = 754,
-                        headerState = HeaderState.Normal,
+                        headerState = HeaderState.Normal(showStoriesButton = true),
                         middleSearchState = MiddleSearchState(searchBarVisible = true, searchBarEnabled = false),
                         firstFrameDrawn = true,
                         setupChecklistState = null,
@@ -784,12 +765,11 @@ private fun MinimalHomepagePreview() {
                                 colors = TopSiteColors.colors(),
                             ),
                         collectionsState = CollectionsState.Gone,
-                        pocketState = FakeHomepagePreview.pocketState(),
                         showPrivacyReport = true,
                         longfoxEnabled = false,
                         showLongfoxAnimation = false,
                         trackersBlockedCount = 754,
-                        headerState = HeaderState.Normal,
+                        headerState = HeaderState.Normal(showStoriesButton = true),
                         firstFrameDrawn = true,
                         setupChecklistState = null,
                         isSearchInProgress = false,
@@ -812,7 +792,7 @@ private fun PrivateHomepagePreview() {
         Homepage(
             state =
                 HomepageState.Private(
-                    headerState = HeaderState.Normal,
+                    headerState = HeaderState.Normal(showStoriesButton = true),
                     firstFrameDrawn = true,
                     isSearchInProgress = false,
                 ),

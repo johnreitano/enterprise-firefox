@@ -11,7 +11,7 @@
  */
 
 import UrlbarPrefs from "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs";
-import * as UrlbarContentUtils from "chrome://browser/content/urlbar/UrlbarContentUtils.mjs";
+import { UrlbarContentUtils } from "chrome://browser/content/urlbar/UrlbarContentUtils.mjs";
 import { UrlbarShared } from "chrome://browser/content/urlbar/UrlbarShared.mjs";
 
 const lazy = typeof ChromeUtils != "undefined" ? {} : null;
@@ -138,6 +138,12 @@ export class SearchModeSwitcher {
       panel.classList.add("searchmode-switcher-panel", "toolbar-menupopup");
       this.#panelList.replaceWith(panel);
       panel.appendChild(this.#panelList);
+    }
+
+    if (!UrlbarShared.keywordEnabled(this.#input.sapName)) {
+      // Show the keyword disabled icon immediately. For keyword enabled,
+      // the icon is updated by the input once the engine store is initialized.
+      this.updateSearchIcon();
     }
   }
 
@@ -599,7 +605,10 @@ export class SearchModeSwitcher {
       if (browser != this.#input.window.gBrowser?.selectedBrowser) {
         return;
       }
-      let show = count < MAX_ADD_ENGINES_BADGE_SHOWN;
+      // Don't hide already shown badges.
+      let show =
+        this.#countedBadgeFor.get(browser) == spec ||
+        count < MAX_ADD_ENGINES_BADGE_SHOWN;
       this.#button.toggleAttribute("addengines", show);
       if (show) {
         this.#countBadgeShown(browser, spec, count);
@@ -657,14 +666,19 @@ export class SearchModeSwitcher {
    * Update the icon shown in the urlbar.
    *
    * @param {object} [options]
-   * @param [options.searchModeChanged]
+   * @param {boolean} [options.searchModeChanged]
    *        Optional flag to note whether the icon is being updated due
    *        the search mode being changed.
    */
-
   async updateSearchIcon(options = {}) {
+    let { source, engineName } = this.#input.searchMode ?? {};
     let { label, icon, wordmark } = await this.#getSearchIcon(options);
-    if (!icon) {
+    let searchMode = this.#input.searchMode;
+    if (
+      !icon ||
+      source != searchMode?.source ||
+      engineName != searchMode?.engineName
+    ) {
       return;
     }
     if (wordmark) {
@@ -728,12 +742,6 @@ export class SearchModeSwitcher {
 
   async #getSearchIcon({ searchModeChanged = false }) {
     let searchMode = this.#input.searchMode;
-
-    try {
-      await this.#input.controller.engineStore.init();
-    } catch {
-      // Search service failed but we continue anyways.
-    }
 
     if (!UrlbarShared.keywordEnabled(this.#input.sapName) && !searchMode) {
       return { icon: SearchModeSwitcher.ICON_GLOBE };
@@ -800,6 +808,12 @@ export class SearchModeSwitcher {
 
   async #getDisplayedEngineDetails(searchMode = null) {
     if (!searchMode || searchMode.engineName) {
+      try {
+        await this.#input.controller.engineStore.init();
+      } catch {
+        return { label: null, icon: SearchModeSwitcher.ICON_GLASS };
+      }
+
       let engine = searchMode
         ? this.#input.controller.engineStore.getEngineByName(
             searchMode.engineName

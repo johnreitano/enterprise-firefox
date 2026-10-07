@@ -59,6 +59,7 @@
 #include "nsError.h"
 #include "nsFocusManager.h"
 #include "nsFrameManager.h"
+#include "nsGlobalWindowInner.h"
 #include "nsGlobalWindowOuter.h"
 #include "nsIDocShell.h"
 #include "nsIFrame.h"
@@ -1178,6 +1179,15 @@ nsDOMWindowUtils::ForceUpdateNativeMenuAt(const nsAString& indexString) {
   if (!widget) return NS_ERROR_FAILURE;
 
   return widget->ForceUpdateNativeMenuAt(indexString);
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::GetNativeMenuItemKeyEquivalent(const nsAString& aElementId,
+                                                 nsAString& aResult) {
+  nsCOMPtr<nsIWidget> widget = GetWidget();
+  if (!widget) return NS_ERROR_FAILURE;
+
+  return widget->GetNativeMenuItemKeyEquivalent(aElementId, aResult);
 }
 
 NS_IMETHODIMP
@@ -2783,6 +2793,12 @@ nsDOMWindowUtils::GetIsTestControllingRefreshes(bool* aResult) {
   *aResult =
       pc ? pc->RefreshDriver()->IsTestControllingRefreshesEnabled() : false;
 
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::GetIsMouseDown(bool* aResult) {
+  *aResult = nsGlobalWindowInner::sMouseDown;
   return NS_OK;
 }
 

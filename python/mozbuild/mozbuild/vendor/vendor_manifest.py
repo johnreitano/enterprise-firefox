@@ -29,7 +29,7 @@ from mozbuild.vendor.rewrite_mozbuild import (
 )
 
 DEFAULT_EXCLUDE_FILES = [".git*", ".git*/**", "**/.cvsignore"]
-DEFAULT_KEEP_FILES = ["**/moz.build", "**/moz.yaml"]
+DEFAULT_KEEP_FILES = ["**/moz.build", "**/moz.yaml", "**/LICENSE-NOTICE.txt"]
 DEFAULT_INCLUDE_FILES = []
 
 

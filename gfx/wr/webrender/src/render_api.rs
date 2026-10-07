@@ -362,7 +362,10 @@ impl Transaction {
         &mut self,
         device_rect: DeviceIntRect,
     ) {
-        window_size_sanity_check(device_rect.size());
+        let device_rect = DeviceIntRect::from_origin_and_size(
+            device_rect.min,
+            clamp_window_size(device_rect.size()),
+        );
         self.scene_ops.push(
             SceneMsg::SetDocumentView {
                 device_rect,
@@ -988,8 +991,6 @@ pub enum DebugCommand {
     StopCaptureSequence,
     /// Clear cached resources, forcing them to be re-uploaded from templates.
     ClearCaches(ClearCache),
-    /// Enable/disable native compositor usage
-    EnableNativeCompositor(bool),
     /// Sets the maximum amount of existing batches to visit before creating a new one.
     SetBatchingLookback(u32),
     /// Causes the scene builder to pause for a given amount of milliseconds each time it
@@ -1296,7 +1297,7 @@ impl RenderApi {
     pub fn add_document_with_id(&self,
                                 initial_size: DeviceIntSize,
                                 id: u32) -> DocumentId {
-        window_size_sanity_check(initial_size);
+        let initial_size = clamp_window_size(initial_size);
 
         let document_id = DocumentId::new(self.namespace_id, id);
 
@@ -1661,13 +1662,17 @@ impl Drop for RenderApi {
 }
 
 
-fn window_size_sanity_check(size: DeviceIntSize) {
+fn clamp_window_size(size: DeviceIntSize) -> DeviceIntSize {
     // Anything bigger than this will crash later when attempting to create
     // a render task.
     use crate::api::MAX_RENDER_TASK_SIZE;
     if size.width > MAX_RENDER_TASK_SIZE || size.height > MAX_RENDER_TASK_SIZE {
-        panic!("Attempting to create a {}x{} window/document", size.width, size.height);
+        warn!("Clamping a {}x{} window/document", size.width, size.height);
     }
+    DeviceIntSize::new(
+        size.width.min(MAX_RENDER_TASK_SIZE),
+        size.height.min(MAX_RENDER_TASK_SIZE),
+    )
 }
 
 /// Collection of heap sizes, in bytes.
@@ -1762,5 +1767,23 @@ mod tests {
         let mut msg = txn.finalize(DocumentId::new(namespace, 0));
         resources.update(&mut msg);
         assert!(msg.blob_requests.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod window_size_tests {
+    use super::*;
+    use crate::api::MAX_RENDER_TASK_SIZE;
+
+    #[test]
+    fn clamp_oversized_window() {
+        assert_eq!(
+            clamp_window_size(DeviceIntSize::new(470287, 29)),
+            DeviceIntSize::new(MAX_RENDER_TASK_SIZE, 29),
+        );
+        assert_eq!(
+            clamp_window_size(DeviceIntSize::new(1024, 768)),
+            DeviceIntSize::new(1024, 768),
+        );
     }
 }

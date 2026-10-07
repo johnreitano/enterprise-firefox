@@ -69,7 +69,7 @@ impl FeltIpcClient {
 
     pub fn send_felt_ready(&self) {
         trace!("FeltIpcClient::send_felt_ready()");
-        let msg = FeltMessage::FeltReady;
+        let msg = FeltMessage::FeltReady(std::process::id());
         if let Some(tx) = &self.tx {
             match tx.send(msg) {
                 Ok(()) => trace!("FeltIpcClient::send_felt_ready() SENT"),
@@ -96,6 +96,23 @@ impl FeltIpcClient {
                 Ok(()) => NS_OK,
                 Err(err) => {
                     trace!("FeltIpcClient::request_update_check() TX ERROR: {}", err);
+                    NS_ERROR_CONNECTION_REFUSED
+                }
+            },
+            None => NS_ERROR_NOT_CONNECTED,
+        }
+    }
+
+    pub fn notify_crash_lock_intent(&self, lock_intent: bool) -> nsresult {
+        trace!("FeltIpcClient::notify_crash_lock_intent({})", lock_intent);
+        match &self.tx {
+            Some(tx) => match tx.send(FeltMessage::CrashLockIntent(lock_intent)) {
+                Ok(()) => NS_OK,
+                Err(err) => {
+                    trace!(
+                        "FeltIpcClient::notify_crash_lock_intent() TX ERROR: {}",
+                        err
+                    );
                     NS_ERROR_CONNECTION_REFUSED
                 }
             },
@@ -500,6 +517,12 @@ impl FeltClientThread {
     pub fn request_update_check(&self) -> nsresult {
         trace!("FeltClientThread::request_update_check()");
         self.ipc_client.borrow().request_update_check()
+    }
+
+    pub fn notify_crash_lock_intent(&self, lock_intent: bool) -> nsresult {
+        trace!("FeltClientThread::notify_crash_lock_intent({})", lock_intent);
+        let client = self.ipc_client.borrow();
+        client.notify_crash_lock_intent(lock_intent)
     }
 
     pub fn notify_refresh_tokens(&self) {

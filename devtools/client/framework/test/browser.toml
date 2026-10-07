@@ -265,6 +265,8 @@ disabled = "Bug 962258"
 
 ["browser_toolbox_server_error.js"]
 
+["browser_toolbox_settings_redesign_enabled.js"]
+
 ["browser_toolbox_show_toolbox_tool_ready.js"]
 
 ["browser_toolbox_split_console.js"]
