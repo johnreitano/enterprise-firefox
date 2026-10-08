@@ -3808,9 +3808,8 @@ const PinnableSitesList = ({
     ...prev,
     [id]: state
   }));
-  const handlePin = async (event, item) => {
+  const handlePin = async (event, item, position) => {
     setItemState(item.id, PENDING);
-    MultiStageUtils.sendActionTelemetry(messageId, item.id, "CLICK_BUTTON");
     const result = await handleAction(event, {
       type: "PIN_TASKBAR_TAB",
       needsAwait: true,
@@ -3829,7 +3828,9 @@ const PinnableSitesList = ({
       pinResultLabel = "failure";
     }
     MultiStageUtils.sendActionTelemetry(messageId, item.id, "PIN_SITE", {
-      result: pinResultLabel
+      result: pinResultLabel,
+      position,
+      personalized: !!item.personalized
     });
 
     // Re-enable the button only on explicit failure so the user can retry.
@@ -3843,7 +3844,7 @@ const PinnableSitesList = ({
   };
   return /*#__PURE__*/external_React_default().createElement("ul", {
     className: `pinnable-sites-list${alwaysShow ? " always-visible" : ""}`
-  }, items.map(item => {
+  }, items.map((item, index) => {
     const nameId = `pinnable-site-name-${item.id}`;
     const state = itemStates[item.id] ?? IDLE;
     const isPendingOrPinned = state === PENDING || state === PINNED;
@@ -3867,8 +3868,9 @@ const PinnableSitesList = ({
       className: "pinnable-sites-description"
     }))), /*#__PURE__*/external_React_default().createElement("button", {
       className: "pinnable-sites-pin-button primary",
+      value: item.id,
       disabled: isPendingOrPinned,
-      onClick: e => handlePin(e, item),
+      onClick: e => handlePin(e, item, index + 1),
       "aria-describedby": nameId
     }, pinButtonLabel && /*#__PURE__*/external_React_default().createElement(Localized, {
       text: pinButtonLabel
@@ -3955,6 +3957,21 @@ function ContentTiles_extends() { return ContentTiles_extends = Object.assign ? 
 const HEADER_STYLES = ["backgroundColor", "border", "padding", "margin", "width", "height"];
 const ContentTiles_TILE_STYLES = ["border", "borderRadius", "marginBlock", "marginInline", "paddingBlock", "paddingInline"];
 const CONTAINER_STYLES = ["padding", "margin", "marginBlock", "marginInline", "paddingBlock", "paddingInline", "flexDirection", "flexWrap", "flexFlow", "flexGrow", "flexShrink", "justifyContent", "alignItems", "gap"];
+
+/**
+ * @param {object|object[]} tiles - The tiles of the screen being shown.
+ * @returns {object} Impression context, if any.
+ */
+function getTileImpressionContext(tiles) {
+  const pinnableSites = (Array.isArray(tiles) ? tiles : [tiles]).find(tile => tile?.type === "pinnable_sites" && Array.isArray(tile.data));
+  if (!pinnableSites) {
+    return {};
+  }
+  return {
+    total_sites: pinnableSites.data.length,
+    personalized_sites: pinnableSites.data.filter(item => item?.personalized).length
+  };
+}
 const ContentTiles = props => {
   const {
     content
@@ -5771,6 +5788,7 @@ function addUtmParams(url, utmTerm) {
 
 
 
+
 // Amount of milliseconds for all transitions to complete (including delays).
 const TRANSITION_OUT_TIME = 1000;
 // Keep in sync with --card-stack-duration in _multistage.scss.
@@ -5838,7 +5856,8 @@ const MultiStageAboutWelcome = props => {
             screen_family: props.message_id,
             screen_index: order,
             screen_id: screen.id,
-            screen_initials: screenInitials
+            screen_initials: screenInitials,
+            ...getTileImpressionContext(screen.content?.tiles)
           });
 
           // Impression actions should be fired before recording the

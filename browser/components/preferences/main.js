@@ -122,6 +122,7 @@ Preferences.addAll([
   { id: "browser.ai.control.speechRecognition", type: "string" },
   { id: "browser.ai.control.sidebarChatbot", type: "string" },
   { id: "browser.ai.control.smartWindow", type: "string" },
+  { id: "browser.ml.chat.provider", type: "string" },
 
   // Update
   { id: "browser.preferences.advanced.selectedTabIndex", type: "int" },
@@ -455,6 +456,10 @@ Preferences.addSetting({
 Preferences.addSetting({
   id: "aiControlSmartWindow",
   pref: "browser.ai.control.smartWindow",
+});
+Preferences.addSetting({
+  id: "chatbotProvider",
+  pref: "browser.ml.chat.provider",
 });
 
 function createDefaultBrowserConfig({

@@ -22,7 +22,9 @@
 #include "mozilla/widget/DMABufSurface.h"
 #include "nsGtkUtils.h"
 #include "nsRegion.h"
-#include "nsWaylandDisplay.h"
+#ifdef MOZ_WAYLAND
+#  include "nsWaylandDisplay.h"
+#endif
 
 using namespace mozilla;
 using namespace mozilla::wr;
@@ -51,6 +53,7 @@ void* SHMBufSurface::GetImageData() {
   if (mBuffer) {
     return mBuffer;
   }
+#ifdef MOZ_WAYLAND
   if (!mShm) {
     mShm = mShmHandle.Map();
     if (!mShm) {
@@ -59,6 +62,9 @@ void* SHMBufSurface::GetImageData() {
     }
   }
   return mShm.Address();
+#else
+  return nullptr;
+#endif
 }
 
 SHMBufSurface::SHMBufSurface() {
@@ -151,6 +157,7 @@ SHMBufSurfaceRGBA::SHMBufSurfaceRGBA() {
 
 bool SHMBufSurfaceRGBA::CreateImpl(const IntSize& aSize,
                                    int32_t aFOURCCFormat) {
+#ifdef MOZ_WAYLAND
   nsWaylandDisplay* waylandDisplay = WaylandDisplayGet();
   if (!waylandDisplay->GetShm()) {
     NS_WARNING("SHMBufSurfaceRGBA: Missing Wayland shm interface!");
@@ -177,6 +184,9 @@ bool SHMBufSurfaceRGBA::CreateImpl(const IntSize& aSize,
   LOGDMABUF("SHMBufSurfaceRGBA::Create() size [%d x %d] format %x", GetWidth(),
             GetHeight(), mFOURCCFormat);
   return true;
+#else
+  return false;
+#endif
 }
 
 bool SHMBufSurfaceRGBA::CreateImpl(

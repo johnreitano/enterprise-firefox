@@ -110,7 +110,7 @@ class _TabGroupState {
    *
    * @param {MozTabbrowserTabGroup} tabGroup
    * @param {string} sourceWindowId
-   *   `window.__SSi` window ID of the open window where the tab group is closing.
+   *   SessionStore ID of the open window where the tab group is closing.
    * @returns {ClosedTabGroupStateData}
    */
   closed(tabGroup, sourceWindowId) {
@@ -132,7 +132,7 @@ class _TabGroupState {
    *
    * @param {MozTabbrowserTabGroup} tabGroup
    * @param {string} sourceWindowId
-   *   `window.__SSi` window ID of the open window where the tab group
+   *   SessionStore ID of the open window where the tab group
    *   is being saved.
    * @returns {SavedTabGroupStateData}
    */

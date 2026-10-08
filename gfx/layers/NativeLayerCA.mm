@@ -1383,6 +1383,7 @@ NativeLayerCARepresentation::NativeLayerCARepresentation()
 NativeLayerCARepresentation::~NativeLayerCARepresentation() {
   [mContentCALayer release];
   [mOpaquenessTintLayer release];
+  [mProtectedBackingLayer release];
   [mWrappingCALayer release];
   [mRoundedClipCALayer release];
 }
@@ -1763,6 +1764,8 @@ bool NativeLayerCARepresentation::ApplyChanges(
     mContentCALayer = nil;
     [mOpaquenessTintLayer release];
     mOpaquenessTintLayer = nil;
+    [mProtectedBackingLayer release];
+    mProtectedBackingLayer = nil;
     [mWrappingCALayer release];
     mWrappingCALayer = nil;
     [mRoundedClipCALayer release];
@@ -1818,6 +1821,16 @@ bool NativeLayerCARepresentation::ApplyChanges(
             setControlTimebase:timebase];
         CFRelease(timebase);
         ((AVSampleBufferDisplayLayer*)mContentCALayer).preventsCapture = aIsDRM;
+        if (aIsDRM) {
+          mProtectedBackingLayer = [[CALayer layer] retain];
+          mProtectedBackingLayer.position = CGPointZero;
+          mProtectedBackingLayer.anchorPoint = CGPointZero;
+          mProtectedBackingLayer.edgeAntialiasingMask = 0;
+          mProtectedBackingLayer.opaque = YES;
+          mProtectedBackingLayer.backgroundColor =
+              CGColorGetConstantColor(kCGColorBlack);
+          [mRoundedClipCALayer addSublayer:mProtectedBackingLayer];
+        }
       } else {
 #ifdef NIGHTLY_BUILD
         if (aIsVideo &&
@@ -1884,6 +1897,9 @@ bool NativeLayerCARepresentation::ApplyChanges(
                                         aSize.height / aBackingScale);
     if (mOpaquenessTintLayer) {
       mOpaquenessTintLayer.bounds = mContentCALayer.bounds;
+    }
+    if (mProtectedBackingLayer) {
+      mProtectedBackingLayer.bounds = mContentCALayer.bounds;
     }
     mContentCALayer.contentsScale = aBackingScale;
   }
@@ -2007,6 +2023,9 @@ bool NativeLayerCARepresentation::ApplyChanges(
       mContentCALayer.transform = transformCA;
       if (mOpaquenessTintLayer) {
         mOpaquenessTintLayer.transform = mContentCALayer.transform;
+      }
+      if (mProtectedBackingLayer) {
+        mProtectedBackingLayer.transform = mContentCALayer.transform;
       }
     }
   }

@@ -43,17 +43,24 @@ const EXPECTED_REQUESTS = [
   },
   {
     method: "GET",
+    url: HTTPS_EXAMPLE_URL + "js_worker-test.js",
+    causeType: "prefetch",
+    causeUri: INITIATOR_URL,
+    stack: false,
+  },
+  {
+    method: "GET",
     url: HTTPS_EXAMPLE_URL + "xhr_request",
     causeType: "xhr",
     causeUri: INITIATOR_URL,
-    stack: [{ fn: "performXhrRequestCallback", file: INITIATOR_URL, line: 32 }],
+    stack: [{ fn: "performXhrRequestCallback", file: INITIATOR_URL, line: 33 }],
   },
   {
     method: "GET",
     url: HTTPS_EXAMPLE_URL + "fetch_request",
     causeType: "fetch",
     causeUri: INITIATOR_URL,
-    stack: [{ fn: "performFetchRequest", file: INITIATOR_URL, line: 37 }],
+    stack: [{ fn: "performFetchRequest", file: INITIATOR_URL, line: 38 }],
   },
   {
     method: "GET",
@@ -64,12 +71,12 @@ const EXPECTED_REQUESTS = [
       {
         fn: "performPromiseFetchRequestCallback",
         file: INITIATOR_URL,
-        line: 43,
+        line: 44,
       },
       {
         fn: "performPromiseFetchRequest",
         file: INITIATOR_URL,
-        line: 42,
+        line: 43,
         asyncCause: "promise callback",
       },
     ],
@@ -83,12 +90,12 @@ const EXPECTED_REQUESTS = [
       {
         fn: "performTimeoutFetchRequestCallback2",
         file: INITIATOR_URL,
-        line: 50,
+        line: 51,
       },
       {
         fn: "performTimeoutFetchRequestCallback1",
         file: INITIATOR_URL,
-        line: 49,
+        line: 50,
         asyncCause: "setTimeout handler",
       },
     ],
@@ -121,7 +128,7 @@ const EXPECTED_REQUESTS = [
     url: HTTPS_EXAMPLE_URL + "beacon_request",
     causeType: "beacon",
     causeUri: INITIATOR_URL,
-    stack: [{ fn: "performBeaconRequest", file: INITIATOR_URL, line: 82 }],
+    stack: [{ fn: "performBeaconRequest", file: INITIATOR_URL, line: 83 }],
   },
 ];
 

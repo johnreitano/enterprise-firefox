@@ -4,7 +4,7 @@
 
 /**
  * @typedef {string} WindowID
- *   `window.__SSi` ID of a window, unique within the session.
+ *   ID SessionStore assigns to a window, unique within the session.
  */
 
 /**
@@ -478,13 +478,27 @@ class _SessionStore {
    */
   #windows = {};
 
+  /**
+   * IDs of the windows SessionStore tracks.
+   *
+   * @type {WeakMap<Window, WindowID>}
+   */
+  #windowIds = new WeakMap();
+
+  /**
+   * IDs that windows restored from the last session had in that session.
+   *
+   * @type {WeakMap<Window, WindowID>}
+   */
+  #lastSessionWindowIds = new WeakMap();
+
   // counter for creating unique window IDs
   #nextWindowID = 0;
 
   // the window to re-focus once windows have been restored
   #windowToFocus = null;
 
-  // the active window's __SSi, cached since it's needed once that window is gone
+  // the active window's ID, cached since it's needed once that window is gone
   #activeWindowSSiCache;
 
   // counter for creating unique split view IDs
@@ -713,7 +727,7 @@ class _SessionStore {
       // last-closed window.
       let tabTimestamps = [];
       for (let window of Services.wm.getEnumerator("navigator:browser")) {
-        let windowState = this.#windows[window.__SSi];
+        let windowState = this.#windows[this.#windowIds.get(window)];
         if (windowState && windowState._closedTabs[0]) {
           tabTimestamps.push(windowState._closedTabs[0].closedAt);
         }
@@ -1672,9 +1686,9 @@ class _SessionStore {
    *        Window reference
    */
   ensureInitialized(window) {
-    if (this.#sessionInitialized && !window.__SSi) {
+    if (this.#sessionInitialized && !this.#windowIds.has(window)) {
       /*
-        We need to check that __SSi is not defined on the window so that if
+        We need to check that the window has no ID yet so that if
         onLoad function is in the middle of executing we don't enter the function
         again and try to redeclare the ContentSessionStore script.
        */
@@ -1690,7 +1704,11 @@ class _SessionStore {
    */
   #onLoad(aWindow) {
     // return if window has already been initialized
-    if (aWindow && aWindow.__SSi && this.#windows[aWindow.__SSi]) {
+    if (
+      aWindow &&
+      this.#windowIds.get(aWindow) &&
+      this.#windows[this.#windowIds.get(aWindow)]
+    ) {
       return;
     }
 
@@ -1701,10 +1719,10 @@ class _SessionStore {
 
     // Assign the window a unique identifier we can use to reference
     // internal data about the window.
-    aWindow.__SSi = this.#generateWindowID();
+    this.#windowIds.set(aWindow, this.#generateWindowID());
 
     // and create its data object
-    this.#windows[aWindow.__SSi] = {
+    this.#windows[this.#windowIds.get(aWindow)] = {
       tabs: [],
       groups: [],
       closedGroups: [],
@@ -1725,25 +1743,26 @@ class _SessionStore {
     };
 
     if (PrivateBrowsingUtils.isWindowPrivate(aWindow)) {
-      this.#windows[aWindow.__SSi].isPrivate = true;
+      this.#windows[this.#windowIds.get(aWindow)].isPrivate = true;
     }
     if (!this.#isWindowLoaded(aWindow)) {
-      this.#windows[aWindow.__SSi]._restoring = true;
+      this.#windows[this.#windowIds.get(aWindow)]._restoring = true;
     }
     if (!aWindow.toolbar.visible) {
-      this.#windows[aWindow.__SSi].isPopup = true;
+      this.#windows[this.#windowIds.get(aWindow)].isPopup = true;
     }
 
     if (aWindow.document.documentElement.hasAttribute("taskbartab")) {
-      this.#windows[aWindow.__SSi].isTaskbarTab = true;
+      this.#windows[this.#windowIds.get(aWindow)].isTaskbarTab = true;
     }
 
     if (lazy.AIWindow.isAIWindowActiveAndEnabled(aWindow)) {
-      this.#windows[aWindow.__SSi].isAIWindow = true;
+      this.#windows[this.#windowIds.get(aWindow)].isAIWindow = true;
     }
 
     if (aWindow.document.documentElement.hasAttribute(ARG_CHROMELESS_WINDOW)) {
-      this.#windows[aWindow.__SSi].args[ARG_CHROMELESS_WINDOW] = true;
+      this.#windows[this.#windowIds.get(aWindow)].args[ARG_CHROMELESS_WINDOW] =
+        true;
     }
 
     if (
@@ -1751,7 +1770,9 @@ class _SessionStore {
         ARG_WEB_EXTENSION_POPUP_WINDOW
       )
     ) {
-      this.#windows[aWindow.__SSi].args[ARG_WEB_EXTENSION_POPUP_WINDOW] = true;
+      this.#windows[this.#windowIds.get(aWindow)].args[
+        ARG_WEB_EXTENSION_POPUP_WINDOW
+      ] = true;
     }
 
     let tabbrowser = aWindow.gBrowser;
@@ -1783,7 +1804,7 @@ class _SessionStore {
    */
   #initializeWindow(aWindow, aInitialState = null) {
     let isPrivateWindow = PrivateBrowsingUtils.isWindowPrivate(aWindow);
-    let isTaskbarTab = this.#windows[aWindow.__SSi].isTaskbarTab;
+    let isTaskbarTab = this.#windows[this.#windowIds.get(aWindow)].isTaskbarTab;
     // A regular window is not a private window, taskbar tab window, or popup window
     let isRegularWindow =
       !isPrivateWindow && !isTaskbarTab && aWindow.toolbar.visible;
@@ -2106,19 +2127,22 @@ class _SessionStore {
     // this window was about to be restored - conserve its original data, if any
     let isFullyLoaded = this.#isWindowLoaded(aWindow);
     if (!isFullyLoaded) {
-      if (!aWindow.__SSi) {
-        aWindow.__SSi = this.#generateWindowID();
+      if (!this.#windowIds.has(aWindow)) {
+        this.#windowIds.set(aWindow, this.#generateWindowID());
       }
 
       let restoreID = WINDOW_RESTORE_IDS.get(aWindow);
-      this.#windows[aWindow.__SSi] =
+      this.#windows[this.#windowIds.get(aWindow)] =
         this.#statesToRestore[restoreID].windows[0];
       delete this.#statesToRestore[restoreID];
       WINDOW_RESTORE_IDS.delete(aWindow);
     }
 
     // ignore windows not tracked by SessionStore
-    if (!aWindow.__SSi || !this.#windows[aWindow.__SSi]) {
+    if (
+      !this.#windowIds.get(aWindow) ||
+      !this.#windows[this.#windowIds.get(aWindow)]
+    ) {
       return completionPromise;
     }
 
@@ -2143,7 +2167,7 @@ class _SessionStore {
 
     aWindow.gBrowser.removeEventListener("XULFrameLoaderCreated", this);
 
-    let winData = this.#windows[aWindow.__SSi];
+    let winData = this.#windows[this.#windowIds.get(aWindow)];
 
     // Collect window data only when *not* closed during shutdown.
     if (lazy.RunState.isRunning) {
@@ -2225,7 +2249,7 @@ class _SessionStore {
       }
 
       // clear this window from the list, since it has definitely been closed.
-      delete this.#windows[aWindow.__SSi];
+      delete this.#windows[this.#windowIds.get(aWindow)];
 
       // This window has the potential to be saved in the #closedWindows
       // array (maybeSaveClosedWindows gets the final call on that).
@@ -2324,7 +2348,7 @@ class _SessionStore {
     DyingWindowCache.set(aWindow, winData);
 
     this.#saveableClosedWindowData.delete(winData);
-    delete aWindow.__SSi;
+    this.#windowIds.delete(aWindow);
   }
 
   /**
@@ -2521,7 +2545,7 @@ class _SessionStore {
     let index = 0;
     for (let window of this.#orderedBrowserWindows) {
       this.#collectWindowData(window);
-      this.#windows[window.__SSi].zIndex = ++index;
+      this.#windows[this.#windowIds.get(window)].zIndex = ++index;
     }
     this.#log.debug(
       `onQuitApplicationGranted, shutdown of ${index} windows will be sync? ${syncShutdown}`
@@ -2686,7 +2710,7 @@ class _SessionStore {
 
       // We may have already stopped tracking this window in #onClose, which is
       // fine as we would've collected window data there as well.
-      if (win.__SSi && this.#windows[win.__SSi]) {
+      if (this.#windowIds.get(win) && this.#windows[this.#windowIds.get(win)]) {
         this.#collectWindowData(win);
       }
 
@@ -2697,7 +2721,7 @@ class _SessionStore {
     // return null by the time quit-application occurs.
     var activeWindow = this.#getTopWindow();
     if (activeWindow) {
-      this.#activeWindowSSiCache = activeWindow.__SSi || "";
+      this.#activeWindowSSiCache = this.#windowIds.get(activeWindow) || "";
     }
     DirtyWindows.clear();
     Glean.sessionRestore.shutdownFlushAllOutcomes.complete.add(1);
@@ -2764,7 +2788,7 @@ class _SessionStore {
     }
 
     // Check if we have data for the given window.
-    let windowData = this.#windows[win.__SSi];
+    let windowData = this.#windows[this.#windowIds.get(win)];
     if (!windowData) {
       return;
     }
@@ -2812,7 +2836,7 @@ class _SessionStore {
     let openWindows = {};
     // Collect open windows.
     for (let window of this.#browserWindows) {
-      openWindows[window.__SSi] = true;
+      openWindows[this.#windowIds.get(window)] = true;
     }
 
     // also clear all data about closed tabs and windows
@@ -3082,8 +3106,11 @@ class _SessionStore {
       return;
     }
 
-    let closedGroups = this.#windows[win.__SSi].closedGroups;
-    let tabGroupState = lazy.TabGroupState.closed(tabGroup, win.__SSi);
+    let closedGroups = this.#windows[this.#windowIds.get(win)].closedGroups;
+    let tabGroupState = lazy.TabGroupState.closed(
+      tabGroup,
+      this.#windowIds.get(win)
+    );
     tabGroupState.tabs = this.#collectClosedTabsForTabGroup(tabGroup.tabs, win);
     tabGroupState.splitViews = this.#collectSplitViewDataForTabGroup(
       tabGroup.tabs
@@ -3093,7 +3120,7 @@ class _SessionStore {
     // necessary when restoring tab groups — it largely depends on how we
     // decide to do the restore.
     // To address in bug1915174
-    this.#windows[win.__SSi]._lastClosedTabGroupCount =
+    this.#windows[this.#windowIds.get(win)]._lastClosedTabGroupCount =
       tabGroupState.tabs.length;
     closedGroups.unshift(tabGroupState);
     this.#closedObjectsChanged = true;
@@ -3215,10 +3242,10 @@ class _SessionStore {
       closedAt: Date.now(),
       closedInGroup: inMultiselection,
       closedInTabGroupId: closedInTabGroup ? tabState.groupId : null,
-      sourceWindowId: aWindow.__SSi,
+      sourceWindowId: this.#windowIds.get(aWindow),
     };
 
-    let winData = this.#windows[aWindow.__SSi];
+    let winData = this.#windows[this.#windowIds.get(aWindow)];
     let closedTabs = closedTabsArray || winData._closedTabs;
 
     // Determine whether the tab contains any information worth saving. Note
@@ -3474,7 +3501,7 @@ class _SessionStore {
    */
   #onTabSelect(aWindow) {
     if (lazy.RunState.isRunning) {
-      this.#windows[aWindow.__SSi].selected =
+      this.#windows[this.#windowIds.get(aWindow)].selected =
         aWindow.gBrowser.tabContainer.selectedIndex;
 
       let tab = aWindow.gBrowser.selectedTab;
@@ -3743,7 +3770,7 @@ class _SessionStore {
    * @returns {{windows: WindowStateData[]}}
    */
   getWindowState(aWindow) {
-    if ("__SSi" in aWindow) {
+    if (this.#windowIds.has(aWindow)) {
       return Cu.cloneInto(this.#getWindowState(aWindow), {});
     }
 
@@ -3770,7 +3797,7 @@ class _SessionStore {
    * @throws {Components.Exception} If the window is not tracked.
    */
   setWindowState(aWindow, aState, aOverwrite) {
-    if (!aWindow.__SSi) {
+    if (!this.#windowIds.get(aWindow)) {
       throw Components.Exception(
         "Window is not tracked",
         Cr.NS_ERROR_INVALID_ARG
@@ -3800,7 +3827,7 @@ class _SessionStore {
     if (!aTab || !aTab.documentGlobal) {
       throw Components.Exception("Need a valid tab", Cr.NS_ERROR_INVALID_ARG);
     }
-    if (!aTab.documentGlobal.__SSi) {
+    if (!this.#windowIds.get(aTab.documentGlobal)) {
       throw Components.Exception(
         "Default view is not tracked",
         Cr.NS_ERROR_INVALID_ARG
@@ -3849,7 +3876,7 @@ class _SessionStore {
     }
 
     let window = aTab.documentGlobal;
-    if (!window || !("__SSi" in window)) {
+    if (!window || !this.#windowIds.has(window)) {
       throw Components.Exception(
         "Window is not tracked",
         Cr.NS_ERROR_INVALID_ARG
@@ -3862,7 +3889,7 @@ class _SessionStore {
 
     this.#ensureNoNullsInTabDataList(
       window.gBrowser.tabs,
-      this.#windows[window.__SSi].tabs,
+      this.#windows[this.#windowIds.get(window)].tabs,
       aTab.index
     );
     this.#restoreTab(aTab, tabState);
@@ -3889,8 +3916,9 @@ class _SessionStore {
    *          tab's custom values.
    */
   getInternalObjectState(obj) {
-    if ("__SSi" in obj && obj.__SSi) {
-      return this.#windows[obj.__SSi];
+    let windowId = this.#windowIds.get(/** @type {Window} */ (obj));
+    if (windowId) {
+      return this.#windows[windowId];
     }
     return "loadURI" in obj
       ? TAB_STATE_FOR_BROWSER.get(obj)
@@ -3934,7 +3962,7 @@ class _SessionStore {
    *        registered with SessionStore yet.
    */
   getWindowId(aWindow) {
-    return aWindow.__SSi ?? null;
+    return this.#windowIds.get(aWindow) ?? null;
   }
 
   /**
@@ -3945,7 +3973,7 @@ class _SessionStore {
   getWindowById(aSessionStoreId) {
     let resultWindow;
     for (let window of this.#browserWindows) {
-      if (window.__SSi === aSessionStoreId) {
+      if (this.#windowIds.get(window) === aSessionStoreId) {
         resultWindow = window;
         break;
       }
@@ -3986,7 +4014,7 @@ class _SessionStore {
     if (!aTab || !aTab.documentGlobal) {
       throw Components.Exception("Need a valid tab", Cr.NS_ERROR_INVALID_ARG);
     }
-    if (!aTab.documentGlobal.__SSi) {
+    if (!this.#windowIds.get(aTab.documentGlobal)) {
       throw Components.Exception(
         "Default view is not tracked",
         Cr.NS_ERROR_INVALID_ARG
@@ -4041,7 +4069,7 @@ class _SessionStore {
       let window = newTab.documentGlobal;
 
       // The tab or its window might be gone.
-      if (!window || !window.__SSi || window.closed) {
+      if (!window || !this.#windowIds.get(window) || window.closed) {
         return;
       }
 
@@ -4108,7 +4136,7 @@ class _SessionStore {
     const privateValues = aIncludePrivate ? [false, true] : [false];
     for (let privateness of privateValues) {
       for (let window of this.getWindows({ private: privateness })) {
-        const windowState = this.#windows[window.__SSi];
+        const windowState = this.#windows[this.#windowIds.get(window)];
         const closedTabs =
           this.#getStateForClosedTabsAndClosedGroupTabs(windowState);
         if (!closedTabs.length) {
@@ -4133,9 +4161,12 @@ class _SessionStore {
    *          The number of tabs that were last closed.
    */
   getLastClosedTabCount(aWindow) {
-    if ("__SSi" in aWindow) {
+    if (this.#windowIds.has(aWindow)) {
       return Math.min(
-        Math.max(this.#windows[aWindow.__SSi]._lastClosedTabGroupCount, 1),
+        Math.max(
+          this.#windows[this.#windowIds.get(aWindow)]._lastClosedTabGroupCount,
+          1
+        ),
         this.getClosedTabCountForWindow(aWindow)
       );
     }
@@ -4151,9 +4182,9 @@ class _SessionStore {
    * @throws {nsresult} NS_ERROR_INVALID_ARG if the window is not tracked.
    */
   resetLastClosedTabCount(aWindow) {
-    if ("__SSi" in aWindow) {
-      this.#windows[aWindow.__SSi]._lastClosedTabGroupCount = -1;
-      this.#windows[aWindow.__SSi].lastClosedTabGroupId = null;
+    if (this.#windowIds.has(aWindow)) {
+      this.#windows[this.#windowIds.get(aWindow)]._lastClosedTabGroupCount = -1;
+      this.#windows[this.#windowIds.get(aWindow)].lastClosedTabGroupId = null;
     } else {
       throw (Components.returnCode = Cr.NS_ERROR_INVALID_ARG);
     }
@@ -4165,9 +4196,9 @@ class _SessionStore {
    * @param {Window} aWindow
    */
   getClosedTabCountForWindow(aWindow) {
-    if ("__SSi" in aWindow) {
+    if (this.#windowIds.has(aWindow)) {
       return this.#getStateForClosedTabsAndClosedGroupTabs(
-        this.#windows[aWindow.__SSi]
+        this.#windows[this.#windowIds.get(aWindow)]
       ).length;
     }
 
@@ -4363,8 +4394,8 @@ class _SessionStore {
    * @param {Window} aWindow
    */
   getLastClosedTabGroupId(aWindow) {
-    if ("__SSi" in aWindow) {
-      return this.#windows[aWindow.__SSi].lastClosedTabGroupId;
+    if (this.#windowIds.has(aWindow)) {
+      return this.#windows[this.#windowIds.get(aWindow)].lastClosedTabGroupId;
     }
 
     throw new Error("Window is not tracked");
@@ -4388,8 +4419,8 @@ class _SessionStore {
     /** @type {WindowStateData} */
     let winData;
 
-    if ("__SSi" in aWindow) {
-      winData = this.#windows[aWindow.__SSi];
+    if (this.#windowIds.has(aWindow)) {
+      winData = this.#windows[this.#windowIds.get(aWindow)];
     }
 
     if (!winData && !DyingWindowCache.has(aWindow)) {
@@ -4493,7 +4524,7 @@ class _SessionStore {
   undoCloseTab(aSource, aIndex, aTargetWindow) {
     const sourceWinData = this.#resolveClosedDataSource(aSource);
     const isPrivateSource = Boolean(sourceWinData.isPrivate);
-    if (aTargetWindow && !aTargetWindow.__SSi) {
+    if (aTargetWindow && !this.#windowIds.get(aTargetWindow)) {
       throw Components.Exception(
         "Target window is not tracked",
         Cr.NS_ERROR_INVALID_ARG
@@ -4793,7 +4824,7 @@ class _SessionStore {
         ) {
           continue;
         }
-        sourceWindowsData.push(this.#windows[win.__SSi]);
+        sourceWindowsData.push(this.#windows[this.#windowIds.get(win)]);
       }
     }
 
@@ -4866,7 +4897,7 @@ class _SessionStore {
    */
   maybeDontRestoreTabs(aWindow) {
     // Don't restore the tabs if we restore the session at startup
-    this.#windows[aWindow.__SSi]._maybeDontRestoreTabs = true;
+    this.#windows[this.#windowIds.get(aWindow)]._maybeDontRestoreTabs = true;
   }
 
   #isLastRestorableWindow() {
@@ -4962,8 +4993,8 @@ class _SessionStore {
    * @throws {Components.Exception} If the window is not tracked.
    */
   getCustomWindowValue(aWindow, aKey) {
-    if ("__SSi" in aWindow) {
-      let data = this.#windows[aWindow.__SSi].extData || {};
+    if (this.#windowIds.has(aWindow)) {
+      let data = this.#windows[this.#windowIds.get(aWindow)].extData || {};
       return data[aKey] || "";
     }
 
@@ -4995,16 +5026,16 @@ class _SessionStore {
       throw new TypeError("setCustomWindowValue only accepts string values");
     }
 
-    if (!("__SSi" in aWindow)) {
+    if (!this.#windowIds.has(aWindow)) {
       throw Components.Exception(
         "Window is not tracked",
         Cr.NS_ERROR_INVALID_ARG
       );
     }
-    if (!this.#windows[aWindow.__SSi].extData) {
-      this.#windows[aWindow.__SSi].extData = {};
+    if (!this.#windows[this.#windowIds.get(aWindow)].extData) {
+      this.#windows[this.#windowIds.get(aWindow)].extData = {};
     }
-    this.#windows[aWindow.__SSi].extData[aKey] = aStringValue;
+    this.#windows[this.#windowIds.get(aWindow)].extData[aKey] = aStringValue;
     this.#saveStateDelayed(aWindow);
   }
 
@@ -5018,11 +5049,11 @@ class _SessionStore {
    */
   deleteCustomWindowValue(aWindow, aKey) {
     if (
-      aWindow.__SSi &&
-      this.#windows[aWindow.__SSi].extData &&
-      this.#windows[aWindow.__SSi].extData[aKey]
+      this.#windowIds.get(aWindow) &&
+      this.#windows[this.#windowIds.get(aWindow)].extData &&
+      this.#windows[this.#windowIds.get(aWindow)].extData[aKey]
     ) {
-      delete this.#windows[aWindow.__SSi].extData[aKey];
+      delete this.#windows[this.#windowIds.get(aWindow)].extData[aKey];
     }
     this.#saveStateDelayed(aWindow);
   }
@@ -5180,7 +5211,7 @@ class _SessionStore {
       ) {
         continue;
       }
-      let windowState = this.#windows[sourceWindow.__SSi];
+      let windowState = this.#windows[this.#windowIds.get(sourceWindow)];
       if (windowState) {
         let closedTabs =
           this.#getStateForClosedTabsAndClosedGroupTabs(windowState);
@@ -5272,7 +5303,7 @@ class _SessionStore {
     };
 
     for (let window of Services.wm.getEnumerator("navigator:browser")) {
-      let windowState = this.#windows[window.__SSi];
+      let windowState = this.#windows[this.#windowIds.get(window)];
       if (windowState) {
         clearClosedTabs(windowState);
       }
@@ -5317,8 +5348,8 @@ class _SessionStore {
     // First collect each window with its id...
     let windows = {};
     for (let window of this.#browserWindows) {
-      if (window.__SS_lastSessionWindowID) {
-        windows[window.__SS_lastSessionWindowID] = window;
+      if (this.#lastSessionWindowIds.get(window)) {
+        windows[this.#lastSessionWindowIds.get(window)] = window;
       }
     }
 
@@ -5340,7 +5371,8 @@ class _SessionStore {
     // We want to re-use the last opened window instead of opening a new one in
     // the case where it's "empty" and not associated with a window in the session.
     let lastWindow = this.#getTopWindow();
-    let canUseLastWindow = lastWindow && !lastWindow.__SS_lastSessionWindowID;
+    let canUseLastWindow =
+      lastWindow && !this.#lastSessionWindowIds.get(lastWindow);
 
     // global data must be restored before #restoreWindow is called so that
     // it happens before observers are notified
@@ -5396,7 +5428,7 @@ class _SessionStore {
           // Since we're not overwriting existing tabs, we want to merge _closedTabs,
           // putting existing ones first. Then make sure we're respecting the max pref.
           if (winState._closedTabs && winState._closedTabs.length) {
-            let curWinState = this.#windows[windowToUse.__SSi];
+            let curWinState = this.#windows[this.#windowIds.get(windowToUse)];
             curWinState._closedTabs = curWinState._closedTabs.concat(
               winState._closedTabs
             );
@@ -5730,7 +5762,7 @@ class _SessionStore {
    *        Window reference
    */
   #updateWindowFeatures(aWindow) {
-    var winData = this.#windows[aWindow.__SSi];
+    var winData = this.#windows[this.#windowIds.get(aWindow)];
 
     for (let attr of WINDOW_ATTRIBUTES) {
       winData[attr] = this.#getWindowDimension(aWindow, attr);
@@ -5783,7 +5815,7 @@ class _SessionStore {
           // always update the window features (whose change alone never triggers a save operation)
           this.#updateWindowFeatures(window);
         }
-        this.#windows[window.__SSi].zIndex = ++index;
+        this.#windows[this.#windowIds.get(window)].zIndex = ++index;
       }
       DirtyWindows.clear();
     }
@@ -5843,7 +5875,7 @@ class _SessionStore {
     }
 
     if (activeWindow) {
-      this.#activeWindowSSiCache = activeWindow.__SSi || "";
+      this.#activeWindowSSiCache = this.#windowIds.get(activeWindow) || "";
     }
     ix = ids.indexOf(this.#activeWindowSSiCache);
     // We don't want to restore focus to a minimized window or a window which had all its
@@ -5905,7 +5937,7 @@ class _SessionStore {
       this.#collectWindowData(aWindow);
     }
 
-    return { windows: [this.#windows[aWindow.__SSi]] };
+    return { windows: [this.#windows[this.#windowIds.get(aWindow)]] };
   }
 
   /**
@@ -5916,14 +5948,17 @@ class _SessionStore {
    * @throws {Error} if `aWindow` is not being managed in the session store.
    */
   #getWindowStateData(aWindow) {
-    if (!aWindow.__SSi || !(aWindow.__SSi in this.#windows)) {
+    if (
+      !this.#windowIds.get(aWindow) ||
+      !(this.#windowIds.get(aWindow) in this.#windows)
+    ) {
       throw Components.Exception(
         "Window is not tracked",
         Cr.NS_ERROR_INVALID_ARG
       );
     }
 
-    return this.#windows[aWindow.__SSi];
+    return this.#windows[this.#windowIds.get(aWindow)];
   }
 
   /**
@@ -5946,7 +5981,7 @@ class _SessionStore {
     let tabbrowser = aWindow.gBrowser;
     let tabs = tabbrowser.tabs;
     /** @type {WindowStateData} */
-    let winData = this.#windows[aWindow.__SSi];
+    let winData = this.#windows[this.#windowIds.get(aWindow)];
     let tabsData = (winData.tabs = []);
 
     // update the internal state data for this window
@@ -5982,11 +6017,11 @@ class _SessionStore {
 
     this.#updateWindowFeatures(aWindow);
 
-    // Make sure we keep __SS_lastSessionWindowID around for cases like entering
+    // Make sure we keep the last session's window ID around for cases like entering
     // or leaving PB mode.
-    if (aWindow.__SS_lastSessionWindowID) {
-      this.#windows[aWindow.__SSi].__lastSessionWindowID =
-        aWindow.__SS_lastSessionWindowID;
+    if (this.#lastSessionWindowIds.get(aWindow)) {
+      this.#windows[this.#windowIds.get(aWindow)].__lastSessionWindowID =
+        this.#lastSessionWindowIds.get(aWindow);
     }
 
     DirtyWindows.remove(aWindow);
@@ -6142,7 +6177,11 @@ class _SessionStore {
     this.#restoreSidebar(aWindow, winData.sidebar, winData.isPopup);
 
     // initialize window if necessary
-    if (aWindow && (!aWindow.__SSi || !this.#windows[aWindow.__SSi])) {
+    if (
+      aWindow &&
+      (!this.#windowIds.get(aWindow) ||
+        !this.#windows[this.#windowIds.get(aWindow)])
+    ) {
       this.#onLoad(aWindow);
     }
 
@@ -6247,31 +6286,32 @@ class _SessionStore {
     // We want to correlate the window with data from the last session, so
     // assign another id if we have one. Otherwise clear so we don't do
     // anything with it.
-    delete aWindow.__SS_lastSessionWindowID;
+    this.#lastSessionWindowIds.delete(aWindow);
     if (winData.__lastSessionWindowID) {
-      aWindow.__SS_lastSessionWindowID = winData.__lastSessionWindowID;
+      this.#lastSessionWindowIds.set(aWindow, winData.__lastSessionWindowID);
     }
 
     if (overwriteTabs) {
-      delete this.#windows[aWindow.__SSi].extData;
+      delete this.#windows[this.#windowIds.get(aWindow)].extData;
     }
 
     // Restore cookies from legacy sessions, i.e. before bug 912717.
     lazy.SessionCookies.restore(winData.cookies || []);
 
     if (winData.extData) {
-      if (!this.#windows[aWindow.__SSi].extData) {
-        this.#windows[aWindow.__SSi].extData = {};
+      if (!this.#windows[this.#windowIds.get(aWindow)].extData) {
+        this.#windows[this.#windowIds.get(aWindow)].extData = {};
       }
       for (var key in winData.extData) {
-        this.#windows[aWindow.__SSi].extData[key] = winData.extData[key];
+        this.#windows[this.#windowIds.get(aWindow)].extData[key] =
+          winData.extData[key];
       }
     }
 
     let newClosedTabsData;
     if (winData._closedTabs) {
       newClosedTabsData = winData._closedTabs;
-      this.#resetClosedTabIds(newClosedTabsData, aWindow.__SSi);
+      this.#resetClosedTabIds(newClosedTabsData, this.#windowIds.get(aWindow));
     } else {
       newClosedTabsData = [];
     }
@@ -6281,47 +6321,47 @@ class _SessionStore {
     if (overwriteTabs || firstWindow) {
       // Overwrite existing closed tabs data when overwriteTabs=true
       // or we're the first window to be restored.
-      this.#windows[aWindow.__SSi]._closedTabs = newClosedTabsData;
+      this.#windows[this.#windowIds.get(aWindow)]._closedTabs =
+        newClosedTabsData;
     } else if (this.#max_tabs_undo > 0) {
       // We preserve tabs between sessions so we just want to filter out any previously open tabs that
       // were added to the _closedTabs list prior to restoreLastSession
       if (PERSIST_SESSIONS) {
-        newClosedTabsData = this.#windows[aWindow.__SSi]._closedTabs.filter(
-          tab => !tab.removeAfterRestore
-        );
+        newClosedTabsData = this.#windows[
+          this.#windowIds.get(aWindow)
+        ]._closedTabs.filter(tab => !tab.removeAfterRestore);
       } else {
         newClosedTabsData = newClosedTabsData.concat(
-          this.#windows[aWindow.__SSi]._closedTabs
+          this.#windows[this.#windowIds.get(aWindow)]._closedTabs
         );
       }
 
       // ... and make sure that we don't exceed the max number of closed tabs
       // we can restore.
-      this.#windows[aWindow.__SSi]._closedTabs = newClosedTabsData.slice(
-        0,
-        this.#max_tabs_undo
-      );
+      this.#windows[this.#windowIds.get(aWindow)]._closedTabs =
+        newClosedTabsData.slice(0, this.#max_tabs_undo);
     }
     // Because newClosedTabsData are put in first, we need to
     // copy also the _lastClosedTabGroupCount.
-    this.#windows[aWindow.__SSi]._lastClosedTabGroupCount =
+    this.#windows[this.#windowIds.get(aWindow)]._lastClosedTabGroupCount =
       newLastClosedTabGroupCount;
 
     // Copy over closed tab groups from the previous session,
     // and reset closed tab ids for tabs within each group.
     let newClosedTabGroupsData = winData.closedGroups || [];
     newClosedTabGroupsData.forEach(group => {
-      this.#resetClosedTabIds(group.tabs, aWindow.__SSi);
+      this.#resetClosedTabIds(group.tabs, this.#windowIds.get(aWindow));
     });
-    this.#windows[aWindow.__SSi].closedGroups = newClosedTabGroupsData;
-    this.#windows[aWindow.__SSi].lastClosedTabGroupId =
+    this.#windows[this.#windowIds.get(aWindow)].closedGroups =
+      newClosedTabGroupsData;
+    this.#windows[this.#windowIds.get(aWindow)].lastClosedTabGroupId =
       winData.lastClosedTabGroupId || null;
 
     if (!this.#isWindowLoaded(aWindow)) {
       // from now on, the data will come from the actual window
       delete this.#statesToRestore[WINDOW_RESTORE_IDS.get(aWindow)];
       WINDOW_RESTORE_IDS.delete(aWindow);
-      delete this.#windows[aWindow.__SSi]._restoring;
+      delete this.#windows[this.#windowIds.get(aWindow)]._restoring;
     }
 
     // Restore tabs, if any.
@@ -6474,7 +6514,11 @@ class _SessionStore {
    */
   #restoreWindows(aWindow, aState, aOptions = {}) {
     // initialize window if necessary
-    if (aWindow && (!aWindow.__SSi || !this.#windows[aWindow.__SSi])) {
+    if (
+      aWindow &&
+      (!this.#windowIds.get(aWindow) ||
+        !this.#windows[this.#windowIds.get(aWindow)])
+    ) {
       this.#onLoad(aWindow);
     }
 
@@ -6582,7 +6626,7 @@ class _SessionStore {
 
     let numTabsToRestore = aTabs.length;
     let numTabsInWindow = tabbrowser.tabs.length;
-    let tabsDataArray = this.#windows[aWindow.__SSi].tabs;
+    let tabsDataArray = this.#windows[this.#windowIds.get(aWindow)].tabs;
 
     // Update the window state in case we shut down without being notified.
     // Individual tab states will be taken care of by #restoreTab() below.
@@ -6608,7 +6652,7 @@ class _SessionStore {
 
     if (aSelectTab > 0 && aSelectTab <= aTabs.length) {
       // Update the window state in case we shut down without being notified.
-      this.#windows[aWindow.__SSi].selected = aSelectTab;
+      this.#windows[this.#windowIds.get(aWindow)].selected = aSelectTab;
     }
 
     // If we restore the selected tab, make sure it goes first.
@@ -6689,7 +6733,7 @@ class _SessionStore {
       );
     }
     // Update the tab state in case we shut down without being notified.
-    this.#windows[window.__SSi].tabs[tab.index] = tabData;
+    this.#windows[this.#windowIds.get(window)].tabs[tab.index] = tabData;
 
     // Prepare the tab so that it can be properly restored.  We'll also attach
     // a copy of the tab's data in case we close it before it's been restored.
@@ -7166,7 +7210,7 @@ class _SessionStore {
           aWindow.resizeTo(aWidth, aHeight);
         }
       }
-      this.#windows[aWindow.__SSi].sizemodeBeforeMinimized =
+      this.#windows[this.#windowIds.get(aWindow)].sizemodeBeforeMinimized =
         aSizeModeBeforeMinimized;
       if (
         aSizeMode &&
@@ -7289,7 +7333,7 @@ class _SessionStore {
   #browserWindows = {
     *[Symbol.iterator]() {
       for (let window of lazy.BrowserWindowTracker.orderedWindows) {
-        if (window.__SSi && !window.closed) {
+        if (SessionStore.getWindowId(window) && !window.closed) {
           yield window;
         }
       }
@@ -7320,7 +7364,7 @@ class _SessionStore {
         return 0;
       });
       for (let window of windows) {
-        if (window.__SSi && !window.closed) {
+        if (SessionStore.getWindowId(window) && !window.closed) {
           yield window;
         }
       }
@@ -8125,7 +8169,7 @@ class _SessionStore {
     // Let's find if the right-most tab or the selected tab is already newtab
     // using the cached restore state since it's possible that the actual pages
     // haven't loaded yet (and can potentially still be about:blank)
-    let windowState = this.#windows[win.__SSi];
+    let windowState = this.#windows[this.#windowIds.get(win)];
     if (windowState?.tabs?.length) {
       let selectedIndex = (windowState.selected || 1) - 1;
       let selectedURL = this.#getActiveURLFromTabData(
@@ -8177,7 +8221,7 @@ class _SessionStore {
    *        The window's busy state
    */
   #setWindowStateBusyValue(aWindow, aValue) {
-    this.#windows[aWindow.__SSi].busy = aValue;
+    this.#windows[this.#windowIds.get(aWindow)].busy = aValue;
 
     // Keep the to-be-restored state in sync because that is returned by
     // getWindowState() as long as the window isn't loaded, yet.
@@ -8900,7 +8944,7 @@ class _SessionStore {
 
     let tabGroupState = lazy.TabGroupState.savedInOpenWindow(
       tabGroup,
-      tabGroup.documentGlobal.__SSi
+      this.#windowIds.get(tabGroup.documentGlobal)
     );
     tabGroupState.tabs = this.#collectClosedTabsForTabGroup(
       tabGroup.tabs,
@@ -9024,7 +9068,7 @@ class _SessionStore {
   undoCloseTabGroup(source, tabGroupId, targetWindow) {
     const sourceWinData = this.#resolveClosedDataSource(source);
     const isPrivateSource = Boolean(sourceWinData.isPrivate);
-    if (targetWindow && !targetWindow.__SSi) {
+    if (targetWindow && !this.#windowIds.get(targetWindow)) {
       throw Components.Exception(
         "Target window is not tracked",
         Cr.NS_ERROR_INVALID_ARG
@@ -9095,7 +9139,7 @@ class _SessionStore {
     if (!targetWindow) {
       targetWindow = this.#getTopWindow();
     }
-    if (!targetWindow.__SSi) {
+    if (!this.#windowIds.get(targetWindow)) {
       throw Components.Exception(
         "Target window is not tracked",
         Cr.NS_ERROR_INVALID_ARG

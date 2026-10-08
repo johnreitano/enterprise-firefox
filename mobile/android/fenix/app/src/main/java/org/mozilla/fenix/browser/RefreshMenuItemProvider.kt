@@ -16,9 +16,13 @@ import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.StandardMenuItem
+import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemIconRes
+import mozilla.components.concept.engine.EngineSession.LoadUrlFlags
+import mozilla.components.feature.session.SessionUseCases
 import mozilla.components.ui.icons.R as iconsR
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
 import org.mozilla.fenix.components.menu.store.MenuAction
 
@@ -26,10 +30,14 @@ import org.mozilla.fenix.components.menu.store.MenuAction
  * [MenuItemProvider] for the menu item allowing to refresh or stop loading the current page.
  *
  * @param browserStore [BrowserStore] used to know if the current page is loading.
+ * @param reload [SessionUseCases.ReloadUrlUseCase] for reloading the current page.
+ * @param stopLoading [SessionUseCases.StopLoadingUseCase] for stopping loading the current page.
  * @param scope [CoroutineScope] used to keep the item up to date for as long as it can be shown.
  */
 class RefreshMenuItemProvider(
-    browserStore: BrowserStore,
+    private val browserStore: BrowserStore,
+    private val reload: SessionUseCases.ReloadUrlUseCase,
+    private val stopLoading: SessionUseCases.StopLoadingUseCase,
     scope: CoroutineScope,
 ) : MenuItemProvider {
     override val itemFlow: StateFlow<MenuItem?> =
@@ -41,6 +49,33 @@ class RefreshMenuItemProvider(
                 started = SharingStarted.Eagerly,
                 initialValue = browserStore.state.refreshItem(),
             )
+
+    override fun handles(event: MenuEvent) = event is MenuAction.Navigate.Reload || event == MenuAction.Navigate.Stop
+
+    override fun onEvent(event: MenuEvent, menu: MenuHost) {
+        val tabId = browserStore.state.selectedTab?.id ?: return
+
+        when (event) {
+            is MenuAction.Navigate.Reload -> {
+                menu.dismiss()
+                reload(
+                    tabId = tabId,
+                    flags =
+                        when (event.bypassCache) {
+                            true -> LoadUrlFlags.select(LoadUrlFlags.BYPASS_CACHE)
+                            false -> LoadUrlFlags.none()
+                        },
+                )
+            }
+
+            MenuAction.Navigate.Stop -> {
+                menu.dismiss()
+                stopLoading(tabId = tabId)
+            }
+
+            else -> Unit
+        }
+    }
 
     private fun BrowserState.refreshItem(): MenuItem? =
         selectedTab?.content?.let { content ->

@@ -1158,17 +1158,15 @@ bool js::CopyDataProperties(JSContext* cx, HandleObject target,
 
   // Step 4.
   Rooted<NativeObject*> nativeTarget(cx);
-  // In some cases, |target| already has properties. For example when the
-  // literal had entries before the spread, as in `{a: 1, ...x}`. One of those
-  // can collide with a source key, and then the property has to be overwritten
-  // rather than added, so the no-hooks add needs a presence check first. A
-  // target that starts out empty cannot collide at all, because |keys| holds no
-  // duplicates and nothing reachable from the loop can add to |target|.
-  bool targetMayCollide = false;
   if (target->is<PlainObject>() && target->as<PlainObject>().isExtensible()) {
     nativeTarget = &target->as<PlainObject>();
-    targetMayCollide = !nativeTarget->empty();
   }
+
+  // It is possible for two keys to collide during copying in two cases:
+  //     1) The target is non-empty.
+  //     2) A non-JS source enumeration results in duplicate keys.
+  bool keysMayCollide =
+      !from->is<NativeObject>() || !nativeTarget || !nativeTarget->empty();
 
   RootedId nextKey(cx);
   RootedValue propValue(cx);
@@ -1226,7 +1224,7 @@ bool js::CopyDataProperties(JSContext* cx, HandleObject target,
 
     // Step 4.c.ii.2.
     if (nativeTarget && !nextKey.isInt() &&
-        (!targetMayCollide || !nativeTarget->contains(cx, nextKey))) {
+        (!keysMayCollide || !nativeTarget->contains(cx, nextKey))) {
       if (!AddDataPropertyToNativeObjectNoHooks(cx, nativeTarget, nextKey,
                                                 propValue)) {
         return false;

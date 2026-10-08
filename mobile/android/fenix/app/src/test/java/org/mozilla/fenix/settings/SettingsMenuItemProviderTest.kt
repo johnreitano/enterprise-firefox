@@ -5,12 +5,17 @@
 package org.mozilla.fenix.settings
 
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.StandardMenuItem
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.ui.icons.R as iconsR
 import org.junit.Test
+import org.mozilla.fenix.NavGraphDirections
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.fake.FakeMenuHost
+import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
 
 class SettingsMenuItemProviderTest {
@@ -26,5 +31,24 @@ class SettingsMenuItemProviderTest {
             ),
             provider.itemFlow.value,
         )
+    }
+
+    @Test
+    fun `WHEN clicking the item THEN show the settings in place of the menu`() {
+        val menu = FakeMenuHost()
+
+        SettingsMenuItemProvider().onEvent(MenuAction.Navigate.Settings, menu)
+
+        assertEquals(NavGraphDirections.actionGlobalSettingsFragment(), menu.directions)
+    }
+
+    @Test
+    fun `WHEN building the item THEN handle all events it can dispatch and no others`() {
+        val provider = SettingsMenuItemProvider()
+
+        val events = requireNotNull(provider.itemFlow.value).reachableEvents()
+
+        assertTrue(events.all { provider.handles(it) }, "Not all of $events are handled")
+        assertFalse(provider.handles(MenuAction.Navigate.History))
     }
 }

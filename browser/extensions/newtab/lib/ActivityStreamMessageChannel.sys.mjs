@@ -40,7 +40,6 @@ export class ActivityStreamMessageChannel {
    * @param  {string} options.pageURL The URL to which the channel is attached, such as about:newtab.
    * @param  {string} options.outgoingMessageName The name of the message sent to child processes
    * @param  {string} options.incomingMessageName The name of the message received from child processes
-   * @return {ActivityStreamMessageChannel}
    */
   constructor(options = {}) {
     Object.assign(this, DEFAULT_OPTIONS, options);

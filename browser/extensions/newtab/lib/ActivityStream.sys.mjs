@@ -2168,14 +2168,6 @@ export const PREFS_CONFIG = new Map([
     },
   ],
   [
-    "discoverystream.rec.impressions",
-    {
-      title: "Track rec impressions",
-      skipBroadcast: true,
-      value: "{}",
-    },
-  ],
-  [
     "discoverystream.topicSelection.enabled",
     {
       title: "Enables topic selection for discovery stream",

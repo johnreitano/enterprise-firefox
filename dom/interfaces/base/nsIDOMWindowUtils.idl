@@ -1125,13 +1125,15 @@ interface nsIDOMWindowUtils : nsISupports {
    * @Param aOffset The relative to start of selection
    * @param aReplaceSrcString the source string of replaceText. If not matched, do nothing.
    * @param aAdditionalFlags See the description of CONTENT_COMMAND_FLAG_*.
+   * @return true if the command is enabled. Note that if the focused content is
+   *         not in the same process, this always returns true.
    */
-  void sendContentCommandEvent(in AString aType,
-                               [optional] in nsITransferable aTransferable,
-                               [optional] in AString aString,
-                               [optional] in uint32_t aOffset,
-                               [optional] in AString aReplaceSrcString,
-                               [optional] in unsigned long aAdditionalFlags);
+  boolean sendContentCommandEvent(in AString aType,
+                                  [optional] in nsITransferable aTransferable,
+                                  [optional] in AString aString,
+                                  [optional] in uint32_t aOffset,
+                                  [optional] in AString aReplaceSrcString,
+                                  [optional] in unsigned long aAdditionalFlags);
 
   /**
    * sendQueryContentEvent()'s aAdditionalFlags may have one of following

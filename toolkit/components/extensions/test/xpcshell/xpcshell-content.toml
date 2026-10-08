@@ -50,3 +50,5 @@ skip-if = [
 ["test_ext_web_accessible_resources.js"]
 
 ["test_ext_web_accessible_resources_matches.js"]
+
+["test_ext_web_accessible_workers.js"]

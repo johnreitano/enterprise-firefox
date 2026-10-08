@@ -431,6 +431,7 @@ document.addEventListener("DOMContentLoaded", function () {
     basicsLink.hidden = false;
     basicsLink.addEventListener("click", async e => {
       e.preventDefault();
+      window.PrivateBrowsingRecordRedesignClick("PrivateWindowBasicsLink");
       // Trigger the spotlight
       await RPMSendAsyncMessage("TRIGGER_MESSAGING_EVENT", {
         id: "privateWindowBasicsLinkClick",
@@ -456,6 +457,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const maskIntro = document.getElementById(
       "about-private-browsing-mask-intro"
     );
+    window.PrivateBrowsingRedesignExposure();
+
     const staticLogo = document.getElementById("about-private-browsing-logo");
     staticLogo.hidden = true;
     maskIntro.hidden = false;
@@ -471,6 +474,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!alreadyShown && !reduceMotion) {
       maskIntro.play = true;
       document.documentElement.classList.add("intro-playing");
+      window.PrivateBrowsingRecordIntroAnimation();
       RPMSetPref("browser.privatebrowsing.introAnimationShown", true);
     }
   }

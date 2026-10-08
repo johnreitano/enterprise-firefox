@@ -6,7 +6,9 @@
 #define SHMBufSurface_h_
 
 #include "Units.h"
-#include "WUniquePtr.h"
+#ifdef MOZ_WAYLAND
+#  include "WUniquePtr.h"
+#endif
 #include "mozilla/RefPtr.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/gfx/Types.h"
@@ -49,12 +51,14 @@ class SHMBufSurface : public BufferSurface {
   // Surface is backed by external memory
   uint8_t* mBuffer = nullptr;
 
+#ifdef MOZ_WAYLAND
   // SHMBufSurface is backed by shared memory (wl_shm_pool) and provides a
   // CPU-accessible buffer we can draw into. The shared memory pool is created
   // and owned directly by the surface.
   mozilla::WUniquePtr<wl_shm_pool> mShmPool;
   mozilla::ipc::MutableSharedMemoryHandle mShmHandle;
   mozilla::ipc::SharedMemoryMapping mShm;
+#endif
 };
 
 class SHMBufSurfaceRGBA final : public SHMBufSurface {

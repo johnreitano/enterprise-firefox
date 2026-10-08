@@ -25,6 +25,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   createAITab: "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs",
   expandUrlTokens:
     "moz-src:///browser/components/aiwindow/ui/modules/UrlTokenizer.sys.mjs",
+  UrlTokenizer:
+    "moz-src:///browser/components/aiwindow/ui/modules/UrlTokenizer.sys.mjs",
 });
 
 add_setup(async function () {
@@ -64,6 +66,17 @@ function servePage() {
       <p>It is a short walk from the Baixa district and has free breakfast.</p>
     </article>
   `;
+}
+
+/**
+ * The token generateAITab gives `url` when it is the first URL in the prompt
+ * with its host and path.
+ *
+ * @param {string} url
+ * @returns {string}
+ */
+function urlToken(url) {
+  return new lazy.UrlTokenizer().formatToken(url);
 }
 
 add_task(async function test_generateAITab_requires_urls() {
@@ -171,9 +184,16 @@ add_task(async function test_generateAITab_includes_page_image() {
     const { request, respond } = await mockEngine.captureRequest({
       purpose: lazy.MODEL_FEATURES.AITAB,
     });
+    const serializedRequest = JSON.stringify(request.args);
     Assert.ok(
-      JSON.stringify(request.args).includes(`Image: ${IMAGE_URL}`),
-      "the page's preview image URL reaches the model prompt"
+      serializedRequest.includes(
+        "Image: §url_token: EXAMPLE_COM_LISBON_HERO_JPG_1§"
+      ),
+      "the page's preview image URL reaches the model prompt as a token"
+    );
+    Assert.ok(
+      !serializedRequest.includes(IMAGE_URL),
+      "the raw preview image URL does not reach the model prompt"
     );
     respond(JSON.stringify(GENERATED_SURFACE));
 
@@ -233,7 +253,8 @@ add_task(async function test_generateAITab_omits_image_for_denied_url() {
       "the denied URL surfaces the refusal message, not page content"
     );
     Assert.ok(
-      !serializedRequest.includes(IMAGE_URL),
+      !serializedRequest.includes(IMAGE_URL) &&
+        !serializedRequest.includes("EXAMPLE_COM_DENIED_HERO_JPG"),
       "the denied URL's preview image does not reach the model prompt"
     );
     respond(JSON.stringify(GENERATED_SURFACE));
@@ -278,7 +299,10 @@ add_task(async function test_generateAITab_hydrates_link_favicons() {
   );
   try {
     const genPromise = lazy.AITab.generateAITab(
-      { urlList: [GEN_URL], focus: "hotels in Lisbon" },
+      {
+        urlList: [GEN_URL],
+        focus: `hotels in Lisbon, see ${NO_FAVICON_URL}`,
+      },
       lazy.newConversation()
     );
 
@@ -298,9 +322,13 @@ add_task(async function test_generateAITab_hydrates_link_favicons() {
             title: "Hotels in Lisbon",
             references: {
               items: [
-                { href: GEN_URL, title: "Hotels", favicon: MODEL_FAVICON },
                 {
-                  href: NO_FAVICON_URL,
+                  href: urlToken(GEN_URL),
+                  title: "Hotels",
+                  favicon: MODEL_FAVICON,
+                },
+                {
+                  href: urlToken(NO_FAVICON_URL),
                   title: "Unvisited",
                   favicon: MODEL_FAVICON,
                 },
@@ -324,8 +352,8 @@ add_task(async function test_generateAITab_hydrates_link_favicons() {
           },
         ],
         dataModel: {
-          sources: [{ href: GEN_URL, title: "Hotels" }],
-          more: [{ href: GEN_URL, title: "More" }],
+          sources: [{ href: urlToken(GEN_URL), title: "Hotels" }],
+          more: [{ href: urlToken(GEN_URL), title: "More" }],
         },
       }),
     });
@@ -410,7 +438,7 @@ add_task(async function test_generateAITab_hydrates_favicon_for_denied_url() {
             component: "SourceLinks",
             items: [
               {
-                href: DENIED_URL,
+                href: urlToken(DENIED_URL),
                 favicon: "https://model.example/injected.ico",
               },
             ],
@@ -528,7 +556,9 @@ add_task(async function test_createAITab_links_to_the_stored_page() {
       purpose: lazy.MODEL_FEATURES.AITAB,
       response: JSON.stringify(GENERATED_SURFACE),
     });
-    const toolResult = await toolPromise;
+    const { success, toolResult, uiData } = await toolPromise;
+    Assert.ok(success);
+    Assert.equal(uiData.properties.state, "choose");
 
     Assert.ok(
       toolResult.aiTab.slug,
@@ -548,6 +578,7 @@ add_task(async function test_createAITab_links_to_the_stored_page() {
       conversation.seenUrls.has(viewerURL),
       "the link is seen, so the chat renders it as a trusted link"
     );
+    Assert.equal(uiData.properties.viewerURL, viewerURL);
   } finally {
     await lazy.AITabStore.destroyDatabase();
     await stopServing();

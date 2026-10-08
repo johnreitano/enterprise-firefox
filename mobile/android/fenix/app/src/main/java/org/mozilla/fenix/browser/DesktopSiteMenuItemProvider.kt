@@ -16,10 +16,13 @@ import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.MenuItemBadge
 import mozilla.components.compose.menu.data.StandardMenuItem
+import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.compose.menu.ui.MenuItemState
+import mozilla.components.feature.session.SessionUseCases
 import mozilla.components.ui.icons.R as iconsR
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
 import org.mozilla.fenix.components.menu.store.MenuAction
 
@@ -27,10 +30,12 @@ import org.mozilla.fenix.components.menu.store.MenuAction
  * [MenuItemProvider] for the menu item allowing to switch the current page between its desktop and mobile versions.
  *
  * @param browserStore [BrowserStore] used to know which version of the current page is shown.
+ * @param requestDesktopSite [SessionUseCases.RequestDesktopSiteUseCase] for switching between the two versions.
  * @param scope [CoroutineScope] used to keep the item up to date for as long as it can be shown.
  */
 class DesktopSiteMenuItemProvider(
-    browserStore: BrowserStore,
+    private val browserStore: BrowserStore,
+    private val requestDesktopSite: SessionUseCases.RequestDesktopSiteUseCase,
     scope: CoroutineScope,
 ) : MenuItemProvider {
     override val itemFlow: StateFlow<MenuItem?> =
@@ -41,6 +46,16 @@ class DesktopSiteMenuItemProvider(
                 started = SharingStarted.Eagerly,
                 initialValue = browserStore.state.desktopSiteItem(),
             )
+
+    override fun handles(event: MenuEvent) =
+        event == MenuAction.RequestDesktopSite || event == MenuAction.RequestMobileSite
+
+    override fun onEvent(event: MenuEvent, menu: MenuHost) {
+        val tabId = browserStore.state.selectedTab?.id ?: return
+
+        menu.dismiss()
+        requestDesktopSite(enable = event == MenuAction.RequestDesktopSite, tabId = tabId)
+    }
 
     /** Switching versions is only offered while a page is shown. */
     private fun BrowserState.desktopSiteItem() =

@@ -1807,8 +1807,12 @@ bool CacheIRCompiler::emitGuardIsNullOrUndefined(ValOperandId inputId) {
   }
 
   Label success;
-  masm.branchTestNull(Assembler::Equal, input, &success);
-  masm.branchTestUndefined(Assembler::NotEqual, input, failure->label());
+  {
+    ScratchTagScope tag(masm, input);
+    masm.splitTagForTest(input, tag);
+    masm.branchTestNull(Assembler::Equal, tag, &success);
+    masm.branchTestUndefined(Assembler::NotEqual, tag, failure->label());
+  }
 
   masm.bind(&success);
   return true;
@@ -9972,25 +9976,29 @@ bool CacheIRCompiler::emitGuardWasmArg(ValOperandId argId,
   // Check that the argument can be converted to the Wasm type in Warp code
   // without bailing out.
   Label done;
-  switch (kind) {
-    case wasm::ValType::I32:
-    case wasm::ValType::F32:
-    case wasm::ValType::F64: {
-      // Argument must be number, bool, or undefined.
-      masm.branchTestNumber(Assembler::Equal, arg, &done);
-      masm.branchTestBoolean(Assembler::Equal, arg, &done);
-      masm.branchTestUndefined(Assembler::NotEqual, arg, failure->label());
-      break;
+  {
+    ScratchTagScope tag(masm, arg);
+    masm.splitTagForTest(arg, tag);
+    switch (kind) {
+      case wasm::ValType::I32:
+      case wasm::ValType::F32:
+      case wasm::ValType::F64: {
+        // Argument must be number, bool, or undefined.
+        masm.branchTestNumber(Assembler::Equal, tag, &done);
+        masm.branchTestBoolean(Assembler::Equal, tag, &done);
+        masm.branchTestUndefined(Assembler::NotEqual, tag, failure->label());
+        break;
+      }
+      case wasm::ValType::I64: {
+        // Argument must be bigint, bool, or string.
+        masm.branchTestBigInt(Assembler::Equal, tag, &done);
+        masm.branchTestBoolean(Assembler::Equal, tag, &done);
+        masm.branchTestString(Assembler::NotEqual, tag, failure->label());
+        break;
+      }
+      default:
+        MOZ_CRASH("Unexpected kind");
     }
-    case wasm::ValType::I64: {
-      // Argument must be bigint, bool, or string.
-      masm.branchTestBigInt(Assembler::Equal, arg, &done);
-      masm.branchTestBoolean(Assembler::Equal, arg, &done);
-      masm.branchTestString(Assembler::NotEqual, arg, failure->label());
-      break;
-    }
-    default:
-      MOZ_CRASH("Unexpected kind");
   }
   masm.bind(&done);
 

@@ -242,6 +242,7 @@
 #include "mozilla/dom/SVGSVGElement.h"
 #include "mozilla/dom/SVGUseElement.h"
 #include "mozilla/dom/Sanitizer.h"
+#include "mozilla/dom/ScreenOrientation.h"
 #include "mozilla/dom/ScriptLoader.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "mozilla/dom/Selection.h"
@@ -13142,6 +13143,8 @@ void Document::OnPageHide(bool aPersisted, EventTarget* aDispatchStartTarget,
                                    return CallState::Continue;
                                  });
   NotifyActivityChanged();
+
+  ScreenOrientation::ReleaseLock(this);
 
   ClearPendingFullscreenRequests(this);
   if (Fullscreen()) {

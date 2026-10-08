@@ -272,7 +272,7 @@ fn try_run(config: &mut Arc<Config>) -> anyhow::Result<bool> {
         //
         // When we are testing, glean will already be initialized (if needed).
         #[cfg(not(test))]
-        let _glean_handle = {
+        let glean_handle = {
             #[cfg_attr(any(mock, not(feature = "enterprise")), allow(unused_mut))]
             let mut options = glean::InitOptions::from_config(&config);
             // Send telemetry to the enterprise console, deriving the endpoint
@@ -289,7 +289,10 @@ fn try_run(config: &mut Arc<Config>) -> anyhow::Result<bool> {
             options.init().context("failed to acquire Glean store")?
         };
 
-        logic::ReportCrash::new(config.clone(), extra)?.run()
+        let report_crash = logic::ReportCrash::new(config.clone(), extra)?;
+        #[cfg(not(test))]
+        let report_crash = report_crash.with_glean_handle(glean_handle);
+        report_crash.run()
     }
 }
 

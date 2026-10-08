@@ -193,6 +193,12 @@ class WebGLExtensionPolygonOffsetClamp : public WebGLExtensionBase {
   static bool IsSupported(const WebGLContext* webgl);
 };
 
+class WebGLExtensionClipControl : public WebGLExtensionBase {
+ public:
+  explicit WebGLExtensionClipControl(WebGLContext* webgl);
+  static bool IsSupported(const WebGLContext* webgl);
+};
+
 class WebGLExtensionSRGB : public WebGLExtensionBase {
  public:
   explicit WebGLExtensionSRGB(WebGLContext*);

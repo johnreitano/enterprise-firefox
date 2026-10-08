@@ -13,6 +13,10 @@ import { UrlbarContentUtils } from "chrome://browser/content/urlbar/UrlbarConten
 import UrlbarPrefs from "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs";
 
 /**
+ * @import { URILoadingHelper } from "resource:///modules/URILoadingHelper.sys.mjs"
+ */
+
+/**
  * @typedef {object} LocalSearchMode
  *   Represents a local search mode, e.g. bookmarks.
  *
@@ -56,6 +60,11 @@ import UrlbarPrefs from "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs"
  */
 
 /**
+ * @typedef {Parameters<URILoadingHelper["openLinkIn"]>[3]} LoadURLParams
+ *   The parameters related to how and where the result will be opened.
+ */
+
+/**
  * @typedef {object} URIFixupPrimitives
  *   The parts of an `nsIURIFixupInfo` that survive the actor boundary, so a
  *   content-realm consumer never holds an XPCOM object. Produced by
@@ -96,16 +105,19 @@ export const UrlbarShared = {
    * chrome-only, and unlike `instanceof` it holds for a value from another
    * global; a content realm compares against its own interface object.
    *
+   * @template T
    * @param {any} value
    *   The value to check.
-   * @param {object} iface
+   * @param {{ new (...args: any[]): T; isInstance?: (obj: any) => boolean }} iface
    *   The interface, e.g. `KeyboardEvent`.
-   * @returns {boolean}
+   * @returns {value is T}
    */
-  isInstance:
-    typeof ChromeUtils != "undefined"
-      ? (value, iface) => iface.isInstance(value)
-      : (value, iface) => value instanceof iface,
+  isInstance(value, iface) {
+    if (typeof ChromeUtils != "undefined") {
+      return iface.isInstance(value);
+    }
+    return value instanceof iface;
+  },
 
   // REGEXP_ constants are duplicated from UrlUtils.sys.mjs
   // Regex matching on whitespaces.

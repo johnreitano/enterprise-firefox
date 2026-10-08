@@ -402,20 +402,18 @@
     --info-bar-margin: 4px;
 
     /** input **/
+    --input-background-color-disabled: var(--button-background-color-disabled);
+    --input-border: var(--border-width) solid var(--input-border-color);
     --input-border-color: var(--border-color-interactive);
-    --input-folder-gap: var(--space-medium);
+    --input-border-color-disabled: var(--border-color-interactive-disabled);
+    --input-border-radius: var(--border-radius-medium);
     --input-height: var(--size-item-small);
-    --input-search-border-radius: var(--input-text-border-radius);
-    --input-search-icon-size: var(--input-text-icon-size);
-    --input-text-background-color-disabled: var(--button-background-color-disabled);
-    --input-text-border: var(--border-width) solid var(--input-text-border-color);
-    --input-text-border-color: var(--border-color);
-    --input-text-border-color-disabled: var(--border-color-interactive-disabled);
-    --input-text-border-radius: var(--border-radius-medium);
+    --input-icon-size: var(--icon-size-xsmall);
+    --input-min-height: var(--button-min-height);
+    --input-opacity-disabled: var(--button-opacity-disabled);
+    --input-search-border-radius: var(--input-border-radius);
+    --input-search-icon-size: var(--input-icon-size);
     --input-text-color-disabled: var(--input-text-color);
-    --input-text-icon-size: var(--icon-size-xsmall);
-    --input-text-min-height: var(--button-min-height);
-    --input-text-opacity-disabled: var(--button-opacity-disabled);
     --input-width: var(--size-item-small);
 
     /** link **/
@@ -984,10 +982,10 @@
       --info-bar-margin: 0;
 
       /** input **/
+      --input-background-color: var(--background-color-box);
+      --input-background-color-disabled: var(--button-background-color-ghost-disabled);
       --input-search-border-radius: var(--border-radius-circle);
       --input-search-icon-size: var(--icon-size-small);
-      --input-text-background-color: var(--background-color-box);
-      --input-text-background-color-disabled: var(--button-background-color-ghost-disabled);
 
       /** link **/
       --link-border-radius-focus: var(--border-radius-xsmall);

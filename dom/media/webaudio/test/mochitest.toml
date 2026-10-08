@@ -167,20 +167,13 @@ skip-if = [
 ["test_decodeAudioError.html"]
 
 ["test_decodeMultichannel.html"]
-skip-if = [
-  "isolated_process", # Bug 1709948
-]
 
 ["test_decodeMultichannelOrder.html"]
-skip-if = [
-  "isolated_process", # Bug 1709948
-]
 
 ["test_decodeOpusTail.html"]
 
 ["test_decoderDelay.html"]
 skip-if = [
-  "isolated_process", # Bug 1709948
   "os == 'android'", # Bug 2018243
 ]
 

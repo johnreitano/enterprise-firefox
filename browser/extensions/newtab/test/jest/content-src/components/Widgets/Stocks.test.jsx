@@ -179,7 +179,7 @@ describe("Stocks widget", () => {
     const { container } = renderStocksState();
     expect(
       container.querySelector(
-        ".stocks-context-menu-button[data-l10n-id='newtab-stocks-widget-menu-button2']"
+        ".stocks-context-menu-button[data-l10n-id='newtab-stocks-widget-open-menu-button2']"
       )
     ).toBeTruthy();
   });

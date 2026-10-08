@@ -5,6 +5,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/** @import {Store} from "resource://newtab/lib/Store.sys.mjs" */
+
 // We use importESModule here instead of static import so that the Karma test
 // environment won't choke on these module. This is because the Karma test
 // environment already stubs out XPCOMUtils and RemoteSettings, and overrides
@@ -208,6 +210,9 @@ const WALLPAPER_USER_EVENTS = new Set([
 ]);
 
 export class TelemetryFeed {
+  /** @type {Store} */
+  store = null;
+
   /**
    * Queue for telemetry events when in NormalGleanSession mode.
    * Events are stored here and cleared at session end based on session type.
@@ -309,13 +314,6 @@ export class TelemetryFeed {
   get inferredTelemetrySettingsOverrides() {
     return this.store?.getState()?.InferredPersonalization
       ?.inferredTelemetrySettingsOverrides;
-  }
-
-  get tileIdRedactedForSponsored() {
-    return (
-      this.store?.getState()?.Prefs.values?.trainhopConfig?.newtabPing
-        ?.redactTileIdForSponsored || false
-    );
   }
 
   /**
@@ -664,7 +662,9 @@ export class TelemetryFeed {
    * Removes fields that link to any user content preference.
    *
    * @param {*} pingDict Input dictionary
-   * @param {boolean} isSponsored Is this in ad, in which case there is nothing we can redact currently
+   * @param {boolean} isSponsored Whether this is a sponsored (ad) item.
+   *   Sponsored items retain the corpus/recommendation identifiers that
+   *   organic items drop, but tile_id is redacted in both cases.
    * @returns {*} Redacted dictionary
    */
   redactNewTabPing(pingDict, isSponsored = false) {
@@ -678,6 +678,10 @@ export class TelemetryFeed {
         section,
         // eslint-disable-next-line no-unused-vars
         selected_topics,
+        // @backward-compat { version 159 }
+        // We can remove tile_id from this list once 159 hits release, since at that point,
+        // tile_id will have been removed from the newtab ping within metrics.yaml, and there
+        // will no longer be a chance of it accidentally slipping through extra_keys.
         // eslint-disable-next-line no-unused-vars
         tile_id,
         // eslint-disable-next-line no-unused-vars
@@ -697,6 +701,12 @@ export class TelemetryFeed {
       section,
       // eslint-disable-next-line no-unused-vars
       selected_topics,
+      // @backward-compat { version 159 }
+      // We can remove tile_id from this list once 159 hits release, since at that point,
+      // tile_id will have been removed from the newtab ping within metrics.yaml, and there
+      // will no longer be a chance of it accidentally slipping through extra_keys.
+      // eslint-disable-next-line no-unused-vars
+      tile_id,
       // eslint-disable-next-line no-unused-vars
       topic,
       // eslint-disable-next-line no-unused-vars
@@ -706,39 +716,7 @@ export class TelemetryFeed {
       ...result
     } = pingDict;
 
-    // For spocs we need to retain the tile id, unless we're configured to
-    // redact it.
-    if (this.tileIdRedactedForSponsored) {
-      delete result.tile_id;
-    }
-
     result.content_redacted = true;
-    return result;
-  }
-
-  /**
-   * Removes the tile_id from a top sites event bound for the newtab ping when
-   * the redactTileIdForSponsored trainhop config is enabled.
-   *
-   * Kept separate from redactNewTabPing because the topsites metrics are
-   * recorded directly rather than through the stories redaction path, and
-   * because content_redacted is not a declared extra key on most of them.
-   *
-   * @param {*} pingDict Input dictionary
-   * @param {boolean} isSponsored Whether this event is for a sponsored top
-   *   site. Defaults to true so that omitting it redacts rather than leaks.
-   * @returns {*} Possibly redacted dictionary
-   */
-  redactTopSitesTileId(pingDict, isSponsored = true) {
-    if (!isSponsored || !this.tileIdRedactedForSponsored) {
-      return pingDict;
-    }
-
-    const {
-      // eslint-disable-next-line no-unused-vars
-      tile_id,
-      ...result
-    } = pingDict;
     return result;
   }
 
@@ -1044,7 +1022,6 @@ export class TelemetryFeed {
       position,
       source,
       advertiser_name,
-      tile_id,
       visible_topsites,
       frecency_boosted = false,
       is_ad_eligible_position,
@@ -1062,7 +1039,6 @@ export class TelemetryFeed {
         if (this.sovEnabled()) {
           const eventData = {
             advertiser_name,
-            tile_id,
             is_sponsored: true,
             position,
             visible_topsites,
@@ -1080,7 +1056,6 @@ export class TelemetryFeed {
         } else {
           const gleanData = {
             advertiser_name,
-            tile_id,
             newtab_visit_id: session.session_id,
             is_sponsored: true,
             position,
@@ -1089,9 +1064,7 @@ export class TelemetryFeed {
               ? { is_ad_eligible_position: true }
               : {}),
           };
-          Glean.topsites.impression.record(
-            this.redactTopSitesTileId(gleanData, true)
-          );
+          Glean.topsites.impression.record(gleanData);
         }
       }
     } else if (type === "click") {
@@ -1102,7 +1075,6 @@ export class TelemetryFeed {
         if (this.sovEnabled()) {
           const eventData = {
             advertiser_name,
-            tile_id,
             is_sponsored: true,
             position,
             visible_topsites,
@@ -1117,15 +1089,12 @@ export class TelemetryFeed {
         } else {
           const gleanData = {
             advertiser_name,
-            tile_id,
             newtab_visit_id: session.session_id,
             is_sponsored: true,
             position,
             visible_topsites,
           };
-          Glean.topsites.click.record(
-            this.redactTopSitesTileId(gleanData, true)
-          );
+          Glean.topsites.click.record(gleanData);
         }
       }
     } else {
@@ -1192,6 +1161,8 @@ export class TelemetryFeed {
    * This tracks how long placeholder content is shown before being replaced
    * with actual sponsored content when using onDemand mode.
    *
+   * @param {object} action
+   * @param {object} action.data
    * @param {number} action.data.duration - Duration in milliseconds
    */
   handleSpocPlaceholderDuration(action) {
@@ -1414,7 +1385,6 @@ export class TelemetryFeed {
           selected_topics,
           shim,
           source_section_id,
-          tile_id,
           topic,
           variant_id,
         } = action.data.value ?? {};
@@ -1455,7 +1425,6 @@ export class TelemetryFeed {
             variant_id,
             source_section_id: source_section_id ?? section,
             position: action.data.action_position,
-            tile_id,
             event_source,
             // We conditionally add in a few props.
             ...(corpus_item_id ? { corpus_item_id } : {}),
@@ -2680,7 +2649,6 @@ export class TelemetryFeed {
           is_sponsored: datum.card_type === "spoc",
           ...(datum.format ? { format: datum.format } : {}),
           position: datum.position,
-          tile_id: datum.id || datum.tile_id,
           ...(datum.section
             ? {
                 section: datum.section,
@@ -2719,14 +2687,12 @@ export class TelemetryFeed {
       }
       // Only log a topsites.dismiss telemetry event if the action came from TopSites section
       if (action.source === "TOP_SITES") {
-        const { position, advertiser_name, tile_id, isSponsoredTopSite } =
-          datum;
+        const { position, advertiser_name, isSponsoredTopSite } = datum;
         if (this.sovEnabled() && isSponsoredTopSite) {
           this.recordOrQueueEvent(
             "topSitesDismiss",
             {
               advertiser_name,
-              tile_id,
               is_sponsored: !!isSponsoredTopSite,
               position,
             },
@@ -2735,14 +2701,11 @@ export class TelemetryFeed {
         } else {
           const gleanData = {
             advertiser_name,
-            tile_id,
             newtab_visit_id: session.session_id,
             is_sponsored: !!isSponsoredTopSite,
             position,
           };
-          Glean.topsites.dismiss.record(
-            this.redactTopSitesTileId(gleanData, !!isSponsoredTopSite)
-          );
+          Glean.topsites.dismiss.record(gleanData);
         }
       }
     }
@@ -2751,27 +2714,23 @@ export class TelemetryFeed {
   handleAboutSponsoredTopSites(action) {
     const session = this.sessions.get(au.getPortIdOfSender(action));
     const { data } = action;
-    const { position, advertiser_name, tile_id } = data;
+    const { position, advertiser_name } = data;
 
     if (session) {
       if (this.sovEnabled()) {
         if (this.privatePingEnabled) {
           this.newtabContentPing.recordEvent("topSitesShowPrivacyClick", {
             advertiser_name,
-            tile_id,
             position,
           });
         }
       } else {
         const gleanData = {
           advertiser_name,
-          tile_id,
           newtab_visit_id: session.session_id,
           position,
         };
-        Glean.topsites.showPrivacyClick.record(
-          this.redactTopSitesTileId(gleanData, true)
-        );
+        Glean.topsites.showPrivacyClick.record(gleanData);
       }
     }
   }
@@ -2814,7 +2773,6 @@ export class TelemetryFeed {
             }
           : {}),
         position: tile.pos,
-        tile_id: tile.id,
         topic: tile.topic,
         variant_id: tile.variant_id,
         source_section_id: tile.source_section_id ?? tile.section,

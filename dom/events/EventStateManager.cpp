@@ -7383,6 +7383,12 @@ nsresult EventStateManager::DoContentCommandInsertTextEvent(
     return NS_OK;
   }
 
+  if (aEvent->ShouldCheckEnabledOnly()) {
+    aEvent->mIsEnabled = !activeEditor->IsReadonly();
+    aEvent->mSucceeded = true;
+    return NS_OK;
+  }
+
   nsresult rv = activeEditor->InsertTextAsAction(aEvent->mString.ref());
   aEvent->mIsEnabled = rv != NS_SUCCESS_DOM_NO_OPERATION;
   aEvent->mSucceeded = NS_SUCCEEDED(rv);
@@ -7459,6 +7465,12 @@ nsresult EventStateManager::DoContentCommandReplaceTextEvent(
   }
   if (!aEvent->mSelection.mReplaceSrcString.Equals(targetStr)) {
     aEvent->mSucceeded = false;
+    return NS_OK;
+  }
+
+  if (aEvent->ShouldCheckEnabledOnly()) {
+    aEvent->mIsEnabled = !activeEditor->IsReadonly();
+    aEvent->mSucceeded = true;
     return NS_OK;
   }
 

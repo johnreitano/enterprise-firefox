@@ -3,7 +3,7 @@ prefs = [
   "browser.ml.modelHubRootUrl='chrome://mochitests/content/browser/toolkit/components/ml/tests/browser/data'",
   # Retire the serving process with its last generator, without an idle wait.
   "browser.ml.hwinference.browser_idle_shutdown_grace_ms=0",
-  # Nightly defaults the pref on; tests opt into the HWInference path.
+  # The pref defaults on; tests opt into the HWInference path.
   "browser.ml.llama.hwInference=false",
 ]
 support-files = [

@@ -283,6 +283,7 @@ treeherder:
         'fenix-nightly': 'Fenix nightly-related tasks'
         'fenix-nightly-nobp': 'Fenix nightly builds without baseline profiles'
         'fenix-nightlySim': 'Nightly-related tasks that run on each github push'
+        'fenix-nightlyAsReleaseSim': 'Fenix nightly-as-release performance tasks (nightly built against release-milestone GeckoView)'
         'fenix-release': 'Fenix production-related tasks'
 
         # This list is based on mobile/android/android-components/.buildconfig.yml except the exceptions down below
@@ -677,7 +678,7 @@ taskgraph:
 
 workers:
     aliases:
-        b-linux(|-docker(|-x?large|-updatebot)-amd|-medium|-aarch64|-xlarge|-kvm):
+        b-linux(|-docker(|-x?large|-updatebot)-amd|-medium|-aarch64|-x?large|-kvm):
             provisioner: '{trust-domain}-{level}'
             implementation: docker-worker
             os: linux
@@ -871,7 +872,7 @@ workers:
             implementation: docker-worker
             os: linux
             worker-type: 't-linux-docker-kvm'
-        t-linux-(talos|netperf)(-1804|-2404)?:
+        t-linux-(talos|netperf)-2404:
             provisioner: releng-hardware
             implementation: generic-worker
             os: linux

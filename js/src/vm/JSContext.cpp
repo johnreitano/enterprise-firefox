@@ -1671,11 +1671,14 @@ void JSContext::suspendExecutionTracing() {
 #ifdef JS_CHECK_UNSAFE_CALL_WITH_ABI
 
 AutoUnsafeCallWithABI::AutoUnsafeCallWithABI(UnsafeABIStrictness strictness)
-    : cx_(TlsContext.get()),
+    // TlsContext isn't initialized when using the frontend-only API
+    // (JS_FrontendOnlyInit), for example when constant folding calls NumberDiv.
+    : cx_(TlsContext.initialized() ? TlsContext.get() : nullptr),
       nested_(cx_ ? cx_->hasAutoUnsafeCallWithABI : false),
       nogc(cx_) {
   if (!cx_) {
-    // This is a helper thread doing Ion or Wasm compilation - nothing to do.
+    // This is a helper thread doing Ion or Wasm compilation, or frontend-only
+    // code without a JSContext - nothing to do.
     return;
   }
   switch (strictness) {

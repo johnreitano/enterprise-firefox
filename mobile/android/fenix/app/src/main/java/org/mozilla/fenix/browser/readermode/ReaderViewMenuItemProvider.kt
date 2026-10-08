@@ -15,9 +15,13 @@ import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.StandardMenuItem
+import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.ui.icons.R as iconsR
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.AppStore
+import org.mozilla.fenix.components.appstate.AppAction.ReaderViewAction
+import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
 import org.mozilla.fenix.components.menu.store.MenuAction
 
@@ -25,10 +29,12 @@ import org.mozilla.fenix.components.menu.store.MenuAction
  * [MenuItemProvider] for the menu item allowing to customize the reader view, shown only while reader view is active.
  *
  * @param browserStore [BrowserStore] used to know whether reader view is active for the current tab.
+ * @param appStore [AppStore] for showing the reader view controls.
  * @param scope [CoroutineScope] used to keep the item up to date for as long as it can be shown.
  */
 class ReaderViewMenuItemProvider(
     browserStore: BrowserStore,
+    private val appStore: AppStore,
     scope: CoroutineScope,
 ) : MenuItemProvider {
     override val itemFlow: StateFlow<MenuItem?> =
@@ -39,6 +45,13 @@ class ReaderViewMenuItemProvider(
                 started = SharingStarted.Eagerly,
                 initialValue = browserStore.state.customizeReaderViewItem(),
             )
+
+    override fun handles(event: MenuEvent) = event == MenuAction.CustomizeReaderView
+
+    override fun onEvent(event: MenuEvent, menu: MenuHost) {
+        menu.dismiss()
+        appStore.dispatch(ReaderViewAction.ReaderViewControlsShown)
+    }
 
     /** Customizing the reader view is only offered while the current page is shown in reader view. */
     private fun BrowserState.customizeReaderViewItem() =

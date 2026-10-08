@@ -6,6 +6,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Localized } from "./MSLocalized";
 import { MultiStageUtils } from "../lib/multistage-utils.mjs";
 import { MultiStageProtonScreen } from "./MultiStageProtonScreen";
+import { getTileImpressionContext } from "./ContentTiles";
 import { useLanguageSwitcher } from "./LanguageSwitcher";
 import { SubmenuButton } from "./SubmenuButton";
 import { BASE_PARAMS, addUtmParams } from "../lib/addUtmParams.mjs";
@@ -101,6 +102,7 @@ export const MultiStageAboutWelcome = props => {
             screen_index: order,
             screen_id: screen.id,
             screen_initials: screenInitials,
+            ...getTileImpressionContext(screen.content?.tiles),
           });
 
           // Impression actions should be fired before recording the

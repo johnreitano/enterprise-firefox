@@ -347,6 +347,8 @@ fail-if = [
 
 ["browser_toolbox_watchedByDevTools.js"]
 
+["browser_toolbox_watchedByDevTools_bfcache.js"]
+
 ["browser_toolbox_window_closed_during_startup.js"]
 
 ["browser_toolbox_window_global_debugging.js"]

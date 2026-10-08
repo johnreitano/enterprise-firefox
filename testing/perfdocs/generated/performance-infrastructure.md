@@ -162,6 +162,7 @@ The devices are split across two device farms: a subset of the performance tests
     * `test-android-hw-a55-14-0-aarch64-shippable/opt`
     * `test-android-hw-a55-14-0-aarch64/opt`
   * `proj-autophone/gecko-t-lambda-perf-a55`
+    * `test-android-hw-a55-14-0-aarch64-nightlyasrelease/opt`
     * `test-android-hw-a55-14-0-aarch64-shippable/opt`
     * `test-android-hw-a55-14-0-aarch64/opt`
 
@@ -186,6 +187,7 @@ More Info: https://www.phonemore.com/specs/samsung/galaxy-a55/
 * **Machines**: 4 devices total
 * **Worker pools, and their platforms**:
   * `proj-autophone/gecko-t-bitbar-gw-perf-s24`
+    * `test-android-hw-s24-14-0-aarch64-nightlyasrelease/opt`
     * `test-android-hw-s24-14-0-aarch64-shippable/opt`
   * `proj-autophone/gecko-t-bitbar-gw-unit-s24`
 
@@ -210,6 +212,7 @@ More Info: https://www.phonemore.com/specs/samsung/galaxy-s24/sm-s921bds-128gb/
 * **Machines**: 4 devices total
 * **Worker pools, and their platforms**:
   * `proj-autophone/gecko-t-bitbar-gw-perf-p6`
+    * `test-android-hw-p6-13-0-aarch64-nightlyasrelease/opt`
     * `test-android-hw-p6-13-0-aarch64-shippable/opt`
   * `proj-autophone/gecko-t-bitbar-gw-unit-p6`
 

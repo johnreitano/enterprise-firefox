@@ -103,7 +103,8 @@ async function withAITab(task) {
     });
     const sourceText = JSON.stringify(request.args);
     respond(JSON.stringify(generatedSurface(title)));
-    return { sourceText, toolResult: await toolPromise };
+    const { success, toolResult, uiData } = await toolPromise;
+    return { sourceText, success, toolResult, uiData };
   }
 
   /**
@@ -180,11 +181,11 @@ add_task(async function test_blocks_url_the_model_chose() {
         "rejecting a URL it does not recognise."
     );
 
-    const toolResult = await runExpectingRefusal([ATTACKER_URL]);
+    const { success, toolResult } = await runExpectingRefusal([ATTACKER_URL]);
 
     Assert.equal(
-      typeof toolResult,
-      "string",
+      success,
+      false,
       "The tool reports a failure, not a created page."
     );
     Assert.ok(
@@ -482,11 +483,11 @@ add_task(async function test_a_page_that_cannot_be_stored_fails_the_tool() {
       .rejects(new Error("no space left on device"));
 
     try {
-      const { toolResult } = await run([SOURCE_URL]);
+      const { success, toolResult } = await run([SOURCE_URL]);
 
       Assert.equal(
-        typeof toolResult,
-        "string",
+        success,
+        false,
         "The tool reports a failure, not a link to a page that is not there."
       );
       Assert.ok(

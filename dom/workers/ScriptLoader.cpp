@@ -707,8 +707,8 @@ already_AddRefed<ScriptLoadRequest> WorkerScriptLoader::CreateScriptLoadRequest(
   if (mWorkerRef->Private()->WorkerType() == WorkerType::Classic ||
       IsDebuggerScript()) {
     request = new ScriptLoadRequest(ScriptKind::eClassic, SRIMetadata(),
-                                    nullptr,  // mReferrer
-                                    loadContext);
+                                    /* aReferrer = */ nullptr, loadContext,
+                                    /* aClassicScriptHintEncoding = */ nullptr);
   } else {
     // Implements part of "To fetch a worklet/module worker script graph"
     // including, setting up the request with a credentials mode,

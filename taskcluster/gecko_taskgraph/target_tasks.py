@@ -527,9 +527,15 @@ def target_tasks_mozilla_central(full_task_graph, parameters, graph_config):
         # do it somewhat hackily. Android doesn't have variants other than shippable
         # and ccov so it is pretty straightforward to check for. Other platforms
         # have many variants, but none of the regular opt builds we're looking for
-        # have a "-" in their platform name, so this works (for now).
+        # have a "-" in their platform name, so this works (for now). The
+        # Android nightly-as-release build is an opt build and is not
+        # shippable. But it is not a regular opt build. Thus exclude it
+        # by name.
         is_regular_opt = (
-            family == "android" and not shippable and not ccov
+            family == "android"
+            and not shippable
+            and not ccov
+            and "nightlyasrelease" not in build_platform
         ) or "-" not in build_platform
 
         if build_type != "opt" or not is_regular_opt:

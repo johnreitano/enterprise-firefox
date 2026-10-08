@@ -152,7 +152,7 @@ describe("Privacy widget", () => {
     const { container } = renderPrivacy();
     const menuButton = container.querySelector(".privacy-context-menu-button");
     expect(menuButton.getAttribute("data-l10n-id")).toBe(
-      "newtab-privacy-widget-menu-button"
+      "newtab-privacy-widget-open-menu-button"
     );
   });
 

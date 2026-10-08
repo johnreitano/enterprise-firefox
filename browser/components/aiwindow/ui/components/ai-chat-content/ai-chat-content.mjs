@@ -28,6 +28,8 @@ import "chrome://browser/content/aiwindow/components/kit-mention.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/agent-monitor-item.mjs";
 // eslint-disable-next-line import/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/aitab-tool-ui.mjs";
+// eslint-disable-next-line import/no-unassigned-import
 import "chrome://global/content/elements/moz-textarea.mjs";
 import {
   dispatchClientError,
@@ -47,6 +49,7 @@ const INVALID_MESSAGE_DATA = {};
  * UI labels for tool results and follow-ups.
  */
 const UI_TYPES = {
+  AITAB: "aitab",
   WEBSITE_CONFIRMATION: "website-confirmation",
   TAB_GROUP_CONFIRMATION: "tab-group-confirmation",
   AI_ACTION_RESULT: "ai-action-result",
@@ -59,6 +62,7 @@ const UI_TYPES = {
  * UI update types for communicating user interactions with tool UIs back to the actor.
  */
 const UI_UPDATE_TYPES = {
+  OPEN_AITAB: "open-aitab",
   CONFIRMATION_TAB_SELECTION: "confirmation-tab-selection",
   CANCEL_TAB_SELECTION: "cancel-tab-selection",
   CONFIRM_TAB_GROUP_SELECTION: "confirm-tab-group-selection",
@@ -170,6 +174,7 @@ export class AIChatContent extends MozLitElement {
 
     // Initialize UI render map
     this.#uiRenderMap = {
+      [UI_TYPES.AITAB]: msg => this.#renderAITab(msg),
       [UI_TYPES.TAB_GROUP_CONFIRMATION]: msg =>
         this.#renderTabGroupConfirmation(msg),
       [UI_TYPES.WEBSITE_CONFIRMATION]: msg =>
@@ -1059,7 +1064,18 @@ export class AIChatContent extends MozLitElement {
       citations = [],
     } = event.detail;
 
-    if (!this.#isAIResponseValid(content, toolUIData)) {
+    const hasRenderableResponse = this.#isAIResponseValid(content, toolUIData);
+    const isToolUICleared = toolUIData === null;
+
+    if (!hasRenderableResponse) {
+      if (isToolUICleared) {
+        this.conversationState = this.conversationState.filter(message => {
+          const isMatchingMessage = message.messageId === messageId;
+          const hasToolUI = !!message.toolUIData;
+          const shouldRemoveMessage = isMatchingMessage && hasToolUI;
+          return !shouldRemoveMessage;
+        });
+      }
       return;
     }
 
@@ -1441,6 +1457,20 @@ export class AIChatContent extends MozLitElement {
 
     const renderFn = this.#uiRenderMap[toolUIData.uiType];
     return renderFn ? renderFn(msg) : nothing;
+  }
+
+  #renderAITab(msg) {
+    return html`<aitab-tool-ui
+      .state=${msg.toolUIData.properties?.state ?? "creating"}
+      .title=${msg.toolUIData.properties?.title ?? ""}
+      @aitab-open-request=${event =>
+        this.#dispatchToolUIUpdate({
+          messageId: msg.messageId,
+          toolCallId: msg.toolUIData.toolCallId,
+          updateType: UI_UPDATE_TYPES.OPEN_AITAB,
+          updateData: { openTarget: event.detail.openTarget },
+        })}
+    ></aitab-tool-ui>`;
   }
 
   #handleConfirmationSubmit = (event, messageId, toolCallId) => {
@@ -1968,6 +1998,10 @@ export class AIChatContent extends MozLitElement {
       lastItem?.type === "message" &&
       lastItem.msg?.role === "assistant" &&
       !!lastItem.msg?.body;
+    const aiTabCreating =
+      lastItem?.type === "message" &&
+      lastItem.msg?.toolUIData?.uiType === UI_TYPES.AITAB &&
+      lastItem.msg.toolUIData.properties?.state === "creating";
     return html`
       <link
         rel="stylesheet"
@@ -1977,7 +2011,9 @@ export class AIChatContent extends MozLitElement {
         <div class="chat-inner-wrapper">
           ${this.#renderMessages(renderItems)}
           ${this.#renderFollowUpSuggestions()}
-          ${this.#renderLoader(actionLogInProgress || replyStreaming)}
+          ${this.#renderLoader(
+            actionLogInProgress || replyStreaming || aiTabCreating
+          )}
           ${this.#renderError()}
         </div>
       </div>

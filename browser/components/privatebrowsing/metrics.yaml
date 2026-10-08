@@ -48,3 +48,46 @@ private_browsing.reset_pbm:
     notification_emails:
       - emz@mozilla.com
     expires: never
+
+aboutprivatebrowsing:
+  basics_modal_shown:
+    type: event
+    description: >
+      Recorded when the "Private Window basics" spotlight is shown, after the
+      user clicks the link that triggers it.
+    bugs: &pbw_redesign_bugs
+      - https://bugzil.la/2074586
+    data_reviews: &pbw_redesign_data_reviews
+      - https://bugzil.la/2074586
+    notification_emails: &pbw_redesign_emails
+      - hthai@mozilla.com
+    data_sensitivity:
+      - interaction
+    expires: never
+
+  click_private_window_basics_link:
+    type: event
+    description: >
+      Recorded when a user clicks the "Private Window basics" link on the
+      redesigned private browsing newtab.
+    bugs: *pbw_redesign_bugs
+    data_reviews: *pbw_redesign_data_reviews
+    notification_emails: *pbw_redesign_emails
+    data_sensitivity:
+      - interaction
+    expires: never
+
+  intro_animation_played:
+    type: event
+    description: >
+      Recorded when the intro animation plays on the redesigned private
+      browsing newtab. It plays once per profile, so this counts the profiles
+      that saw it rather than the number of plays. The exposure event for the
+      privateWindowRedesign feature is the denominator: it is recorded every
+      time the redesigned page renders, animation or not.
+    bugs: *pbw_redesign_bugs
+    data_reviews: *pbw_redesign_data_reviews
+    notification_emails: *pbw_redesign_emails
+    data_sensitivity:
+      - interaction
+    expires: never

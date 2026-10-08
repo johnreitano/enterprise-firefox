@@ -9,9 +9,12 @@ import kotlinx.coroutines.flow.StateFlow
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.StandardMenuItem
+import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.ui.icons.R as iconsR
+import org.mozilla.fenix.NavGraphDirections
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
 import org.mozilla.fenix.components.menu.store.MenuAction
 
@@ -25,4 +28,10 @@ class SettingsMenuItemProvider : MenuItemProvider {
                 onClickEvent = MenuAction.Navigate.Settings,
             )
         )
+
+    override fun handles(event: MenuEvent) = event == MenuAction.Navigate.Settings
+
+    override fun onEvent(event: MenuEvent, menu: MenuHost) {
+        menu.navigate(NavGraphDirections.actionGlobalSettingsFragment())
+    }
 }

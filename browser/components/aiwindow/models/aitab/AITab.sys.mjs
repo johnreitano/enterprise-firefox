@@ -6,6 +6,11 @@
 /** @import { Conversation } from "moz-src:///browser/components/aiwindow/models/Conversation.sys.mjs" */
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+import {
+  expandUrlTokens,
+  stripUnresolvedUrlTokens,
+  UrlTokenizer,
+} from "moz-src:///browser/components/aiwindow/ui/modules/UrlTokenizer.sys.mjs";
 
 const lazy = {};
 
@@ -81,6 +86,13 @@ const SOURCE_TEXT_BUDGET = 10000;
 const PAGE_BREAK = "\n\n<----- PAGE BREAK ---->\n\n";
 
 const MAX_AITAB_URLS = 20;
+
+// Surface properties the browser navigates to or loads. The model may only
+// fill them with URL tokens it was given (see expandSurfaceUrlTokens).
+const LINK_FIELDS = new Set(["href", "image"]);
+// Nesting limit for walking model output in expandSurfaceUrlTokens. Surfaces
+// are flat adjacency lists, so real ones stay far below this.
+const MAX_EXPAND_RECURSION_DEPTH = 32;
 
 const CANCELED_ERROR = "page generation was canceled";
 
@@ -766,6 +778,10 @@ export class AITab {
     // model prompt stays bounded no matter how many tabs are included.
     const perTabBudget = Math.floor(SOURCE_TEXT_BUDGET / urls.length);
 
+    // URLs only reach the model as tokens, so any link it emits can be traced
+    // back to a URL it was actually given.
+    const urlTokenizer = new UrlTokenizer();
+
     /** @type {AITabSource[]} */
     const urlsUsed = [];
     const sourceParts = [];
@@ -791,12 +807,18 @@ export class AITab {
       // model.
       const budgetedText =
         text.length > perTabBudget ? text.slice(0, perTabBudget) : text;
+      const headLines = [
+        `## ${urlTokenizer.tokenizeText(heading)}`,
+        `URL: ${urlTokenizer.formatToken(url)}`,
+      ];
       // Omit the Image: line when absent so the model never echoes an empty
       // value.
-      const head = imageUrl
-        ? `## ${heading}\nURL: ${url}\nImage: ${imageUrl}\n\n`
-        : `## ${heading}\nURL: ${url}\n\n`;
-      sourceParts.push(`${head}${budgetedText}`);
+      if (imageUrl) {
+        headLines.push(`Image: ${urlTokenizer.formatToken(imageUrl)}`);
+      }
+      sourceParts.push(
+        `${headLines.join("\n")}\n\n${urlTokenizer.tokenizeText(budgetedText)}`
+      );
     }
 
     if (signal?.aborted) {
@@ -809,7 +831,8 @@ export class AITab {
     // page-break marker in the prompt.
     const structured = await AITab.#generateStructuredSurface({
       sourceText: sourceParts.join(PAGE_BREAK),
-      focus: focusText,
+      focus: urlTokenizer.tokenizeText(focusText),
+      urlTokenizer,
       signal,
     });
 
@@ -1014,8 +1037,6 @@ export class AITab {
    * Extract a JSON object from the model's text output, tolerating markdown
    * code fences or surrounding prose.
    *
-   * Internal, but not private: the xpcshell test exercises it directly.
-   *
    * @param {string} text
    * @returns {A2UISurface|null} The candidate surface, not yet validated
    *   against the catalog.
@@ -1044,6 +1065,63 @@ export class AITab {
   }
 
   /**
+   * Expand the URL tokens in a parsed model surface back into full URLs.
+   * Tokens inside free text are expanded, or removed when hallucinated. Link
+   * fields (see LINK_FIELDS) must hold exactly one known token; an item whose
+   * `href` does not is dropped, and any other invalid link field is removed,
+   * so a URL the model was never given can't become a link or image.
+   *
+   * @param {any} value - A parsed surface, or a value nested in one.
+   * @param {UrlTokenizer} urlTokenizer - The tokenizer used for the prompt.
+   * @param {number} [recursionDepth] - Nesting level of `value`; callers
+   *   leave it unset.
+   * @returns {any} A detokenized copy, or undefined when `value` is dropped or
+   *   nested deeper than MAX_EXPAND_RECURSION_DEPTH.
+   */
+  static expandSurfaceUrlTokens(value, urlTokenizer, recursionDepth = 0) {
+    if (typeof value == "string") {
+      return stripUnresolvedUrlTokens(
+        expandUrlTokens(value, urlTokenizer.tokenToUrl)
+      );
+    }
+    if (recursionDepth > MAX_EXPAND_RECURSION_DEPTH) {
+      return undefined;
+    }
+    if (Array.isArray(value)) {
+      return value
+        .map(item =>
+          AITab.expandSurfaceUrlTokens(item, urlTokenizer, recursionDepth + 1)
+        )
+        .filter(item => item !== undefined);
+    }
+    if (!value || typeof value != "object") {
+      return value;
+    }
+    const result = {};
+    for (const [key, sub] of Object.entries(value)) {
+      if (LINK_FIELDS.has(key)) {
+        const url = urlTokenizer.resolveExactToken(sub);
+        if (url) {
+          result[key] = url;
+        } else if (key == "href") {
+          lazy.console.warn("dropping item with unknown link", sub);
+          return undefined;
+        }
+        continue;
+      }
+      const expanded = AITab.expandSurfaceUrlTokens(
+        sub,
+        urlTokenizer,
+        recursionDepth + 1
+      );
+      if (expanded !== undefined) {
+        result[key] = expanded;
+      }
+    }
+    return result;
+  }
+
+  /**
    * Ask the model for a validated surface for the given source content.
    * Returns the validated surface on success, or an object with an `error`
    * string describing why generation failed.
@@ -1051,10 +1129,16 @@ export class AITab {
    * @param {object} options Options, as detailed in the Tool specification for AITab
    * @param {string} [options.focus] Focus of page information.
    * @param {string} options.sourceText Page content separated by PAGE_BREAK_TOKEN
+   * @param {object} options.urlTokenizer Tokenizer class for URLs
    * @param {AbortSignal} [options.signal] - Cancels the generation.
    * @returns {Promise<{surface: A2UISurface} | {error: string}>}
    */
-  static async #generateStructuredSurface({ sourceText, focus, signal }) {
+  static async #generateStructuredSurface({
+    sourceText,
+    focus,
+    urlTokenizer,
+    signal,
+  }) {
     try {
       const { env } = await AITab.loadAssets();
 
@@ -1090,11 +1174,12 @@ export class AITab {
         return { error: "the model returned an empty response" };
       }
 
-      const surface = AITab.parsePageConfig(text);
-      if (!surface) {
+      const parsed = AITab.parsePageConfig(text);
+      if (!parsed) {
         lazy.console.error("model did not return valid JSON:", text);
         return { error: "the model did not return valid JSON" };
       }
+      const surface = AITab.expandSurfaceUrlTokens(parsed, urlTokenizer);
 
       const result = AITab.buildSurface(surface, env);
       if (!result.ok) {

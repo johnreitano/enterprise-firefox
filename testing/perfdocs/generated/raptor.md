@@ -4283,6 +4283,48 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
 :::
 
 
+:::{list-table} **{ref}`test-android-hw-a55-14-0-aarch64-nightlyasrelease/opt <hardware-samsung-a55>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **browsertime-benchmark-speedometer3-mobile-fenix**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-fenix-native-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-fenix-nofis**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview-native-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview-nofis**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
 :::{list-table} **{ref}`test-android-hw-a55-14-0-aarch64-shippable/opt <hardware-samsung-a55>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
@@ -4377,6 +4419,48 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
 :::
 
 
+:::{list-table} **{ref}`test-android-hw-p6-13-0-aarch64-nightlyasrelease/opt <hardware-google-pixel-6>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **browsertime-benchmark-speedometer3-mobile-fenix**
+  - ✅
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-fenix-native-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-fenix-nofis**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview-native-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview-nofis**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
 :::{list-table} **{ref}`test-android-hw-p6-13-0-aarch64-shippable/opt <hardware-google-pixel-6>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
@@ -4408,6 +4492,48 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
   - ❌
 * - **browsertime-benchmark-speedometer3-mobile-fenix-nofis**
   - ✅
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview-native-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview-nofis**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-android-hw-s24-14-0-aarch64-nightlyasrelease/opt <hardware-samsung-s24>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **browsertime-benchmark-speedometer3-mobile-fenix**
+  - ✅
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-fenix-native-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-fenix-nofis**
+  - ❌
   - ❌
   - ❌
   - ❌
@@ -5063,6 +5189,48 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
 :::
 
 
+:::{list-table} **{ref}`test-android-hw-a55-14-0-aarch64-nightlyasrelease/opt <hardware-samsung-a55>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **browsertime-benchmark-speedometer3-mobile-fenix**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-fenix-native-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-fenix-nofis**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview-native-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview-nofis**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
 :::{list-table} **{ref}`test-android-hw-a55-14-0-aarch64-shippable/opt <hardware-samsung-a55>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
@@ -5157,6 +5325,48 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
 :::
 
 
+:::{list-table} **{ref}`test-android-hw-p6-13-0-aarch64-nightlyasrelease/opt <hardware-google-pixel-6>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **browsertime-benchmark-speedometer3-mobile-fenix**
+  - ✅
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-fenix-native-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-fenix-nofis**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview-native-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview-nofis**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
 :::{list-table} **{ref}`test-android-hw-p6-13-0-aarch64-shippable/opt <hardware-google-pixel-6>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
@@ -5188,6 +5398,48 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
   - ❌
 * - **browsertime-benchmark-speedometer3-mobile-fenix-nofis**
   - ✅
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview-native-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-geckoview-nofis**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-android-hw-s24-14-0-aarch64-nightlyasrelease/opt <hardware-samsung-s24>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **browsertime-benchmark-speedometer3-mobile-fenix**
+  - ✅
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-fenix-native-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **browsertime-benchmark-speedometer3-mobile-fenix-nofis**
+  - ❌
   - ❌
   - ❌
   - ❌

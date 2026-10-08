@@ -205,7 +205,9 @@ class TaskDescriptionSchema(Schema, kw_only=True):
     # information specific to the worker implementation that will run this task
     worker: Optional[TaskWorkerSchema] = None
     # Override the default priority for the project
-    priority: Optional[str] = None
+    priority: Optional[  # type: ignore
+        optionally_keyed_by("project", str, use_msgspec=True)
+    ] = None
     # Override the default 5 retries
     retries: Optional[int] = None
 
@@ -2652,7 +2654,14 @@ def build_task(config, tasks):
         if "deadline-after" not in task:
             task["deadline-after"] = "1 day"
 
-        if "priority" not in task:
+        resolve_keyed_by(
+            task,
+            "priority",
+            item_name=task["label"],
+            **{"project": config.params["project"]},
+        )
+
+        if task.get("priority") is None:
             task["priority"] = get_default_priority(
                 config.graph_config,
                 config.params["project"],

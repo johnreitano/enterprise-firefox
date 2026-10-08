@@ -1372,7 +1372,9 @@ IPCResult BrowserParent::RecvNewWindowGlobal(
     return IPC_FAIL(this, "Failed to create WindowGlobalParent");
   }
 
-  BindPWindowGlobalEndpoint(std::move(aEndpoint), wgp);
+  if (NS_WARN_IF(!BindPWindowGlobalEndpoint(std::move(aEndpoint), wgp))) {
+    return IPC_FAIL(this, "BindPWindowGlobalEndpoint failed");
+  }
   wgp->InitFromContentProcess(aInit.context().mFields, Manager());
   return IPC_OK();
 }

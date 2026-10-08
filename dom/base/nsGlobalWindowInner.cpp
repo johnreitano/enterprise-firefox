@@ -1152,6 +1152,10 @@ void nsGlobalWindowInner::FreeInnerObjects() {
   }
   StartDying();
 
+  if (JSObject* global = GetWrapperPreserveColor()) {
+    js::SetRealmIsDyingHint(global);
+  }
+
   ClearHasPointerRawUpdateEventListeners();
 
   if (mDoc && mDoc->GetWindowContext()) {

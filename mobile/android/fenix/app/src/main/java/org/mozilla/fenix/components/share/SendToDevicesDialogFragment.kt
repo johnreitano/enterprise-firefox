@@ -44,6 +44,7 @@ import org.mozilla.fenix.components.share.store.ShareUiState
 import org.mozilla.fenix.components.share.store.ShareUiStore
 import org.mozilla.fenix.ext.components
 import org.mozilla.fenix.ext.requireComponents
+import org.mozilla.fenix.settings.SupportUtils
 import org.mozilla.fenix.settings.account.SignOutFragment
 import org.mozilla.fenix.share.listadapters.SyncShareOption
 import org.mozilla.fenix.snackbar.FenixSnackbarDelegate
@@ -89,6 +90,9 @@ class SendToDevicesDialogFragment : BottomSheetDialogFragment() {
                     removeAccountFromSync()
                 },
                 onRetryClicked = { deviceObserver.refreshDevices(null) },
+                onLearnMoreClicked = {
+                    openLearnMoreLink()
+                },
             )
         }
     }
@@ -192,6 +196,11 @@ class SendToDevicesDialogFragment : BottomSheetDialogFragment() {
             )
             dismiss()
         }
+    }
+
+    private fun openLearnMoreLink() {
+        val url = SupportUtils.getGenericSumoURLForTopic(SupportUtils.SumoTopic.CONNECT_ADDITIONAL_DEVICES_TO_SYNC)
+        SupportUtils.launchSandboxCustomTab(requireContext(), url)
     }
 
     /**

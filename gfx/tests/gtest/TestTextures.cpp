@@ -141,8 +141,9 @@ void TestTextureClientSurface(TextureClient* texture,
   ASSERT_TRUE(texture->Lock(OpenMode::OPEN_READ_WRITE));
   // client painting
   RefPtr<DrawTarget> dt = texture->BorrowDrawTarget();
-  RefPtr<SourceSurface> source =
-      gfxPlatform::GetPlatform()->GetSourceSurfaceForSurface(dt, surface);
+  RefPtr<SourceSurface> source = Factory::CreateWrappingDataSourceSurface(
+      surface->Data(), surface->Stride(), surface->GetSize(),
+      surface->Format());
   dt->CopySurface(source, IntRect(IntPoint(), source->GetSize()), IntPoint());
 
   RefPtr<SourceSurface> snapshot = dt->Snapshot();

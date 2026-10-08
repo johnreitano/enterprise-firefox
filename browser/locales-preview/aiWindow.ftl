@@ -546,3 +546,12 @@ aiwindow-resume-section-empty-no-suggestions-description = When there’s someth
 aiwindow-resume-section-empty-all-dismissed-heading = All caught up
 aiwindow-resume-section-empty-all-dismissed-description = That’s all the suggestions for now. Check back later for more.
 aiwindow-resume-section-hide = Hide for now
+
+smartwindow-aitab-creating = Creating a page…
+# "Open here" opens aitab url in the current tab
+smartwindow-aitab-open-current =
+    .label = Open here
+# "Open in new tab" opens a new browser tab with the AITab url in it
+smartwindow-aitab-open-new =
+    .label = Open in new tab
+smartwindow-aitab-created-an-aitab = Created a Smart Page

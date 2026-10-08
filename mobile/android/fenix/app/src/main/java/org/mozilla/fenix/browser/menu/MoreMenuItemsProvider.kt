@@ -14,13 +14,16 @@ import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.ExpandableMenuItem
 import mozilla.components.compose.menu.data.StandardMenuItem
+import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.ui.icons.R as iconsR
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.menu.ExpandableMenuItemProvider
+import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.store.MenuAction
 import org.mozilla.fenix.summarization.isSummarizePageMenuItem
 import org.mozilla.fenix.summarization.onboarding.SummarizationFeatureDiscoveryConfiguration
+import org.mozilla.fenix.summarization.onboarding.SummarizeDiscoveryEvent
 
 /**
  * [ExpandableMenuItemProvider] for the menu item expanding to show more general menu items related to the current
@@ -32,10 +35,13 @@ import org.mozilla.fenix.summarization.onboarding.SummarizationFeatureDiscoveryC
  * @param scope [CoroutineScope] used to keep the item up to date for as long as it can be shown.
  */
 class MoreMenuItemsProvider(
-    browserStore: BrowserStore,
+    private val browserStore: BrowserStore,
     private val summarizationSettings: SummarizationFeatureDiscoveryConfiguration,
     scope: CoroutineScope,
 ) : ExpandableMenuItemProvider {
+    // What this currently expands to, as last configured by the menu.
+    private var lastSubMenuItems: List<StandardMenuItem> = emptyList()
+
     override val itemFlow: StateFlow<ExpandableMenuItem> =
         browserStore.stateFlow
             .map { state ->
@@ -67,6 +73,8 @@ class MoreMenuItemsProvider(
         item: ExpandableMenuItem,
         subMenuItems: List<StandardMenuItem>,
     ): ExpandableMenuItem {
+        lastSubMenuItems = subMenuItems
+
         // "Summarize page" has different rules for highlighting itself vs the "More" header.
         val shouldHighlightForSummarize =
             item.icon?.isHighlighted == true && subMenuItems.any { it.isSummarizePageMenuItem() }
@@ -79,6 +87,19 @@ class MoreMenuItemsProvider(
             subMenuItems = subMenuItems,
             icon = icon(isHighlighted = shouldHighlightForSummarize || shouldHighlightForOtherItems),
         )
+    }
+
+    override fun handles(event: MenuEvent) = event == MenuAction.OnMoreMenuClicked
+
+    /** Expanding this while it draws attention to "Summarize page" counts as the user noticing that feature. */
+    override fun onEvent(event: MenuEvent, menu: MenuHost) {
+        if (
+            lastSubMenuItems.any { it.isSummarizePageMenuItem() } &&
+                browserStore.state.selectedTab?.content?.private == false &&
+                summarizationSettings.shouldHighlightOverflowMenuItem
+        ) {
+            summarizationSettings.cacheDiscoveryEvent(SummarizeDiscoveryEvent.MenuOverflowInteraction)
+        }
     }
 
     private fun icon(isHighlighted: Boolean) =

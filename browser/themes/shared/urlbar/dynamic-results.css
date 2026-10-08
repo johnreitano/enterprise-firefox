@@ -216,6 +216,8 @@
      cropped and the actions + outline are aligned with the
      rest of the results */
   padding-inline: 2px;
+  flex-wrap: wrap;
+  row-gap: var(--space-small);
 }
 
 .urlbarView-dynamic-actions-buttons {

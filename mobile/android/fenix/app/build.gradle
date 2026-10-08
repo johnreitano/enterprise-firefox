@@ -210,6 +210,19 @@ android {
             resources.srcDirs += ['src/androidTest/resources']
             assets.srcDirs += files("$projectDir/schemas".toString())
         }
+        // Web extensions that only the UI tests install.
+        // WebExtensionController.ensureBuiltIn resolves resource://android/assets
+        // against the app's asset manager, so these have to be packaged in the app under test
+        // rather than the test apk.
+        // Added to the debug and other test builds, so they never reach a shipping build.
+        debug {
+            assets.srcDirs += ['src/androidTest/appAssets']
+        }
+        if (project.hasProperty("testBuildType")) {
+            named(project.property("testBuildType")) {
+                assets.srcDirs += ['src/androidTest/appAssets']
+            }
+        }
         if (project.hasProperty('baselineProfilePath')) {
             main {
                 baselineProfiles.srcDirs(project.property('baselineProfilePath'))

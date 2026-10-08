@@ -898,7 +898,7 @@ add_task(async function test_excluded_from_session_restore() {
   );
 
   Assert.ok(
-    !win.__SSi,
+    !SessionStore.getWindowId(win),
     "auth window is not tracked by SessionStore (never registered)"
   );
 

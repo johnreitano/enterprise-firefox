@@ -36,6 +36,19 @@ export class AboutPrivateBrowsingChild extends RemotePageChild {
     Cu.exportFunction(this.PrivateBrowsingRedesignEnabled.bind(this), window, {
       defineAs: "PrivateBrowsingRedesignEnabled",
     });
+    Cu.exportFunction(this.PrivateBrowsingRedesignExposure.bind(this), window, {
+      defineAs: "PrivateBrowsingRedesignExposure",
+    });
+    Cu.exportFunction(
+      this.PrivateBrowsingRecordRedesignClick.bind(this),
+      window,
+      { defineAs: "PrivateBrowsingRecordRedesignClick" }
+    );
+    Cu.exportFunction(
+      this.PrivateBrowsingRecordIntroAnimation.bind(this),
+      window,
+      { defineAs: "PrivateBrowsingRecordIntroAnimation" }
+    );
   }
 
   PrivateBrowsingIsEnrolledInExperiment() {
@@ -51,6 +64,22 @@ export class AboutPrivateBrowsingChild extends RemotePageChild {
 
   PrivateBrowsingPromoExposureTelemetry() {
     lazy.NimbusFeatures.pbNewtab.recordExposureEvent({ once: false });
+  }
+
+  PrivateBrowsingRecordRedesignClick(source) {
+    Glean.aboutprivatebrowsing["click" + source].record();
+  }
+
+  PrivateBrowsingRecordIntroAnimation() {
+    Glean.aboutprivatebrowsing.introAnimationPlayed.record();
+  }
+
+  // Without this the redesign experiment records enrollment but never records
+  // who actually saw the treatment.
+  PrivateBrowsingRedesignExposure() {
+    lazy.NimbusFeatures.privateWindowRedesign.recordExposureEvent({
+      once: true,
+    });
   }
 
   PrivateBrowsingRedesignEnabled() {

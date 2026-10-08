@@ -2511,14 +2511,28 @@ static bool PrepareAndExecuteRegExp(MacroAssembler& masm, Register regexp,
   masm.branchTwoByteString(input, &doneQuickCheck);
 
   // if (index >= length) return false
+  // Load string chars pointer into temp3.
   masm.loadStringLength(input, temp2);
   masm.branch32(Assembler::GreaterThanOrEqual, lastIndex, temp2,
                 &doneQuickCheck);
+  masm.loadStringChars(input, temp3, CharEncoding::Latin1);
 
-  // Check the first character against the reject bitset
-  // Load chars[index] into temp2
-  masm.loadStringChars(input, temp2, CharEncoding::Latin1);
-  masm.load8ZeroExtend(BaseIndex(temp2, lastIndex, TimesOne), temp2);
+  // if (index + sizeof(uint32_t) <= length) {
+  Label skipMask;
+  masm.sub32(Imm32(4), temp2);
+  masm.branch32(Assembler::GreaterThan, lastIndex, temp2, &skipMask);
+
+  // if ((word & quickCheckMask_) != quickCheckValue_) { return true; }
+  masm.load32(BaseIndex(temp3, lastIndex, TimesOne), temp2);
+  masm.and32(Address(regexpReg, RegExpShared::offsetOfQuickCheckMask()), temp2);
+  masm.branch32(Assembler::NotEqual,
+                Address(regexpReg, RegExpShared::offsetOfQuickCheckValue()),
+                temp2, notFound);
+  masm.bind(&skipMask);
+
+  // Check the first character against the reject bitset.
+  // Load chars[index] into temp2.
+  masm.load8ZeroExtend(BaseIndex(temp3, lastIndex, TimesOne), temp2);
 
   // [word, bit] = quickCheckBitsetBit(chars[index])
   static_assert(RegExpShared::QuickCheckBitsetBitsPerWord == 32);
@@ -2532,21 +2546,6 @@ static bool PrepareAndExecuteRegExp(MacroAssembler& masm, Register regexp,
               temp3);
   masm.flexibleRshift32(temp2, temp3);
   masm.branchTest32(Assembler::NonZero, temp3, Imm32(1), notFound);
-
-  // if (index + sizeof(uint32_t) <= length) {
-  masm.loadStringLength(input, temp2);
-  masm.sub32(Imm32(4), temp2);
-  masm.branch32(Assembler::GreaterThan, lastIndex, temp2, &doneQuickCheck);
-
-  // Load 4 bytes into temp2
-  masm.loadStringChars(input, temp2, CharEncoding::Latin1);
-  masm.load32(BaseIndex(temp2, lastIndex, TimesOne), temp2);
-
-  // if ((word & quickCheckMask_) != quickCheckValue_) { return true; }
-  masm.and32(Address(regexpReg, RegExpShared::offsetOfQuickCheckMask()), temp2);
-  masm.branch32(Assembler::NotEqual,
-                Address(regexpReg, RegExpShared::offsetOfQuickCheckValue()),
-                temp2, notFound);
   masm.bind(&doneQuickCheck);
 
   // If we don't need to look at the capture groups, we can leave pairCount at 1

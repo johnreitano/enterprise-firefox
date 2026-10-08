@@ -143,7 +143,7 @@ html|textarea {
   border: 1px solid var(--input-border-color);
   border-radius: var(--border-radius-medium);
   margin: 0;
-  background-color: var(--input-text-background-color);
+  background-color: var(--input-background-color);
   color: var(--input-text-color);
 
   &:where(:user-invalid) {

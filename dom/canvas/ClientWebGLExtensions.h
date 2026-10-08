@@ -52,6 +52,21 @@ class ClientWebGLExtensionBase : public nsWrapperCache {
 
 ////
 
+class ClientWebGLExtensionClipControl : public ClientWebGLExtensionBase {
+ public:
+  virtual JSObject* WrapObject(JSContext* cx,
+                               JS::Handle<JSObject*> givenProto) override;
+  explicit ClientWebGLExtensionClipControl(ClientWebGLContext&);
+
+  void ClipControlEXT(GLenum origin, GLenum depth) const {
+    if (!mContext) [[unlikely]] {
+      AutoJsWarning("clipControlEXT: Extension is `invalidated`.");
+      return;
+    }
+    mContext->ClipControlEXT(origin, depth);
+  }
+};
+
 class ClientWebGLExtensionPolygonOffsetClamp : public ClientWebGLExtensionBase {
  public:
   virtual JSObject* WrapObject(JSContext* cx,

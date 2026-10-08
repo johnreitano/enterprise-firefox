@@ -790,12 +790,12 @@ export class UrlbarChildController {
    * scope can't import) goes through `UrlbarContentUtils`; everything else,
    * including the guarded empty-tab read, is content-safe and stays here.
    *
-   * @param {KeyboardEvent | MouseEvent} event
+   * @param {Event} event
    *   The event that triggered the opening.
    * @returns {"current" | "tabshifted" | "tab" | "save" | "window"}
    */
   whereToOpen(event) {
-    let isKeyboardEvent = UrlbarShared.isInstance(event, KeyboardEvent);
+    const isKeyboardEvent = UrlbarShared.isInstance(event, KeyboardEvent);
     let reuseEmpty = isKeyboardEvent;
     /** @type {"current" | "tabshifted" | "tab" | "save" | "window"} */
     let where;

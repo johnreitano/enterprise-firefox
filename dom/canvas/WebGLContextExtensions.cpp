@@ -23,6 +23,7 @@ const char* GetExtensionName(const WebGLExtensionID ext) {
 
     WEBGL_EXTENSION_IDENTIFIER(ANGLE_instanced_arrays)
     WEBGL_EXTENSION_IDENTIFIER(EXT_blend_minmax)
+    WEBGL_EXTENSION_IDENTIFIER(EXT_clip_control)
     WEBGL_EXTENSION_IDENTIFIER(EXT_color_buffer_float)
     WEBGL_EXTENSION_IDENTIFIER(EXT_color_buffer_half_float)
     WEBGL_EXTENSION_IDENTIFIER(EXT_depth_clamp)
@@ -134,6 +135,8 @@ RefPtr<ClientWebGLExtensionBase> ClientWebGLContext::GetExtension(
         // EXT_
         case WebGLExtensionID::EXT_blend_minmax:
           return MakeRefPtr<ClientWebGLExtensionBlendMinMax>(*this);
+        case WebGLExtensionID::EXT_clip_control:
+          return MakeRefPtr<ClientWebGLExtensionClipControl>(*this);
         case WebGLExtensionID::EXT_color_buffer_float:
           return MakeRefPtr<ClientWebGLExtensionEXTColorBufferFloat>(*this);
         case WebGLExtensionID::EXT_color_buffer_half_float:
@@ -258,6 +261,9 @@ bool WebGLContext::IsExtensionSupported(WebGLExtensionID ext) const {
     // EXT_
     case WebGLExtensionID::EXT_blend_minmax:
       return WebGLExtensionBlendMinMax::IsSupported(this);
+
+    case WebGLExtensionID::EXT_clip_control:
+      return WebGLExtensionClipControl::IsSupported(this);
 
     case WebGLExtensionID::EXT_color_buffer_float:
       return WebGLExtensionEXTColorBufferFloat::IsSupported(this);
@@ -419,6 +425,9 @@ void WebGLContext::RequestExtension(const WebGLExtensionID ext,
     // EXT_
     case WebGLExtensionID::EXT_blend_minmax:
       slot = std::make_unique<WebGLExtensionBlendMinMax>(this);
+      break;
+    case WebGLExtensionID::EXT_clip_control:
+      slot = std::make_unique<WebGLExtensionClipControl>(this);
       break;
     case WebGLExtensionID::EXT_color_buffer_float:
       slot = std::make_unique<WebGLExtensionEXTColorBufferFloat>(this);

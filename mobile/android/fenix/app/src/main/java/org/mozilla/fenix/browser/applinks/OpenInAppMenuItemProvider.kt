@@ -16,6 +16,7 @@ import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.StandardMenuItem
+import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.compose.menu.ui.MenuItemState
 import mozilla.components.feature.app.links.AppLinksUseCases
@@ -24,8 +25,10 @@ import org.mozilla.fenix.R
 import org.mozilla.fenix.components.AppStore
 import org.mozilla.fenix.components.appstate.AppState
 import org.mozilla.fenix.components.appstate.SupportedMenuNotifications
+import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
 import org.mozilla.fenix.components.menu.store.MenuAction
+import org.mozilla.fenix.utils.Settings
 
 /**
  * [MenuItemProvider] for the menu item allowing to open the current webpage in the app that handles it.
@@ -35,13 +38,16 @@ import org.mozilla.fenix.components.menu.store.MenuAction
  *
  * @param browserStore [BrowserStore] used to know which page the item is about.
  * @param appStore [AppStore] used to know whether to draw attention to this item.
- * @param appLinksUseCases [AppLinksUseCases] used to know which app can open the current page.
+ * @param appLinksUseCases [AppLinksUseCases] used to know which app can open the current page, and to open it there.
+ * @param settings [Settings] for remembering that the user opened a page in an app, so that they are not told about it
+ *   again.
  * @param scope [CoroutineScope] used to keep the item up to date for as long as it can be shown.
  */
 class OpenInAppMenuItemProvider(
-    browserStore: BrowserStore,
+    private val browserStore: BrowserStore,
     appStore: AppStore,
     private val appLinksUseCases: AppLinksUseCases,
+    private val settings: Settings,
     scope: CoroutineScope,
 ) : MenuItemProvider {
     override val itemFlow: StateFlow<MenuItem?> =
@@ -87,6 +93,22 @@ class OpenInAppMenuItemProvider(
                     else -> MenuItemState.DEFAULT
                 },
         )
+    }
+
+    override fun handles(event: MenuEvent) = event == MenuAction.OpenInApp
+
+    /**
+     * Whether there is an app for the current page is resolved again, since the user may have navigated to another page
+     * since the item was offered.
+     */
+    override fun onEvent(event: MenuEvent, menu: MenuHost) {
+        val url = browserStore.state.selectedTab?.content?.url ?: return
+        val redirect = appLinksUseCases.appLinkRedirect(url)
+        if (!redirect.hasExternalApp()) return
+
+        settings.openInAppOpened = true
+        appLinksUseCases.openAppLink(redirect.appIntent)
+        menu.dismiss()
     }
 }
 

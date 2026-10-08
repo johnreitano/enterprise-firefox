@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+/** @import {Store} from "resource://newtab/lib/Store.sys.mjs" */
+
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   RemoteSettings: "resource://services-settings/remote-settings.sys.mjs",
@@ -69,6 +71,9 @@ const PREF_WALLPAPERS_USER_ENABLED_MIGRATED =
 const WALLPAPER_FILE_LOCK = "newtab-wallpaper-file";
 
 export class WallpaperFeed {
+  /** @type {Store} */
+  store = null;
+
   constructor() {
     this.loaded = false;
     // Applying moves several prefs, and this feed reacts to two of them. Held
@@ -920,6 +925,14 @@ export class WallpaperFeed {
         PREF_WALLPAPERS_CUSTOM_WALLPAPER_UUID,
         filename
       );
+      // Before the prefs below, which reach the page as they change. Turning
+      // wallpapers back on would otherwise paint the URL it still holds.
+      this.store.dispatch(
+        ac.BroadcastToContent({
+          type: at.WALLPAPERS_CUSTOM_SET,
+          data: getWallpaperURL(filename, this.libraryEnabled),
+        })
+      );
       this.store.dispatch(
         ac.SetPref("newtabWallpapers.customWallpaper.theme", parsed.theme)
       );
@@ -939,9 +952,6 @@ export class WallpaperFeed {
     } finally {
       this.applyingWallpaper--;
     }
-
-    // Every pref agrees now, so this is the one picture content is told about.
-    this.broadcastAppliedWallpaper();
 
     await this.#sweepWallpaperDirectory();
 

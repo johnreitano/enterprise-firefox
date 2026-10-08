@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import mozilla.components.browser.state.action.WebExtensionAction
+import mozilla.components.browser.state.state.extension.WebExtensionPromptRequest
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.ExpandableMenuItem
@@ -22,11 +24,13 @@ import mozilla.components.compose.menu.data.MenuItemActionButton
 import mozilla.components.compose.menu.data.MenuItemBadge
 import mozilla.components.compose.menu.data.MenuItemSummary
 import mozilla.components.compose.menu.data.StandardMenuItem
+import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemIcon
 import mozilla.components.compose.menu.ui.MenuItemIconBitmap
 import mozilla.components.compose.menu.ui.MenuItemIconDrawable
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.compose.menu.ui.MenuItemState
+import mozilla.components.concept.engine.webextension.InstallationMethod
 import mozilla.components.feature.addons.Addon
 import mozilla.components.feature.addons.AddonManager
 import mozilla.components.feature.addons.AddonManagerException
@@ -35,9 +39,14 @@ import mozilla.components.feature.addons.ui.summary
 import mozilla.components.support.base.log.logger.Logger
 import mozilla.components.support.ktx.android.util.dpToPx
 import mozilla.components.ui.icons.R as iconsR
+import org.mozilla.fenix.NavGraphDirections
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.AppStore
+import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
 import org.mozilla.fenix.components.menu.store.MenuAction
+import org.mozilla.fenix.components.usecases.FenixBrowserUseCases
+import org.mozilla.fenix.settings.SupportUtils.AMO_HOMEPAGE_FOR_ANDROID
 
 private const val NUMBER_OF_RECOMMENDED_ADDONS_TO_SHOW = 3
 private const val EXTENSION_ACTION_ICON_SIZE_DP = 24
@@ -53,6 +62,8 @@ private const val EXTENSION_ACTION_ICON_SIZE_DP = 24
  *   details.
  * @param applicationScope [CoroutineScope] tied to the lifetime of the application, on which to query the extensions
  *   since that cannot be interrupted.
+ * @param appStore [AppStore] used to know whether to open pages in a private tab.
+ * @param fenixBrowserUseCases [FenixBrowserUseCases] for opening the extensions website.
  */
 class ExtensionsMenuItemProvider(
     private val context: Context,
@@ -60,14 +71,23 @@ class ExtensionsMenuItemProvider(
     private val addonManager: AddonManager,
     viewLifecycleScope: CoroutineScope,
     applicationScope: CoroutineScope,
+    private val appStore: AppStore,
+    private val fenixBrowserUseCases: FenixBrowserUseCases,
 ) : MenuItemProvider {
     private val logger = Logger("ExtensionsMenuItemProvider")
     private val actionIconSize = EXTENSION_ACTION_ICON_SIZE_DP.dpToPx(context.resources.displayMetrics)
 
-    // The item is first offered without any extensions data, since knowing what extensions are available requires an
-    // IO operation and the menu should not wait for that. Whether their process is disabled is known right away.
+    // Whether the extensions process is disabled, which extensions are installed and what they offer for the current
+    // page is known right away, so that the item can be offered as it will be shown. Only the icons of what extensions
+    // offer and the extensions to recommend take a while to know, and they show only once the item is expanded.
     private val extensions =
-        MutableStateFlow(ExtensionsStatus(isProcessDisabled = browserStore.state.extensionsProcessDisabled))
+        MutableStateFlow(
+            ExtensionsStatus(
+                isProcessDisabled = browserStore.state.extensionsProcessDisabled,
+                hasInstalledExtensions = browserStore.state.extensions.values.any { !it.isBuiltIn },
+                actions = browserStore.state.webExtensionMenuActionsWithoutIcons(customTabId = null),
+            )
+        )
 
     override val itemFlow: StateFlow<MenuItem?> =
         extensions
@@ -110,6 +130,7 @@ class ExtensionsMenuItemProvider(
         extensions.update {
             it.copy(
                 hasCheckedExtensions = true,
+                hasInstalledExtensions = installed.isNotEmpty(),
                 installed = installed.filter { addon -> addon.isEnabled() },
                 recommended =
                     when (installed.isEmpty()) {
@@ -124,14 +145,87 @@ class ExtensionsMenuItemProvider(
     }
 
     private fun Addon.toMenuAddon() = MenuAddon(name = displayName(context), summary = summary(context), addon = this)
+
+    override fun handles(event: MenuEvent) =
+        when (event) {
+            MenuAction.OnExtensionsMenuClicked,
+            is MenuAction.InstallAddon,
+            is MenuAction.Navigate.AddonDetails,
+            is MenuAction.Navigate.InstalledAddonDetails,
+            MenuAction.Navigate.ManageExtensions,
+            is MenuAction.WebExtensionActionClicked,
+            MenuAction.Navigate.DiscoverMoreExtensions -> true
+            else -> false
+        }
+
+    /** Expanding the item is left to the menu. */
+    override fun onEvent(event: MenuEvent, menu: MenuHost) {
+        when (event) {
+            is MenuAction.InstallAddon -> installAddon(event.addon, event.addonName, menu)
+
+            is MenuAction.Navigate.AddonDetails ->
+                menu.navigate(NavGraphDirections.actionGlobalAddonDetailsFragment(addon = event.addon))
+
+            is MenuAction.Navigate.InstalledAddonDetails ->
+                menu.navigate(NavGraphDirections.actionGlobalToInstalledAddonDetailsFragment(addon = event.addon))
+
+            MenuAction.Navigate.ManageExtensions ->
+                menu.navigate(NavGraphDirections.actionGlobalAddonsManagementFragment())
+
+            is MenuAction.WebExtensionActionClicked -> clickExtensionAction(event, menu)
+
+            MenuAction.Navigate.DiscoverMoreExtensions -> {
+                menu.dismiss()
+                fenixBrowserUseCases.loadUrlOrSearch(
+                    searchTermOrURL = AMO_HOMEPAGE_FOR_ANDROID,
+                    newTab = true,
+                    private = appStore.state.mode.isPrivate,
+                )
+            }
+
+            else -> Unit
+        }
+    }
+
+    private fun installAddon(addon: Addon, addonName: String?, menu: MenuHost) {
+        if (addon.isInstalled()) return
+
+        menu.dismiss()
+
+        browserStore.dispatch(
+            WebExtensionAction.UpdatePromptRequestWebExtensionAction(
+                WebExtensionPromptRequest.InstallationRequested(
+                    url = addon.downloadUrl,
+                    name = addonName,
+                    iconUrl = addon.iconUrl,
+                    installationMethod = InstallationMethod.MANAGER,
+                )
+            )
+        )
+    }
+
+    /**
+     * What an extension does when the user clicks what it offers is up to it, so the menu gets out of the way first.
+     * The action is resolved as late as possible - what the extension shows may have changed since the menu was built.
+     */
+    private fun clickExtensionAction(event: MenuAction.WebExtensionActionClicked, menu: MenuHost) {
+        val extensionAction =
+            browserStore.state.findWebExtensionMenuAction(
+                extensionId = event.extensionId,
+                isPageAction = event.isPageAction,
+            ) ?: return
+
+        menu.dismiss()
+        extensionAction.onClick()
+    }
 }
 
 /**
  * Everything the extensions menu item needs to know about the user's extensions.
  *
  * @property isProcessDisabled Whether the extensions process was disabled after repeated crashes.
- * @property hasCheckedExtensions Whether the installed extensions are already known, to avoid telling the user they
- *   have none while that is still being read from disk.
+ * @property hasCheckedExtensions Whether the extensions were already queried, which tells which ones to recommend.
+ * @property hasInstalledExtensions Whether the user installed any extensions, whether enabled or not.
  * @property actions What the user's extensions offer for the current page, to list when the item is expanded.
  * @property installed The installed and enabled extensions, each the owner of one or more of [actions].
  * @property recommended Extensions to suggest when the user has none installed.
@@ -139,6 +233,7 @@ class ExtensionsMenuItemProvider(
 private data class ExtensionsStatus(
     val isProcessDisabled: Boolean = false,
     val hasCheckedExtensions: Boolean = false,
+    val hasInstalledExtensions: Boolean = false,
     val actions: List<WebExtensionMenuAction> = emptyList(),
     val installed: List<Addon> = emptyList(),
     val recommended: List<MenuAddon> = emptyList(),
@@ -189,9 +284,13 @@ private fun ExtensionsStatus.toMenuItem(context: Context): MenuItem {
     )
 }
 
-/** Whether the user's extensions offer nothing for this page and there is nothing to recommend them either. */
+/**
+ * Whether the user's extensions offer nothing for this page and there is nothing to recommend them either.
+ *
+ * Extensions are only recommended to users without any, so for the others this is known before checking.
+ */
 private val ExtensionsStatus.hasNothingToShow: Boolean
-    get() = hasCheckedExtensions && actions.isEmpty() && recommended.isEmpty()
+    get() = (hasCheckedExtensions || hasInstalledExtensions) && actions.isEmpty() && recommended.isEmpty()
 
 private fun ExtensionsStatus.icon(context: Context): MenuItemIcon =
     when (isProcessDisabled) {
@@ -216,8 +315,8 @@ private val ExtensionsStatus.summary: MenuItemSummary?
             hasNothingToShow ->
                 MenuItemSummary(text = Text.Resource(R.string.browser_menu_no_extensions_installed_description))
             actions.isNotEmpty() -> MenuItemSummary(text = Text.String(actions.joinToString { it.label }))
-            // Only worth suggesting once it is known that the user has no extensions of their own to show instead.
-            hasCheckedExtensions && installed.isEmpty() ->
+            // Only worth suggesting to users without any extensions of their own to show instead.
+            !hasInstalledExtensions ->
                 MenuItemSummary(text = Text.Resource(R.string.browser_menu_try_a_recommended_extension_description))
             else -> null
         }

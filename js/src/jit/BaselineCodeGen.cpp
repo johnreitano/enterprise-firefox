@@ -2492,8 +2492,12 @@ bool BaselineCodeGen<Handler>::emit_Coalesce() {
 
   Label undefinedOrNull;
 
-  masm.branchTestUndefined(Assembler::Equal, R0, &undefinedOrNull);
-  masm.branchTestNull(Assembler::Equal, R0, &undefinedOrNull);
+  {
+    ScratchTagScope tag(masm, R0);
+    masm.splitTagForTest(R0, tag);
+    masm.branchTestUndefined(Assembler::Equal, tag, &undefinedOrNull);
+    masm.branchTestNull(Assembler::Equal, tag, &undefinedOrNull);
+  }
   emitJump();
 
   masm.bind(&undefinedOrNull);
@@ -5760,8 +5764,12 @@ bool BaselineCodeGen<Handler>::emit_CheckObjCoercible() {
 
   Label fail, done;
 
-  masm.branchTestUndefined(Assembler::Equal, R0, &fail);
-  masm.branchTestNull(Assembler::NotEqual, R0, &done);
+  {
+    ScratchTagScope tag(masm, R0);
+    masm.splitTagForTest(R0, tag);
+    masm.branchTestUndefined(Assembler::Equal, tag, &fail);
+    masm.branchTestNull(Assembler::NotEqual, tag, &done);
+  }
 
   masm.bind(&fail);
   prepareVMCall();

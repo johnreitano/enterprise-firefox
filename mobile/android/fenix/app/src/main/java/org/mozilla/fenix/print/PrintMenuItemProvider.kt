@@ -6,12 +6,16 @@ package org.mozilla.fenix.print
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.StandardMenuItem
+import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemIconRes
+import mozilla.components.feature.session.SessionUseCases
 import mozilla.components.ui.icons.R as iconsR
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
 import org.mozilla.fenix.components.menu.store.MenuAction
 
@@ -19,8 +23,14 @@ import org.mozilla.fenix.components.menu.store.MenuAction
  * [MenuItemProvider] for the menu item allowing to print the current webpage
  *
  * @param isAndroidAutomotiveAvailable Whether the device is running on Android Automotive.
+ * @param browserStore [BrowserStore] used to get the current page.
+ * @param printContent [SessionUseCases.PrintContentUseCase] for printing the current page.
  */
-class PrintMenuItemProvider(isAndroidAutomotiveAvailable: Boolean) : MenuItemProvider {
+class PrintMenuItemProvider(
+    isAndroidAutomotiveAvailable: Boolean,
+    private val browserStore: BrowserStore,
+    private val printContent: SessionUseCases.PrintContentUseCase,
+) : MenuItemProvider {
     override val itemFlow: StateFlow<MenuItem?> =
         MutableStateFlow(
             if (isAndroidAutomotiveAvailable) {
@@ -33,4 +43,11 @@ class PrintMenuItemProvider(isAndroidAutomotiveAvailable: Boolean) : MenuItemPro
                 )
             }
         )
+
+    override fun handles(event: MenuEvent) = event == MenuAction.PrintRequested
+
+    override fun onEvent(event: MenuEvent, menu: MenuHost) {
+        menu.dismiss()
+        printContent(tabId = browserStore.state.selectedTabId)
+    }
 }

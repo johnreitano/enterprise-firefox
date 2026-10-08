@@ -1861,11 +1861,9 @@ void ChromeUtils::InvalidateResourceCache(GlobalObject& aGlobal,
 
 void ChromeUtils::GetCachedJavaScriptSource(
     GlobalObject& aGlobal, const nsACString& aKey, const nsACString& aURI,
-    const nsACString& aHintCharset, JS::MutableHandle<JS::Value> aRetval,
-    ErrorResult& aRv) {
+    JS::MutableHandle<JS::Value> aRetval, ErrorResult& aRv) {
   JSContext* cx = aGlobal.Context();
-  if (!SharedScriptCache::GetCachedScriptSource(cx, aKey, aURI, aHintCharset,
-                                                aRetval)) {
+  if (!SharedScriptCache::GetCachedScriptSource(cx, aKey, aURI, aRetval)) {
     aRv.NoteJSContextException(aGlobal.Context());
   }
 }

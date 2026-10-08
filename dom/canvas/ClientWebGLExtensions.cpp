@@ -11,6 +11,7 @@ NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE_0(ClientWebGLExtensionBase)
 DEFINE_WEBGL_EXTENSION_GOOP(ANGLE_instanced_arrays,
                             WebGLExtensionInstancedArrays)
 DEFINE_WEBGL_EXTENSION_GOOP(EXT_blend_minmax, WebGLExtensionBlendMinMax)
+DEFINE_WEBGL_EXTENSION_GOOP(EXT_clip_control, WebGLExtensionClipControl)
 DEFINE_WEBGL_EXTENSION_GOOP(EXT_color_buffer_float,
                             WebGLExtensionEXTColorBufferFloat)
 DEFINE_WEBGL_EXTENSION_GOOP(EXT_color_buffer_half_float,

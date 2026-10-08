@@ -231,6 +231,19 @@ geckoview-isolated-process:
         mozharness:
             extra-options:
                 - "--enable-isolated-process"
+                # The Java MediaCodec decoders are unavailable in an isolated process,
+                # so decode and encode with the MediaCodec NDK via ffmpeg in RDD.
+                - "--setpref=media.android-media-codec.enabled=false"
+                - "--setpref=media.android-media-codec.preferred=false"
+                - "--setpref=media.ffmpeg.encoder.enabled=true"
+                - "--setpref=media.ffvpx-hw.enabled=true"
+                - "--setpref=media.rdd-ffvpx.enabled=true"
+                - "--setpref=media.rdd-opus.enabled=true"
+                - "--setpref=media.rdd-process.enabled=true"
+                - "--setpref=media.rdd-vorbis.enabled=true"
+                - "--setpref=media.rdd-vpx.enabled=true"
+                - "--setpref=media.rdd-wav.enabled=true"
+                - "--setpref=media.use-remote-encoder.video.platform=true"
 
 no-fission:
     description: "{description} without fission enabled"
@@ -524,7 +537,6 @@ media-gpu:
                         "android" in task["test-platform"]
                         && "hw" in task["test-platform"]
                     )
-                    || "linux1804" in task["test-platform"]
                 '
     merge:
         worker:

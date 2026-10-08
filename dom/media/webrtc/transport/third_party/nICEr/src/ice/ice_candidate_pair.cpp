@@ -299,6 +299,11 @@ static void nr_ice_candidate_pair_stun_cb(NR_SOCKET s, int how, void *cb_arg)
           nr_ice_candidate_pair_set_state(pair->pctx,pair,NR_ICE_PAIR_STATE_SUCCEEDED);
         }
         else if(pair->stun_client->state == NR_STUN_CLIENT_STATE_DONE) {
+          if (pair->local->stream->obsolete) {
+            r_log(LOG_ICE,LOG_DEBUG,"ICE-PEER(%s)/CAND-PAIR(%s): ignore mapped address %s for obsolete stream on pair %s",pair->pctx->label,pair->codeword,pair->stun_client->results.ice_binding_response.mapped_addr.as_string,pair->as_string);
+            goto done;
+          }
+
           /* OK, this didn't correspond to a pair on the check list, but
              it probably matches one of our candidates */
 

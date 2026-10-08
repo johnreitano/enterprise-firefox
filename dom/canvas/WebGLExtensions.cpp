@@ -680,6 +680,15 @@ bool WebGLExtensionPolygonOffsetClamp::IsSupported(
   return webgl->GL()->IsSupported(gl::GLFeature::polygon_offset_clamp);
 }
 
+WebGLExtensionClipControl::WebGLExtensionClipControl(WebGLContext* webgl)
+    : WebGLExtensionBase(webgl) {
+  MOZ_ASSERT(IsSupported(webgl), "Don't construct extension if unsupported.");
+}
+
+bool WebGLExtensionClipControl::IsSupported(const WebGLContext* const webgl) {
+  return webgl->GL()->IsSupported(gl::GLFeature::clip_control);
+}
+
 // -
 
 WebGLExtensionInstancedArrays::WebGLExtensionInstancedArrays(

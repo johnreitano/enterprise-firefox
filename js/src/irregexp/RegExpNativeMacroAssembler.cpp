@@ -1056,8 +1056,15 @@ void SMRegExpMacroAssembler::Push(Register source) {
 void SMRegExpMacroAssembler::Pop(Register target) {
   MOZ_ASSERT(target != backtrack_stack_pointer_);
 
+#ifdef JS_CODEGEN_ARM64
+  masm_.Ldrsw(
+      js::jit::ARMRegister(target, 64),
+      vixl::MemOperand(js::jit::ARMRegister(backtrack_stack_pointer_, 64),
+                       int32_t(sizeof(int32_t)), vixl::PostIndex));
+#else
   masm_.load32SignExtendToPtr(Address(backtrack_stack_pointer_, 0), target);
   masm_.addPtr(Imm32(sizeof(int32_t)), backtrack_stack_pointer_);
+#endif
 }
 
 void SMRegExpMacroAssembler::JumpOrBacktrack(Label* to) {
