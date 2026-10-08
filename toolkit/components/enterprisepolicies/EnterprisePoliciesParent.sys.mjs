@@ -274,10 +274,6 @@ EnterprisePoliciesManager.prototype = {
       // about:policies lists the first logged argument only, so the error
       // goes into the message as well as being passed along for its stack.
       if (e instanceof RemotePolicyProviderInitError) {
-        lazy.log.error(
-          `Failed to fetch startup policies when building the policies provider: ${e}`,
-          e
-        );
         // Fail closed rather than run with no policies. This only takes effect
         // under Felt, which fetched from this console just before launching
         // Firefox, so a failure here should be rare.
@@ -1582,6 +1578,7 @@ class RemotePoliciesProvider extends PoliciesProvider {
     this._poller = null;
     this._updateInProgress = false;
     this._lastPoliciesHash = null;
+    this._lastPollError = null;
     this._pollingFrequency = Services.prefs.getIntPref(
       this.POLLING_FREQUENCY_PREF,
       this.POLLING_FREQUENCY_FALLBACK
@@ -1664,13 +1661,29 @@ class RemotePoliciesProvider extends PoliciesProvider {
       lazy.log.debug("Remote policies changed; firing update.");
       Services.obs.notifyObservers(null, "EnterprisePolicies:Update");
     } catch (e) {
-      lazy.log.error(
+      this._reportPollFailure(
         `Failed to poll for remote policies: ${describeConsoleRequestError(e)}`,
         e
       );
     } finally {
       this._updateInProgress = false;
     }
+  }
+
+  /**
+   * Log a failed poll, unless the previous poll failed the same way, so an
+   * outage adds one row to about:policies rather than one per poll.
+   *
+   * @param {string} message what about:policies shows for the failure
+   * @param {...any} details logged after the message, such as the error
+   */
+  _reportPollFailure(message, ...details) {
+    if (message === this._lastPollError) {
+      lazy.log.debug(`Remote policy poll failed again: ${message}`);
+      return;
+    }
+    this._lastPollError = message;
+    lazy.log.error(message, ...details);
   }
 
   _startPolling() {
@@ -1697,8 +1710,8 @@ class RemotePoliciesProvider extends PoliciesProvider {
   async ingestPolicies() {
     const res = await lazy.ConsoleClient.getRemotePolicies();
     if (!res?.policies) {
-      lazy.log.error(
-        `No policies were found in the response: ${JSON.stringify(res)}.`
+      this._reportPollFailure(
+        `The console response has no policies field: ${JSON.stringify(res)}.`
       );
       const wasFailed = this._failed;
       this._failed = true;
@@ -1708,6 +1721,7 @@ class RemotePoliciesProvider extends PoliciesProvider {
 
     const wasFailed = this._failed;
     this._failed = false;
+    this._lastPollError = null;
     this._policies = res.policies;
 
     if (wasFailed) {
