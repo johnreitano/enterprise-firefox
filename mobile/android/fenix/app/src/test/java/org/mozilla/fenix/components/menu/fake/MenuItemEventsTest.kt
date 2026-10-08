@@ -6,10 +6,13 @@ package org.mozilla.fenix.components.menu.fake
 
 import kotlin.test.assertEquals
 import mozilla.components.compose.base.text.Text
+import mozilla.components.compose.menu.data.BannerMenuItem
 import mozilla.components.compose.menu.data.ExpandableMenuItem
 import mozilla.components.compose.menu.data.MenuItemActionButton
+import mozilla.components.compose.menu.data.MenuItemSummary
 import mozilla.components.compose.menu.data.StandardMenuItem
 import mozilla.components.compose.menu.store.MenuEvent
+import mozilla.components.compose.menu.ui.MenuItemIconRes
 import org.junit.Test
 
 class MenuItemEventsTest {
@@ -49,6 +52,20 @@ class MenuItemEventsTest {
             listOf(TestEvent("expand"), TestEvent("long click"), TestEvent("click")),
             item.reachableEvents(),
         )
+    }
+
+    @Test
+    fun `WHEN getting the events of a banner THEN include clicking and dismissing it`() {
+        val item =
+            BannerMenuItem(
+                title = Text.String("Banner"),
+                summary = MenuItemSummary(Text.String("Subtitle")),
+                icon = MenuItemIconRes(0),
+                onClickEvent = TestEvent("click"),
+                onDismissEvent = TestEvent("dismiss"),
+            )
+
+        assertEquals(listOf<MenuEvent>(TestEvent("click"), TestEvent("dismiss")), item.reachableEvents())
     }
 
     @Test

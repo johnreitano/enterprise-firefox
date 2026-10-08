@@ -2,10 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/** @import MozBoxItem from 'moz-src:///toolkit/content/widgets/moz-box-item/moz-box-item.mjs';*/
+/** @import { MozBoxItem } from 'moz-src:///toolkit/content/widgets/moz-box-item/moz-box-item.mjs';*/
 /** @import { MozOption } from 'moz-src:///toolkit/content/widgets/moz-select/moz-select.mjs';*/
-/** @import MozSelect from 'moz-src:///toolkit/content/widgets/moz-select/moz-select.mjs';*/
-/** @import MozBoxGroup from 'chrome://global/content/elements/moz-box-group.mjs'; */
+/** @import { MozSelect } from 'moz-src:///toolkit/content/widgets/moz-select/moz-select.mjs';*/
+/** @import { MozBoxGroup } from 'chrome://global/content/elements/moz-box-group.mjs'; */
 /** @import { AsyncSettingHandler } from 'chrome://global/content/preferences/AsyncSetting.mjs'; */
 /** @import { HandlerInfoWrapper, ApplicationListItem } from './config/downloads.mjs';*/
 
@@ -2111,9 +2111,7 @@ let AppFileHandler = (function () {
      * @return {MozBoxItem}
      */
     _buildHeader() {
-      const headerElement = /** @type {MozBoxItem} */ (
-        document.createElement("moz-box-item")
-      );
+      const headerElement = document.createElement("moz-box-item");
       headerElement.slot = "header";
       this.typeColumn = document.createElement("label");
       this.typeColumn.setAttribute("data-l10n-id", "applications-type-heading");

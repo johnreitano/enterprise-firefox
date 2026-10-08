@@ -51,7 +51,12 @@ async function seedPage() {
   await ConversationStore.updateConversation(
     new Conversation({ id: CONV_ID, feature: "aitab" })
   );
-  await AITabStore.create({ convId: CONV_ID, slug: SLUG, title: "Delete me" });
+  await AITabStore.create({
+    convId: "conv-delete-flow-chat",
+    toolConvId: CONV_ID,
+    slug: SLUG,
+    title: "Delete me",
+  });
 }
 
 /**

@@ -5,7 +5,7 @@
 // META: script=/notifications/resources/helpers.js
 // META: script=/_mozilla/notifications/resources/MockAlertsService.js
 
-import { encrypt } from "/push-api/resources/helpers.js"
+import { pushMessageAndWait } from "./resources/helpers.js"
 
 let subscription;
 
@@ -23,37 +23,10 @@ const DWP = {
   }
 };
 
-async function sendPush(t, message) {
-  await MockAlertsService.register(t);
-  await MockAlertsService.enableAutoClick();
-
-  const {promise, resolve} = Promise.withResolvers();
-  const signal = t.get_signal();
-
-  new BroadcastChannel("broadcast-when-opened").addEventListener("message", async e => {
-    resolve({dwp: true});
-  }, {signal});
-  navigator.serviceWorker.addEventListener("message", e => {
-    if (e.data.data) {
-      resolve({swPush: e.data.data});
-    }
-  }, {signal});
-
-  const result = await encrypt(
-    new TextEncoder().encode(message),
-    subscription.getKey("p256dh"),
-    subscription.getKey("auth")
-  );
-
-  await fetch(subscription.endpoint, {
-    method: "post",
-    ...result
-  });
-  return promise;
-}
-
 async function sendDWP(t) {
-  const result = await sendPush(t, JSON.stringify(DWP));
+  const result = await pushMessageAndWait(t, subscription, {
+    message: JSON.stringify(DWP)
+  });
   assert_true(result.dwp, "Should allow sending DWP via window.pushManager.");
   const notifications = await MockAlertsService.getNotificationData();
   assert_equals(notifications.length, 1,

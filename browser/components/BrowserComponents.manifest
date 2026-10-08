@@ -32,7 +32,7 @@ category browser-before-ui-startup resource:///modules/enterprise/EnterpriseThem
 #ifdef XP_WIN
 category browser-before-ui-startup moz-src:///browser/components/shell/StartupOSIntegration.sys.mjs StartupOSIntegration.applyCustomIconOnStartup
 #endif
-#if defined(XP_MACOSX) && defined(NIGHTLY_BUILD)
+#ifdef XP_MACOSX
 category browser-before-ui-startup moz-src:///browser/modules/ASWebAuthSessionService.sys.mjs ASWebAuthSessionService.init
 category browser-idle-startup moz-src:///browser/modules/ASWebAuthSessionService.sys.mjs ASWebAuthSessionService.removeLeftoverEphemeralContainers
 category browser-quit-application-granted moz-src:///browser/modules/ASWebAuthSessionService.sys.mjs ASWebAuthSessionService.uninit

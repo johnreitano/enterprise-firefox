@@ -249,6 +249,12 @@ class WebGLExtensionTextureHalfFloatLinear : public WebGLExtensionBase {
   explicit WebGLExtensionTextureHalfFloatLinear(WebGLContext*);
 };
 
+class WebGLExtensionTextureMirrorClampToEdge : public WebGLExtensionBase {
+ public:
+  explicit WebGLExtensionTextureMirrorClampToEdge(WebGLContext* webgl)
+      : WebGLExtensionBase(webgl) {}
+};
+
 class WebGLExtensionTextureNorm16 : public WebGLExtensionBase {
  public:
   static bool IsSupported(const WebGLContext*);

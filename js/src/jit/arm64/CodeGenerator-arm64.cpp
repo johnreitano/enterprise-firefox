@@ -44,7 +44,7 @@ bool CodeGeneratorARM64::generateOutOfLineCode() {
     return false;
   }
 
-  if (deoptLabel_.used()) {
+  if (needsDeoptLabel()) {
     // All non-table-based bailouts will go here.
     masm.bind(&deoptLabel_);
 
@@ -71,7 +71,7 @@ void CodeGeneratorARM64::emitBranch(Assembler::Condition cond,
 
 void CodeGeneratorARM64::emitBailoutOOL(LSnapshot* snapshot) {
   masm.push(Imm32(snapshot->snapshotOffset()));
-  masm.B(&deoptLabel_);
+  jumpToDeoptLabel();
 }
 
 void CodeGeneratorARM64::bailoutIf(Assembler::Condition condition,

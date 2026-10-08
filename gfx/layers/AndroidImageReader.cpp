@@ -412,8 +412,8 @@ bool AndroidImageReader::UpdateTexImageWithReadback(
   MonitorAutoLock lock(mMonitor);
 
   DoUpdateTexImage(lock, aFrameId);
-  if (!mCurrentImage) {
-    MOZ_ASSERT_UNREACHABLE("unexpected to be called");
+  // A timeout is recoverable. Do not read back a previous frame as aFrameId.
+  if (!mCurrentImage || mCurrentFrameId != aFrameId) {
     return false;
   }
 
@@ -501,25 +501,52 @@ bool AndroidImageReader::DoUpdateTexImage(const MonitorAutoLock& aProofOfLock,
 
   mIsPendingNextImage = true;
 
-  MOZ_ASSERT(!mWaitingFrameAvailable);
-  mWaitingFrameAvailable = true;
+  // Bound the total notification wait in this call, including an older frame
+  // left outstanding by a previous timeout.
+  const TimeStamp deadline =
+      TimeStamp::Now() + TimeDuration::FromMilliseconds(20);
+  bool updated = false;
 
-  if (!MaybeReleaseFrameToCodec(aProofOfLock, aFrameId, /* aRender */ true)) {
-    mWaitingFrameAvailable = false;
-    return false;
-  }
-
-  const TimeDuration timeout = TimeDuration::FromMilliseconds(20);
-
-  while (mWaitingFrameAvailable) {
-    CVStatus status = mMonitor.Wait(timeout);
-    if (status == CVStatus::Timeout) {
-      gfxCriticalNoteOnce << "UpdateTexImage wait timeout";
-      return false;
+  while (mCurrentFrameId != aFrameId) {
+    if (mPendingFrameId.isNothing()) {
+      MOZ_ASSERT(!mWaitingFrameAvailable);
+      mPendingFrameId = Some(aFrameId);
+      mWaitingFrameAvailable = true;
+      if (!MaybeReleaseFrameToCodec(aProofOfLock, aFrameId,
+                                    /* aRender */ true)) {
+        mPendingFrameId.reset();
+        mWaitingFrameAvailable = false;
+        return updated;
+      }
     }
+
+    while (mWaitingFrameAvailable) {
+      const TimeDuration remaining = deadline - TimeStamp::Now();
+      if (remaining <= TimeDuration()) {
+        gfxCriticalNoteOnce << "UpdateTexImage wait timeout";
+        // The image may already be queued even if its notification is late.
+        // Try acquiring it before giving up on this update.
+        break;
+      }
+      mMonitor.Wait(remaining);
+    }
+
+    // OnFrameAvailable does not carry a frame ID. Consume the outstanding
+    // frame before releasing another, even when aFrameId has since changed.
+    if (!AcquirePendingImage()) {
+      // Keep the pending frame ID and notification state if no image was
+      // acquired. Do not release another codec buffer until it is consumed.
+      return updated;
+    }
+    updated = true;
   }
 
-  mWaitingFrameAvailable = false;
+  return updated;
+}
+
+bool AndroidImageReader::AcquirePendingImage() {
+  MOZ_ASSERT(mPendingFrameId.isSome());
+  // Acquisition is also allowed before OnFrameAvailable after a timeout.
 
   AImage* image = nullptr;
   media_status_t ret = AMEDIA_OK;
@@ -551,6 +578,11 @@ bool AndroidImageReader::DoUpdateTexImage(const MonitorAutoLock& aProofOfLock,
     return false;
   }
 
+  // This buffer has been consumed even if importing it subsequently fails.
+  const AndroidMediaCodecFrameId frameId = mPendingFrameId.value();
+  mPendingFrameId.reset();
+  mWaitingFrameAvailable = false;
+
   AHardwareBuffer* nativeBuffer = nullptr;
   media_status_t result = AImage_getHardwareBuffer(image, &nativeBuffer);
   if (!nativeBuffer) {
@@ -575,7 +607,7 @@ bool AndroidImageReader::DoUpdateTexImage(const MonitorAutoLock& aProofOfLock,
 
   mCurrentImage = new AndroidImageWrapper(this, image, nativeBuffer, size,
                                           format, std::move(fence));
-  mCurrentFrameId = aFrameId;
+  mCurrentFrameId = frameId;
 
   MOZ_ASSERT(static_cast<int32_t>(mAcquiredImageCount) <= mMaxImageCount);
 
@@ -766,7 +798,7 @@ void GpuProcessAndroidImageReaderMap::UnregisterImageConsumer(
 
 GpuProcessAndroidImageReaderMap::ImageReaderHolder::ImageReaderHolder(
     AndroidImageReader* aImageReader)
-    : mImageReader(RefPtr<AndroidImageReader>(aImageReader)) {}
+    : mImageReader(aImageReader) {}
 
 GpuProcessAndroidImageReaderMap::ImageReaderHolder::~ImageReaderHolder() {}
 

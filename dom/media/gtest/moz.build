@@ -182,6 +182,7 @@ TEST_HARNESS_FILES.gtest += [
     "small-shot-partial-xing.mp3",
     "small-shot.mp3",
     "test.webm",
+    "test_av1.mp4",
     "test_case_1224361.vp8.ivf",
     "test_case_1224363.vp8.ivf",
     "test_case_1224369.vp8.ivf",

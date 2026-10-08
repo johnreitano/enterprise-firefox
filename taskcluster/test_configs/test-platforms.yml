@@ -468,11 +468,8 @@ macosx2700-aarch64-shippable/opt:
 macosx1470-64-shippable/opt:
     build-platform: macosx64-shippable/opt
     test-sets:
-        - awsy
         - browsertime
         - browsertime-profiling
-        - macosx64-talos
-        - talos-profiling
         - macosx1470-64-tests
         - webgpu
         - web-platform-tests-backlog

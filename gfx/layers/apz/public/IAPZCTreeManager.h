@@ -17,7 +17,7 @@
 namespace mozilla {
 namespace layers {
 
-class APZInputBridge;
+class APZBridge;
 struct ZoomTarget;
 
 enum AllowedTouchBehavior {
@@ -117,13 +117,13 @@ class IAPZCTreeManager {
       const ScrollableLayerGuid& aGuid) = 0;
 
   /**
-   * Returns an APZInputBridge interface that can be used to send input
+   * Returns an APZBridge interface that can be used to send input
    * events to APZ in a synchronous manner. This will always be non-null, and
    * the returned object's lifetime will match the lifetime of this
    * IAPZCTreeManager implementation.
    * It is only valid to call this function in the UI process.
    */
-  virtual APZInputBridge* InputBridge() = 0;
+  virtual APZBridge* Bridge() = 0;
 
  protected:
   // Discourage destruction outside of decref

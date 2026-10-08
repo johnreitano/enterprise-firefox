@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.menu.data.MenuItem
+import mozilla.components.compose.menu.store.MenuEvent
 import org.junit.Test
 import org.mozilla.fenix.browser.BackMenuItemProvider
 import org.mozilla.fenix.browser.ForwardMenuItemProvider
@@ -56,16 +57,18 @@ class MenuItemsRegistryTest {
     @Test
     fun `WHEN building the default menu THEN each navigation event is handled by exactly one provider`() = runTest {
         val browserStore = BrowserStore()
+        val session = MenuTarget.BrowserTab
         val registry =
             MenuItemsRegistry(
-                configuration = BrowserMenuBuilder.buildDefaultConfiguration(false, false),
+                configuration = MenuConfigurations.browser(isToolbarAtBottom = false, isExpandedToolbarEnabled = false),
                 resolver = { item ->
                     when (item) {
-                        FenixMenuItem.Back -> BackMenuItemProvider(browserStore, mockk(), backgroundScope)
-                        FenixMenuItem.Forward -> ForwardMenuItemProvider(browserStore, mockk(), backgroundScope)
-                        FenixMenuItem.Share -> ShareMenuItemProvider(browserStore, mockk())
+                        FenixMenuItem.Back -> BackMenuItemProvider(browserStore, session, mockk(), backgroundScope)
+                        FenixMenuItem.Forward ->
+                            ForwardMenuItemProvider(browserStore, session, mockk(), backgroundScope)
+                        FenixMenuItem.Share -> ShareMenuItemProvider(browserStore, session, mockk())
                         FenixMenuItem.Refresh ->
-                            RefreshMenuItemProvider(browserStore, mockk(), mockk(), backgroundScope)
+                            RefreshMenuItemProvider(browserStore, session, mockk(), mockk(), backgroundScope)
                         else -> FakeMenuItemProvider()
                     }
                 },
@@ -92,5 +95,9 @@ class MenuItemsRegistryTest {
 
     private class FakeMenuItemProvider : MenuItemProvider {
         override val itemFlow = MutableStateFlow<MenuItem?>(null)
+
+        override fun handles(event: MenuEvent) = false
+
+        override fun onEvent(event: MenuEvent, menu: MenuHost) = Unit
     }
 }

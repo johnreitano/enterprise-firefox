@@ -204,7 +204,9 @@
       margin-bottom: -15px;
     }
 
-    --tab-width-transition: min-width 100ms ease-out, max-width 100ms ease-out;
+    @media (prefers-reduced-motion: no-preference) {
+      --tab-width-transition: min-width 100ms ease-out, max-width 100ms ease-out;
+    }
   }
 
   &[noshadowfortests] {
@@ -245,8 +247,10 @@
 .closing-tabs-spacer {
   pointer-events: none;
 
-  #tabbrowser-arrowscrollbox:not(:hover) > #tabbrowser-arrowscrollbox-periphery > & {
-    transition: width 0.15s ease-out;
+  @media (prefers-reduced-motion: no-preference) {
+    #tabbrowser-arrowscrollbox:not(:hover) > #tabbrowser-arrowscrollbox-periphery > & {
+      transition: width 0.15s ease-out;
+    }
   }
 }
 

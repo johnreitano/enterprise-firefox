@@ -32,6 +32,8 @@ export const PAGE_LAYOUT_VARIANTS = {
   AUTO_MINIMIZE_WIDGETS: "auto-minimize-widgets",
   // @experiment(remove) { bug 2069496 }
   WIDGETS_AD_LARGE: "widgets-ad-large",
+  // @experiment(remove) { bug 2078816 }
+  WIDGET_FIRST_CONTENT_SLOT: "widget-first-content-slot",
 };
 
 export const DEFAULT_PAGE_LAYOUT_VARIANT = PAGE_LAYOUT_VARIANTS.NOVA_FULL_WIDTH;
@@ -785,4 +787,36 @@ export const selectWidgetsRowAd = (prefs, spocs) => {
   );
   const blocked = spocs?.blocked ?? [];
   return first && !blocked.includes(first.url) ? first : null;
+};
+
+// @experiment(remove) { bug 2078816 }
+export const PREF_WIDGET_FIRST_WIDGET =
+  "pageLayouts.widgetFirstContentSlot.widget";
+
+// @experiment(remove) { bug 2078816 }
+/**
+ * The id of the widget shown in the first card of the top stories section, or
+ * null when there is none. The widget must already be enabled.
+ *
+ * @param {object} prefs - current pref values from the Redux store
+ * @returns {string|null} a widget registry id
+ */
+export const selectFirstSlotWidget = prefs => {
+  if (
+    resolvePageLayoutVariant(prefs) !==
+    PAGE_LAYOUT_VARIANTS.WIDGET_FIRST_CONTENT_SLOT
+  ) {
+    return null;
+  }
+  const id =
+    prefs.trainhopConfig?.pageLayouts?.widgetFirstContentSlot?.widget ??
+    prefs[PREF_WIDGET_FIRST_WIDGET];
+  const widget = WIDGET_REGISTRY.find(w => w.id === id);
+  return widget &&
+    prefs["nova.enabled"] &&
+    prefs["feeds.section.topstories"] &&
+    prefs["feeds.system.topstories"] &&
+    isWidgetEnabled(widget, prefs, prefs["widgets.enabled"])
+    ? id
+    : null;
 };

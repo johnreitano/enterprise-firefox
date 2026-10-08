@@ -70,7 +70,7 @@ browser.engagement:
     notification_emails:
       - csadilek@mozilla.com
       - tlong@mozilla.com
-    expires: 161
+    expires: 184
     send_in_pings:
       - baseline
       - metrics
@@ -112,7 +112,7 @@ browser.engagement:
     notification_emails:
       - csadilek@mozilla.com
       - tlong@mozilla.com
-    expires: 161
+    expires: 184
     labels:
       - active_ticks
       - active_ticks_non_synthesized
@@ -155,7 +155,7 @@ browser.engagement:
     notification_emails:
       - csadilek@mozilla.com
       - tlong@mozilla.com
-    expires: 161
+    expires: 184
     labels:
       - active_ticks
       - active_ticks_non_synthesized

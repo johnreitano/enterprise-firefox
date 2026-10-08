@@ -14,6 +14,7 @@ import org.mozilla.fenix.helpers.AppAndSystemHelper.setScreenOrientation
 import org.mozilla.fenix.helpers.HomeActivityIntentTestRule
 import org.mozilla.fenix.helpers.TestAssetHelper.getGenericAsset
 import org.mozilla.fenix.ui.efficiency.helpers.BaseTest
+import org.mozilla.fenix.ui.efficiency.helpers.SwipeDirection
 import org.mozilla.fenix.ui.efficiency.selectors.TabDrawerSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.WebCompatReporterSelectors
 
@@ -194,5 +195,59 @@ class ReportBrokenSiteTest : BaseTest() {
             .mozClick(WebCompatReporterSelectors.REPORTED_BROKEN_SITE_REASON("Site doesn’t load"))
             .mozVerifyElementsByGroup(WebCompatReporterSelectors.Group.REPORTER_FORM)
             .mozVerifyAnyContainsText(WebCompatReporterSelectors.DESCRIPTION_INPUT_BOX, "Prolonged page loading time")
+    }
+
+    // TestRail link: https://mozilla.testrail.io/index.php?/cases/view/4227541
+    @Critical
+    @Test
+    fun verifyThePreviewReportBottomSheetTest() {
+        val defaultWebPage = mockWebServer.getGenericAsset(1)
+
+        on.browserPage.navigateToPage(defaultWebPage.url.toString())
+        on.webCompatReporter
+            .navigateToPage()
+            .mozClick(WebCompatReporterSelectors.REPORTED_BROKEN_SITE_REASON("Something else"))
+            .mozClick(WebCompatReporterSelectors.PREVIEW_REPORT_BUTTON)
+            .mozVerifyElementsByGroup(WebCompatReporterSelectors.Group.REPORT_PREVIEW_ITEMS)
+
+        PREVIEW_SECTIONS.forEach { (button, group) ->
+            on.webCompatReporter
+                .mozClick(button)
+                .mozVerify(WebCompatReporterSelectors.REPORT_PREVIEW_OPTION_CHEVRON(button.value, true))
+                .mozVerifyElementsByGroup(group)
+                .mozClick(button)
+                .mozVerify(WebCompatReporterSelectors.REPORT_PREVIEW_OPTION_CHEVRON(button.value, false))
+        }
+
+        on.webCompatReporter.mozSwipeElementUntilAbsent(
+            WebCompatReporterSelectors.REPORT_PREVIEW_HANDLE,
+            SwipeDirection.DOWN,
+            maxSwipes = 3,
+        )
+    }
+
+    companion object {
+        // Each collapsible section of the report preview bottom sheet, paired with the details group it reveals.
+        val PREVIEW_SECTIONS =
+            listOf(
+                WebCompatReporterSelectors.REPORT_PREVIEW_BASIC_BUTTON to
+                    WebCompatReporterSelectors.Group.REPORT_PREVIEW_BASIC_DETAILS,
+                WebCompatReporterSelectors.REPORT_PREVIEW_ANTITRACKING_BUTTON to
+                    WebCompatReporterSelectors.Group.REPORT_PREVIEW_ANTITRACKING_DETAILS,
+                WebCompatReporterSelectors.REPORT_PREVIEW_GRAPHICS_BUTTON to
+                    WebCompatReporterSelectors.Group.REPORT_PREVIEW_GRAPHICS_DETAILS,
+                WebCompatReporterSelectors.REPORT_PREVIEW_BROWSER_INFO_BUTTON to
+                    WebCompatReporterSelectors.Group.REPORT_PREVIEW_BROWSER_INFO_DETAILS,
+                WebCompatReporterSelectors.REPORT_PREVIEW_APP_BUTTON to
+                    WebCompatReporterSelectors.Group.REPORT_PREVIEW_APP_DETAILS,
+                WebCompatReporterSelectors.REPORT_PREVIEW_SYSTEM_BUTTON to
+                    WebCompatReporterSelectors.Group.REPORT_PREVIEW_SYSTEM_DETAILS,
+                WebCompatReporterSelectors.REPORT_PREVIEW_PREFS_BUTTON to
+                    WebCompatReporterSelectors.Group.REPORT_PREVIEW_PREFS_DETAILS,
+                WebCompatReporterSelectors.REPORT_PREVIEW_TAB_INFO_BUTTON to
+                    WebCompatReporterSelectors.Group.REPORT_PREVIEW_TAB_INFO_DETAILS,
+                WebCompatReporterSelectors.REPORT_PREVIEW_FRAMEWORKS_BUTTON to
+                    WebCompatReporterSelectors.Group.REPORT_PREVIEW_FRAMEWORKS_DETAILS,
+            )
     }
 }

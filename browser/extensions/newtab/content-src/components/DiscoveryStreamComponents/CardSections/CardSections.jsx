@@ -30,6 +30,8 @@ import { TopicNavigation } from "../TopicNavigation/TopicNavigation";
 import { PersonalizedCard } from "../PersonalizedCard/PersonalizedCard";
 import { FollowSectionButtonHighlight } from "../FeatureHighlight/FollowSectionButtonHighlight";
 import { MessageWrapper } from "content-src/components/MessageWrapper/MessageWrapper";
+import { ErrorBoundary } from "content-src/components/ErrorBoundary/ErrorBoundary";
+import { WIDGET_ROW_COMPONENTS } from "content-src/components/Widgets/WidgetsComponentRegistry.jsx";
 
 // Prefs
 const PREF_SECTIONS_CARDS_ENABLED = "discoverystream.sections.cards.enabled";
@@ -288,6 +290,14 @@ function CardSection({
           link.focus();
         }
       }
+    }
+  };
+
+  // @experiment(remove) { bug 2078816 }
+  const handleWidgetInteraction = widgetName => {
+    const prefName = `widgets.${widgetName}.interaction`;
+    if (prefs[prefName] === false) {
+      dispatch(ac.SetPref(prefName, true));
     }
   };
 
@@ -566,6 +576,27 @@ function CardSection({
       }
 
       const rec = displaySections[dataIndex];
+
+      // @experiment(remove) { bug 2078816 }
+      if (rec?.type === "widget") {
+        const Widget = WIDGET_ROW_COMPONENTS[rec.widgetId];
+        cards.push(
+          <div
+            key={`section-widget-${rec.widgetId}`}
+            className={`section-widget ${classNames.join(" ")}`}
+          >
+            <ErrorBoundary className="widget-error-fallback">
+              <Widget
+                dispatch={dispatch}
+                handleUserInteraction={handleWidgetInteraction}
+              />
+            </ErrorBoundary>
+          </div>
+        );
+        dataIndex++;
+        continue;
+      }
+
       const currentIndex = dataIndex;
       const mappedFocusPosition = cardPositions[activeColumnCount];
       // Fall back to card order when this layout does not define a mapped position.

@@ -150,13 +150,20 @@ export class AITabParent extends JSWindowActorParent {
         // The page is gone from here on. If clearing the conversation fails,
         // the delete the reader asked for still happened, so say so and log
         // the leftover rather than reporting a failure that did not happen.
-        try {
-          await ConversationStore.deleteConversationById(page.convId);
-        } catch (error) {
-          console.error(
-            "Deleted an AI Tab page but could not delete its conversation",
-            error
-          );
+        //
+        // The generation conversation holds the text extracted from every
+        // source page, so it is the one that has to go; `convId` names the
+        // chat the page was requested in, which outlives it. Pages stored
+        // before that id was recorded have nothing to clear.
+        if (page.toolConvId) {
+          try {
+            await ConversationStore.deleteConversationById(page.toolConvId);
+          } catch (error) {
+            console.error(
+              "Deleted an AI Tab page but could not delete its conversation",
+              error
+            );
+          }
         }
       }
 

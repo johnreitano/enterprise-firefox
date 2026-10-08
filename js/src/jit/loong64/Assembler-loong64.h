@@ -883,6 +883,9 @@ enum OpcodeField {
   op_vbsll_v = 0xe51cU << 15,
   op_vbsrl_v = 0xe51dU << 15,
   op_vpcnt_b = 0x1ca708U << 10,
+  op_vpcnt_h = 0x1ca709U << 10,
+  op_vpcnt_w = 0x1ca70aU << 10,
+  op_vpcnt_d = 0x1ca70bU << 10,
   op_vneg_b = 0x1ca70cU << 10,
   op_vneg_h = 0x1ca70dU << 10,
   op_vneg_w = 0x1ca70eU << 10,
@@ -936,6 +939,10 @@ enum OpcodeField {
   op_vpickve2gr_bu = 0x1cbceU << 14,
   op_vpickve2gr_hu = 0x3979eU << 13,
   op_vpickve2gr_wu = 0x72f3eU << 12,
+  op_vreplvei_b = 0x1cbdeU << 14,
+  op_vreplvei_h = 0x397beU << 13,
+  op_vreplvei_w = 0x72f7eU << 12,
+  op_vreplvei_d = 0xe5efeU << 11,
   op_vsllwil_h_b = 0x39841U << 13,
   op_vsllwil_w_h = 0x1cc21U << 14,
   op_vsllwil_d_w = 0xe611U << 15,
@@ -2011,6 +2018,9 @@ class AssemblerLOONG64 : public AssemblerShared {
   BufferOffset as_vbsll_v(FloatRegister vd, FloatRegister vj, uint32_t imm5);
   BufferOffset as_vbsrl_v(FloatRegister vd, FloatRegister vj, uint32_t imm5);
   BufferOffset as_vpcnt_b(FloatRegister vd, FloatRegister vj);
+  BufferOffset as_vpcnt_h(FloatRegister vd, FloatRegister vj);
+  BufferOffset as_vpcnt_w(FloatRegister vd, FloatRegister vj);
+  BufferOffset as_vpcnt_d(FloatRegister vd, FloatRegister vj);
   BufferOffset as_vneg_b(FloatRegister vd, FloatRegister vj);
   BufferOffset as_vneg_h(FloatRegister vd, FloatRegister vj);
   BufferOffset as_vneg_w(FloatRegister vd, FloatRegister vj);
@@ -2064,6 +2074,10 @@ class AssemblerLOONG64 : public AssemblerShared {
   BufferOffset as_vpickve2gr_bu(Register rd, FloatRegister vj, uint32_t imm4);
   BufferOffset as_vpickve2gr_hu(Register rd, FloatRegister vj, uint32_t imm3);
   BufferOffset as_vpickve2gr_wu(Register rd, FloatRegister vj, uint32_t imm2);
+  BufferOffset as_vreplvei_b(FloatRegister vd, FloatRegister vj, uint32_t imm4);
+  BufferOffset as_vreplvei_h(FloatRegister vd, FloatRegister vj, uint32_t imm3);
+  BufferOffset as_vreplvei_w(FloatRegister vd, FloatRegister vj, uint32_t imm2);
+  BufferOffset as_vreplvei_d(FloatRegister vd, FloatRegister vj, uint32_t imm1);
   BufferOffset as_vsllwil_h_b(FloatRegister vd, FloatRegister vj,
                               uint32_t imm3);
   BufferOffset as_vsllwil_w_h(FloatRegister vd, FloatRegister vj,
@@ -2512,12 +2526,21 @@ class InstImm : public Instruction {
     // (signed, width)
     mozilla::DebugOnly<std::optional<std::tuple<bool, uint32_t>>> imm_format;
     switch (op) {
+      // ui1 formats.
+      case op_vreplvei_d:
+        imm_format = std::make_tuple(false, 1);
+        break;
+      // ui2 formats.
+      case op_vreplvei_w:
+        imm_format = std::make_tuple(false, 2);
+        break;
       // ui3 formats.
       case op_vslli_b:
       case op_vsrli_b:
       case op_vsrai_b:
       case op_vsllwil_h_b:
       case op_vsllwil_hu_bu:
+      case op_vreplvei_h:
         imm_format = std::make_tuple(false, 3);
         break;
       // ui4 formats.
@@ -2530,6 +2553,7 @@ class InstImm : public Instruction {
       case op_vsat_hu:
       case op_vssrani_b_h:
       case op_vssrani_bu_h:
+      case op_vreplvei_b:
         imm_format = std::make_tuple(false, 4);
         break;
       // ui5 formats.

@@ -1688,10 +1688,32 @@ void IMContextWrapper::NotifyIMEOfFocusChange(IMEFocusState aIMEFocusState) {
 
 void IMContextWrapper::OnSelectionChange(
     nsWindow* aCaller, const IMENotification& aIMENotification) {
-  const bool isSelectionRangeChanged =
-      mContentSelection.isNothing() ||
-      !aIMENotification.mSelectionChangeData.EqualsRange(
-          mContentSelection.ref());
+  const bool isSelectionRangeChanged = [&]() {
+    if (mContentSelection.isNothing()) [[unlikely]] {
+      return true;
+    }
+    // If the new range exactly matches with the caret in the composition
+    // string, we can treat the selection is not changed actually.
+    if (aIMENotification.mSelectionChangeData.EqualsRange(
+            mContentSelection.ref())) {
+      return false;
+    }
+    if (!EditorHasCompositionString()) {
+      return true;
+    }
+    // If there is composition string, we should treat that selection is not
+    // changed if there is no range or the new range is in the composition
+    // string because we will set new caret position at the next composition
+    // change and the web app does not intent to make the user to insert text to
+    // different place.
+    if (!aIMENotification.mSelectionChangeData.HasRange()) [[unlikely]] {
+      return false;
+    }
+    return aIMENotification.mSelectionChangeData.StartOffset() >=
+               mCompositionStart &&
+           aIMENotification.mSelectionChangeData.EndOffset() <=
+               mCompositionStart + mDispatchedCompositionString.Length();
+  }();
   mContentSelection =
       Some(ContentSelection(aIMENotification.mSelectionChangeData));
   const bool retrievedSurroundingSignalReceived =
@@ -1768,7 +1790,7 @@ void IMContextWrapper::OnSelectionChange(
     return;
   }
 
-  bool occurredBeforeComposition =
+  const bool occurredBeforeComposition =
       IsComposing() && !selectionChangeData.mOccurredDuringComposition &&
       !selectionChangeData.mCausedByComposition;
   if (occurredBeforeComposition) {
@@ -2618,6 +2640,16 @@ bool IMContextWrapper::DispatchCompositionChangeEvent(
   mCompositionTargetRange.mOffset =
       mCompositionStart + rangeArray->TargetClauseOffset();
   mCompositionTargetRange.mLength = rangeArray->TargetClauseLength();
+
+  // If the web content updates selection as-is at `compositionupdate`,
+  // `beforeinput` or `input` as-is, we should ignore it in OnSelectionChange().
+  // To check whether the range is actually changed, we need to update the
+  // normal selection range right now.
+  const uint32_t caretOffsetInCompositionString =
+      rangeArray->HasCaret() ? rangeArray->GetCaretPosition()
+                             : mDispatchedCompositionString.Length();
+  mContentSelection->Collapse(mCompositionStart +
+                              caretOffsetInCompositionString);
 
   RefPtr<nsWindow> lastFocusedWindow(mLastFocusedWindow);
   nsEventStatus status;

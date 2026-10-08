@@ -2397,7 +2397,7 @@ export const PREFS_CONFIG = new Map([
     "pageLayouts.variant",
     {
       title:
-        "Name of the active newtab page layout variant, for layout experimentation. One of nova-full-width, side-by-side-content-lead, side-by-side-widgets-lead, side-by-side-content-lead-five, side-by-side-widgets-lead-five, spaces-buttons-top, spaces-buttons-bottom, spaces-thematic-v1, spaces-floating-arrows, auto-minimize-widgets, widgets-ad-large. The -five variants reach five card columns counting the widgets column, the others four. The spaces variants split the band into separately-navigable panels; the buttons- ones differ only in where the segmented control sits, spaces-floating-arrows replaces the segmented control with an arrow at each edge that has a space beyond it, while spaces-thematic-v1 names its panels for interests and puts the side-by-side pair inside each one, configured by pageLayouts.spacesConfig. The auto-minimize-widgets variant collapses the widgets section to its title row shortly after load. The widgets-ad-large variant puts a large sponsored card at the end of the first widget row. At one card column it sits second instead. Overridden by trainhopConfig.pageLayouts.variant.",
+        "Name of the active newtab page layout variant, for layout experimentation. See PAGE_LAYOUT_VARIANTS in common/PageLayoutVariants.mjs for the valid values. Overridden by trainhopConfig.pageLayouts.variant.",
       value: "nova-full-width",
     },
   ],
@@ -2424,6 +2424,15 @@ export const PREFS_CONFIG = new Map([
       title:
         "How long (in ms) the widgets section stays expanded before the auto-minimize-widgets layout variant collapses it. Overridden by trainhopConfig.pageLayouts.autoMinimizeDelayMs.",
       value: 3000,
+    },
+  ],
+  // @experiment(remove) { bug 2078816 }
+  [
+    "pageLayouts.widgetFirstContentSlot.widget",
+    {
+      title:
+        "Id of the widget the widget-first-content-slot layout variant puts in the first card slot of Popular Today. Overridden by trainhopConfig.pageLayouts.widgetFirstContentSlot.widget.",
+      value: "",
     },
   ],
   [

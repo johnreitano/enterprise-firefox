@@ -89,8 +89,6 @@ export class UrlbarView {
     this.input = input;
     this.panel = input.panel;
     this.controller = input.controller;
-    this.document = this.panel.ownerDocument;
-    this.window = this.document.defaultView;
 
     this.#rows = this.panel.querySelector(".urlbarView-results");
     this.resultMenu = /** @type {PanelList} */ (
@@ -136,9 +134,9 @@ export class UrlbarView {
   }
 
   /**
-   * The top chrome window. this.window is the owner of the view's panel which
-   * can be a content window for smartbar, so use the window exposed by the
-   * input to consistently get the chrome window for gBrowser and other APIs.
+   * The top chrome window. The module's `window` owns the view's panel and is
+   * a content window for smartbar, so use the window exposed by the input to
+   * get the chrome window for gBrowser and other APIs.
    */
   get chromeWindow() {
     return this.input.window;
@@ -751,8 +749,8 @@ export class UrlbarView {
       this.controller.engagementEvent.discard();
     }
 
-    this.window.removeEventListener("resize", this);
-    this.window.removeEventListener("blur", this);
+    window.removeEventListener("resize", this);
+    window.removeEventListener("blur", this);
 
     this.controller.notify(UrlbarShared.NOTIFICATIONS.VIEW_CLOSE);
 
@@ -786,7 +784,7 @@ export class UrlbarView {
     closeBtn.addEventListener("click", () => this.close());
 
     let canvas = document.createElement("canvas");
-    let dpr = this.window.devicePixelRatio || 1;
+    let dpr = window.devicePixelRatio || 1;
     canvas.width = 400 * dpr;
     canvas.height = 400 * dpr;
     let ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext("2d"));
@@ -805,24 +803,20 @@ export class UrlbarView {
       return;
     }
     if (this.#tail150.keyHandler) {
-      this.window.removeEventListener(
-        "keydown",
-        this.#tail150.keyHandler,
-        true
-      );
+      window.removeEventListener("keydown", this.#tail150.keyHandler, true);
     }
     this.#tail150.overlay.remove();
     this.#tail150 = null;
   }
 
   #runTail150(canvas) {
-    let S = this.window.getComputedStyle(canvas);
+    let S = window.getComputedStyle(canvas);
     let AC = S.getPropertyValue("--color-gray-0");
     let FD = S.getPropertyValue("--color-yellow-30");
-    let SP = new this.window.Image();
+    let SP = new window.Image();
     SP.src = "chrome://branding/content/icon48.png";
     // prettier-ignore
-    (() => { let c=canvas,W=this.window,A=t=>W.requestAnimationFrame(t),X=c.getContext("2d"),CA=(x,y,r)=>{X.beginPath();X.arc(x,y,r,0,7);X.fill()},g=()=>20*Math.random()|0,V=[,[-1,0],[0,-1],[1,0],[0,1]],s,d,n,f,e,r=0,l=0,GO=m=>{r=0,X.shadowColor="#000",X.shadowBlur=8,X.fillStyle=AC,X.fillText(m,200,180),X.fillText(e,200,230)},PF=()=>{let a=[];for(let x=0;x<20;x++)for(let y=0;y<20;y++)s.every($=>$.x!=x||$.y!=y)&&a.push({x,y});a.length?f=a[a.length*Math.random()|0]:GO("GG")},I=()=>{s=[...Array(8)].map(($,t)=>({x:10-t,y:10})),d=n=V[3],e=0,f={x:15,y:15},r=1,A(L)},L=$=>{if(!this.#tail150||!r)return;A(L);let p=($-l)/100;if(p>=1){l=$,d=n,p=0;let t={x:s[0].x+d[0],y:s[0].y+d[1]};if(t.x<0||t.x>19||t.y<0||t.y>19||s.some($=>$.x==t.x&&$.y==t.y)){GO("GAME OVER");return}s.unshift(t),t.x==f.x&&t.y==f.y?(e++,PF()):s.pop();if(!r)return}X.clearRect(0,0,400,400),X.fillStyle=FD,CA(20*f.x+10,20*f.y+10,6),s.map(($,t)=>{if(X.save(),X.translate(Math.min(390,Math.max(10,20*($.x+(!t&&d[0]*p))+10)),Math.min(390,Math.max(10,20*($.y+(!t&&d[1]*p))+10))),t){let i=t/s.length;X.fillStyle=`oklch(${62+17*i}% ${.21-.01*i} ${90*i})`,CA(0,0,8)}else SP.complete&&X.drawImage(SP,-10,-10,20,20);X.restore()})};X.fillStyle=AC;X.textAlign="center";X.font="30px Arial";X.fillText("← ↑ ↓ →",200,200);W.addEventListener("keydown",this.#tail150.keyHandler=$=>{$.keyCode!=27&&($.preventDefault(),$.stopPropagation());let t=V[$.keyCode-36];!r&&t&&I(),t&&(t[0]!=-d[0]||t[1]!=-d[1])&&(n=t)},true); })(); // eslint-disable-line
+    (() => { let c=canvas,W=window,A=t=>W.requestAnimationFrame(t),X=c.getContext("2d"),CA=(x,y,r)=>{X.beginPath();X.arc(x,y,r,0,7);X.fill()},g=()=>20*Math.random()|0,V=[,[-1,0],[0,-1],[1,0],[0,1]],s,d,n,f,e,r=0,l=0,GO=m=>{r=0,X.shadowColor="#000",X.shadowBlur=8,X.fillStyle=AC,X.fillText(m,200,180),X.fillText(e,200,230)},PF=()=>{let a=[];for(let x=0;x<20;x++)for(let y=0;y<20;y++)s.every($=>$.x!=x||$.y!=y)&&a.push({x,y});a.length?f=a[a.length*Math.random()|0]:GO("GG")},I=()=>{s=[...Array(8)].map(($,t)=>({x:10-t,y:10})),d=n=V[3],e=0,f={x:15,y:15},r=1,A(L)},L=$=>{if(!this.#tail150||!r)return;A(L);let p=($-l)/100;if(p>=1){l=$,d=n,p=0;let t={x:s[0].x+d[0],y:s[0].y+d[1]};if(t.x<0||t.x>19||t.y<0||t.y>19||s.some($=>$.x==t.x&&$.y==t.y)){GO("GAME OVER");return}s.unshift(t),t.x==f.x&&t.y==f.y?(e++,PF()):s.pop();if(!r)return}X.clearRect(0,0,400,400),X.fillStyle=FD,CA(20*f.x+10,20*f.y+10,6),s.map(($,t)=>{if(X.save(),X.translate(Math.min(390,Math.max(10,20*($.x+(!t&&d[0]*p))+10)),Math.min(390,Math.max(10,20*($.y+(!t&&d[1]*p))+10))),t){let i=t/s.length;X.fillStyle=`oklch(${62+17*i}% ${.21-.01*i} ${90*i})`,CA(0,0,8)}else SP.complete&&X.drawImage(SP,-10,-10,20,20);X.restore()})};X.fillStyle=AC;X.textAlign="center";X.font="30px Arial";X.fillText("← ↑ ↓ →",200,200);W.addEventListener("keydown",this.#tail150.keyHandler=$=>{$.keyCode!=27&&($.preventDefault(),$.stopPropagation());let t=V[$.keyCode-36];!r&&t&&I(),t&&(t[0]!=-d[0]||t[1]!=-d[1])&&(n=t)},true); })(); // eslint-disable-line
   }
 
   /**
@@ -1143,7 +1137,7 @@ export class UrlbarView {
     // We need to ensure that aria-activedescendant reflects this new ID.
     if (this.#selectedElement && !this.oneOffSearchButtons?.selectedButton) {
       let aadID = this.input.inputField.getAttribute("aria-activedescendant");
-      if (aadID && !this.document.getElementById(aadID)) {
+      if (aadID && !document.getElementById(aadID)) {
         this.#setAccessibleFocus(this.#selectedElement);
       }
     }
@@ -1354,8 +1348,8 @@ export class UrlbarView {
     this.input.toggleAttribute("suppress-focus-border", true);
     this.input.toggleAttribute("open", true);
 
-    this.window.addEventListener("resize", this);
-    this.window.addEventListener("blur", this);
+    window.addEventListener("resize", this);
+    window.addEventListener("blur", this);
 
     this.controller.notify(UrlbarShared.NOTIFICATIONS.VIEW_OPEN);
 
@@ -1376,7 +1370,7 @@ export class UrlbarView {
       UrlbarPrefs.get("closeOtherPanelsOnOpen") &&
       !this.input.inOverflowPanel
     ) {
-      this.window.docShell.treeOwner
+      window.docShell.treeOwner
         .QueryInterface(Ci.nsIInterfaceRequestor)
         .getInterface(Ci.nsIAppWindow)
         .rollupAllPopups();
@@ -1762,7 +1756,7 @@ export class UrlbarView {
         new Date(result.payload.bookmarkDateMs),
         { forceAbsoluteDate: true }
       );
-      this.document.l10n.setAttributes(
+      document.l10n.setAttributes(
         bookmarked,
         "urlbar-result-explanation-bookmarked",
         { date: formattedDate }
@@ -1792,7 +1786,7 @@ export class UrlbarView {
         default:
           throw new Error("Unhandled date format type: " + dateFormatType);
       }
-      this.document.l10n.setAttributes(lastVisited, l10nId, {
+      document.l10n.setAttributes(lastVisited, l10nId, {
         date: formattedDate,
       });
     } else {
@@ -2390,7 +2384,7 @@ export class UrlbarView {
         args: action.l10nArgs,
       });
     } else {
-      this.document.l10n.setAttributes(label, action.label, action.l10nArgs);
+      document.l10n.setAttributes(label, action.label, action.l10nArgs);
     }
     button.appendChild(label);
     actionContainer.appendChild(button);
@@ -2825,7 +2819,7 @@ export class UrlbarView {
         });
       this.#updateOverflowTooltip(url, displayedUrl);
 
-      if (UrlbarContentUtils.isTextDirectionRTL(displayedUrl, this.window)) {
+      if (UrlbarContentUtils.isTextDirectionRTL(displayedUrl, window)) {
         // Stripping the url prefix may change the initial text directionality,
         // causing parts of it to jump to the end. To prevent that we insert a
         // LRM character in place of the prefix.
@@ -3027,7 +3021,7 @@ export class UrlbarView {
           description.querySelector("[data-l10n-name=learn-more-link]")
         );
         if (learnMoreLink) {
-          learnMoreLink.dataset.url = this.window.getHelpLinkURL(
+          learnMoreLink.dataset.url = window.getHelpLinkURL(
             result.payload.descriptionLearnMoreTopic
           );
         } else {
@@ -3342,7 +3336,7 @@ export class UrlbarView {
   }
 
   async #ariaNotifyLocalizedString(element, l10nId, l10nArgs) {
-    let message = await this.document.l10n.formatValue(l10nId, l10nArgs);
+    let message = await document.l10n.formatValue(l10nId, l10nArgs);
     element.ariaNotify(message);
   }
 
@@ -3399,7 +3393,7 @@ export class UrlbarView {
     // removing stale rows also accepts tentative exposures, so an outlived one
     // would do both to the query starting here.
     this.#cancelRemoveStaleRowsTimer();
-    this.#removeStaleRowsTimer = this.window.setTimeout(() => {
+    this.#removeStaleRowsTimer = window.setTimeout(() => {
       this.#removeStaleRowsTimer = null;
       this.#removeStaleRows();
     }, UrlbarPrefs.get("removeStaleRowsTimeout"));
@@ -3407,7 +3401,7 @@ export class UrlbarView {
 
   #cancelRemoveStaleRowsTimer() {
     if (this.#removeStaleRowsTimer) {
-      this.window.clearTimeout(this.#removeStaleRowsTimer);
+      window.clearTimeout(this.#removeStaleRowsTimer);
       this.#removeStaleRowsTimer = null;
     }
   }
@@ -4551,7 +4545,7 @@ export class UrlbarView {
    */
   #createContainerMenuItem(l10nId, onPick) {
     let menuitem = document.createElement("panel-item");
-    this.document.l10n.setAttributes(menuitem, l10nId);
+    document.l10n.setAttributes(menuitem, l10nId);
     menuitem.addEventListener("click", onPick);
     return menuitem;
   }
@@ -4752,7 +4746,7 @@ export class UrlbarView {
 
     // Attaching the event listener to the window so we can capture `mouseup`
     // outside of the panel when the mouse is dragged.
-    this.window.addEventListener("mouseup", this);
+    window.addEventListener("mouseup", this);
 
     // Select the element and open a speculative connection unless it's a
     // button. Buttons are special in the two ways listed below. Some buttons
@@ -4793,7 +4787,7 @@ export class UrlbarView {
       return;
     }
 
-    this.window.removeEventListener("mouseup", this);
+    window.removeEventListener("mouseup", this);
 
     // Since the listener must be on the window use `event.composedPath()`
     // instead of `event.target` to handle shadow DOM encapsulation while

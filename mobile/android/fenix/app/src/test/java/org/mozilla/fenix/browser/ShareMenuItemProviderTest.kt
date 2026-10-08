@@ -24,6 +24,7 @@ import mozilla.components.ui.icons.R as iconsR
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -148,8 +149,9 @@ class ShareMenuItemProviderTest {
                     tabs = listOf(createTab(url = TEST_URL, title = TEST_TITLE, id = TAB_ID)),
                     selectedTabId = TAB_ID,
                 )
-            )
-    ) = ShareMenuItemProvider(browserStore = browserStore, shareUseCases = shareUseCases)
+            ),
+        target: MenuTarget = MenuTarget.BrowserTab,
+    ) = ShareMenuItemProvider(browserStore = browserStore, target = target, shareUseCases = shareUseCases)
 
     private companion object {
         const val TAB_ID = "tab1"

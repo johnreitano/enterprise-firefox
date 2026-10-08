@@ -78,10 +78,6 @@ skip-if = [
 ["test_conformance__uniforms__uniform-default-values.html"]
 skip-if = [
   "os == 'android' && os_version == '14' && arch == 'aarch64'",
-  "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland'",
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11'",
-  "os == 'win' && os_version == '11.26100'",
-  "os == 'win' && os_version == '11.26200'",
 ]
 
 ["test_conformance__uniforms__uniform-location.html"]
@@ -89,7 +85,3 @@ skip-if = [
 ["test_conformance__uniforms__uniform-samplers-test.html"]
 
 ["test_conformance__uniforms__uniform-values-per-program.html"]
-skip-if = [
-  "os == 'win' && os_version == '11.26100'",
-  "os == 'win' && os_version == '11.26200'",
-]

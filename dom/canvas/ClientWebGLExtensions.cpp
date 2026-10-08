@@ -25,6 +25,8 @@ DEFINE_WEBGL_EXTENSION_GOOP(EXT_shader_texture_lod,
                             WebGLExtensionShaderTextureLod)
 DEFINE_WEBGL_EXTENSION_GOOP(EXT_texture_filter_anisotropic,
                             WebGLExtensionTextureFilterAnisotropic)
+DEFINE_WEBGL_EXTENSION_GOOP(EXT_texture_mirror_clamp_to_edge,
+                            WebGLExtensionTextureMirrorClampToEdge)
 DEFINE_WEBGL_EXTENSION_GOOP(EXT_texture_norm16, WebGLExtensionTextureNorm16)
 DEFINE_WEBGL_EXTENSION_GOOP(MOZ_debug, WebGLExtensionMOZDebug)
 DEFINE_WEBGL_EXTENSION_GOOP(OES_draw_buffers_indexed,

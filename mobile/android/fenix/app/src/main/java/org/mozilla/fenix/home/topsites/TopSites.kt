@@ -122,7 +122,6 @@ internal fun TopSites(
             isExpanded = expanded
             interactor.onExpandToggleClicked(expanded)
         },
-        isAddShortcutEnabled = state.isAddShortcutEnabled,
         isExpandToggleEnabled = state.isExpandToggleEnabled,
         isExpanded = isExpanded,
     )
@@ -144,7 +143,6 @@ internal fun TopSites(
  * @param onTopSitesItemBound Invoked during the composition of a top site item.
  * @param onAddShortcutClicked Invoked when the user clicks on the "Add shortcut" tile.
  * @param onExpandToggleClick Invoked when the user clicks on the expand/collapse control.
- * @param isAddShortcutEnabled Whether the "Add shortcut" tile is enabled.
  * @param isExpandToggleEnabled Whether the control that expands and collapses the grid is enabled.
  * @param isExpanded Whether every top site is shown rather than only the first [TOP_SITES_COLLAPSED_ROWS] rows.
  */
@@ -164,7 +162,6 @@ fun TopSites(
     onTopSitesItemBound: () -> Unit,
     onAddShortcutClicked: () -> Unit,
     onExpandToggleClick: () -> Unit = {},
-    isAddShortcutEnabled: Boolean = false,
     isExpandToggleEnabled: Boolean = false,
     isExpanded: Boolean = false,
 ) {
@@ -181,7 +178,7 @@ fun TopSites(
         val collapsedCount = collapsedTopSitesCount(columns)
 
         val hasHiddenShortcuts = topSites.size > collapsedCount
-        val hasHiddenAddShortcut = isAddShortcutEnabled && topSites.size >= collapsedCount
+        val hasHiddenAddShortcut = topSites.size >= collapsedCount
 
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -190,7 +187,7 @@ fun TopSites(
             Shortcuts(
                 topSites = if (isExpanded) topSites else topSites.take(collapsedCount),
                 topSiteColors = topSiteColors,
-                showAddShortcut = isAddShortcutEnabled && (isExpanded || topSites.size < collapsedCount),
+                showAddShortcut = isExpanded || topSites.size < collapsedCount,
                 scrollable = false,
                 menuItems = { topSite ->
                     getMenuItems(

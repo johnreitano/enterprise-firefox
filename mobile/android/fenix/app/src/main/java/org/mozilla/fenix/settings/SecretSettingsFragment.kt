@@ -204,11 +204,6 @@ class SecretSettingsFragment : PreferenceFragmentCompat(), SystemInsetsPaddedFra
             onPreferenceChangeListener = SharedPreferenceUpdater()
         }
 
-        requirePreference<SwitchPreferenceCompat>(R.string.pref_key_enable_add_shortcuts_improvement).apply {
-            isChecked = settings.enableAddShortcutsImprovement
-            onPreferenceChangeListener = SharedPreferenceUpdater()
-        }
-
         requirePreference<SwitchPreferenceCompat>(R.string.pref_key_show_more_shortcuts).apply {
             isChecked = settings.showMoreShortcuts
             onPreferenceChangeListener = SharedPreferenceUpdater()

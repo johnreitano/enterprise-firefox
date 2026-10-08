@@ -5,7 +5,7 @@
 // META: script=/notifications/resources/helpers.js
 // META: script=/_mozilla/notifications/resources/MockAlertsService.js
 
-import { encrypt } from "/push-api/resources/helpers.js"
+import { pushMessageAndWait } from "./resources/helpers.js"
 
 let registration;
 let subscription;
@@ -19,44 +19,14 @@ promise_setup(async (t) => {
 let enableDWPPref;
 
 async function pushAndReceiveMessage(t, message) {
-  // Enable auto-click so that we can detect when DWP is received.
-  await MockAlertsService.register(t);
-  await MockAlertsService.enableAutoClick();
-
   await using _pref = await SpecialPowers.prefEnv({
     set: [["dom.push.declarative.enabled", enableDWPPref]],
   });
 
   await GleanTest.testResetFOG();
 
-  const result = await encrypt(
-    new TextEncoder().encode(message),
-    subscription.getKey("p256dh"),
-    subscription.getKey("auth")
-  );
+  await pushMessageAndWait(t, subscription, { message });
 
-  const { promise, resolve } = Promise.withResolvers();
-  const controller = new AbortController();
-  navigator.serviceWorker.addEventListener("message", ev => {
-    if (ev.data.data !== message) {
-      return;
-    }
-    controller.abort();
-    resolve();
-  }, { signal: controller.signal });
-
-  new BroadcastChannel("broadcast-when-opened").addEventListener("message", () => {
-    controller.abort();
-    resolve();
-  }, { signal: controller.signal });
-
-
-  await fetch(subscription.endpoint, {
-    method: "post",
-    ...result
-  });
-
-  await promise;
   await GleanTest.flush();
 }
 

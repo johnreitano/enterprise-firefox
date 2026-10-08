@@ -16,7 +16,7 @@
 #include "mozilla/TimeStamp.h"      // for TimeStamp
 #include "mozilla/gfx/Point.h"      // for IntSize
 #include "mozilla/ipc/ProtocolUtils.h"
-#include "mozilla/layers/APZInputBridgeParent.h"
+#include "mozilla/layers/APZBridgeParent.h"
 #include "mozilla/layers/CompositorController.h"
 #include "mozilla/layers/CompositorVsyncSchedulerOwner.h"
 #include "mozilla/layers/FocusTarget.h"
@@ -427,10 +427,10 @@ class CompositorBridgeParent final : public CompositorBridgeParentBase {
     // LayersId if no widget could be found.
     LayersId mEmbedderLayersId;
     RefPtr<APZCTreeManagerParent> mApzcTreeManagerParent;
-    // The mApzInputBridgeParent is only populated for LayerTreeState
+    // The mApzBridgeParent is only populated for LayerTreeState
     // objects corresponding to root LayerIds (one for each top-level
     // window).
-    RefPtr<APZInputBridgeParent> mApzInputBridgeParent;
+    RefPtr<APZBridgeParent> mApzBridgeParent;
     RefPtr<CompositorBridgeParent> mParent;
     RefPtr<WebRenderBridgeParent> mWrBridge;
     // The mWebRenderAPI is only populated for LayerTreeState objects
@@ -505,9 +505,9 @@ class CompositorBridgeParent final : public CompositorBridgeParentBase {
 
   /**
    * Same as the GetGeckoContentControllerForRoot function, but returns
-   * the APZInputBridge.
+   * the APZBridgeParent.
    */
-  static RefPtr<APZInputBridgeParent> GetApzInputBridgeParentForRoot(
+  static RefPtr<APZBridgeParent> GetApzBridgeParentForRoot(
       LayersId aContentLayersId);
 
   /**
@@ -526,9 +526,8 @@ class CompositorBridgeParent final : public CompositorBridgeParentBase {
       const StaticMonitorAutoLock& aProofOfLayerTreeStateLock,
       const LayersId& aLayersId, LayerTreeState& aLayerTreeStateToUpdate);
 
-  static void SetAPZInputBridgeParent(
-      const LayersId& aLayersId,
-      RefPtr<APZInputBridgeParent>&& aInputBridgeParent);
+  static void SetAPZBridgeParent(const LayersId& aLayersId,
+                                 RefPtr<APZBridgeParent>&& aApzBridgeParent);
 
   already_AddRefed<PAPZParent> AllocPAPZParent(
       const LayersId& aLayersId) override;

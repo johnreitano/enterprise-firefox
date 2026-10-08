@@ -251,9 +251,9 @@ export const PURPOSES = Object.freeze({
  * Keep ui/test/browser/head.js MOCK_RS_RECORDS aligned with this table.
  */
 export const FEATURE_MAJOR_VERSIONS = Object.freeze({
-  // TODO Bug 2053495: remove with mistral release pref (CHAT becomes 11)
+  // TODO Bug 2053495: remove with mistral release pref (CHAT becomes 12)
   get [MODEL_FEATURES.CHAT]() {
-    return Services.prefs.getBoolPref(MISTRAL_RELEASE_PREF, false) ? 11 : 10;
+    return Services.prefs.getBoolPref(MISTRAL_RELEASE_PREF, false) ? 12 : 10;
   },
   [MODEL_FEATURES.SMART_FORM_FILL]: 1,
   [MODEL_FEATURES.TITLE_GENERATION]: 1,

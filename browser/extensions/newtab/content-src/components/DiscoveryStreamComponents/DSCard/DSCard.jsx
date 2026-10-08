@@ -648,6 +648,7 @@ export class _DSCard extends React.PureComponent {
           url={this.props.url}
           title={this.props.title}
           isSponsored={!!this.props.flightId}
+          dwellLabel={this.props.flightId ? "story_sponsored" : "story_organic"}
           tabIndex={this.props.tabIndex}
           onFocus={this.props.onFocus}
         >

@@ -587,11 +587,11 @@ class MenuDialogFragment : BottomSheetDialogFragment() {
                                     menuStore.dispatch(MenuAction.FindInPage)
                                 },
                                 onBannerClick = {
-                                    menuStore.dispatch(MenuAction.MenuBanner)
+                                    menuStore.dispatch(MenuAction.DefaultBrowserMenuBannerClicked)
                                     (context as? Activity)?.openSetDefaultBrowserOption()
                                 },
                                 onBannerDismiss = {
-                                    menuStore.dispatch(MenuAction.DismissMenuBanner)
+                                    menuStore.dispatch(MenuAction.DefaultBrowserMenuBannerDismissed)
                                     shouldShowMenuBanner = false
                                 },
                                 onExtensionsMenuClick = {

@@ -8860,10 +8860,11 @@ pub extern "C" fn Servo_StyleSet_MaybeInvalidateRelativeSelectorForRemoval(
 ) {
     let element = GeckoElement(element);
 
+    let search_direction = element.relative_selector_search_direction();
     // This element was in-tree, so we can safely say that if it was not on
     // the relative selector search path, its removal will not invalidate any
     // relative selector.
-    if element.relative_selector_search_direction().is_empty() {
+    if search_direction.is_empty() {
         return;
     }
     let node = element.as_node();
@@ -8873,6 +8874,12 @@ pub extern "C" fn Servo_StyleSet_MaybeInvalidateRelativeSelectorForRemoval(
         inherit_relative_selector_search_direction(element.parent_element(), prev_sibling);
     if inherited.is_empty() {
         return;
+    }
+
+    if let Some(sibling) = next_sibling.as_ref() {
+        // This element may be the one that fully matched the relative selector. In that case,
+        // our next sibling must inherit the information, so that the search can continue.
+        sibling.apply_selector_flags(search_direction);
     }
 
     let data = raw_data.borrow();

@@ -82,6 +82,9 @@
       "chrome://browser/content/aiwindow/components/aitab-timeline.mjs": [
         "../../../browser/components/aiwindow/ui/components/aitab-page/aitab-timeline/aitab-timeline.mjs"
       ],
+      "chrome://browser/content/aiwindow/components/aitab-tool-ui.mjs": [
+        "../../../browser/components/aiwindow/ui/components/aitab-tool-ui/aitab-tool-ui.mjs"
+      ],
       "chrome://browser/content/aiwindow/components/applied-memories-button.mjs": [
         "../../../browser/components/aiwindow/ui/components/ai-chat-content/chat-assistant-footer/applied-memories-button.mjs"
       ],
@@ -1534,9 +1537,6 @@
       "resource:///modules/Dedupe.sys.mjs": [
         "../../../browser/modules/Dedupe.sys.mjs"
       ],
-      "resource:///modules/DevToolsStartup.sys.mjs": [
-        "../../../devtools/startup/DevToolsStartup.sys.mjs"
-      ],
       "resource:///modules/EveryWindow.sys.mjs": [
         "../../../browser/modules/EveryWindow.sys.mjs"
       ],
@@ -1722,6 +1722,9 @@
       ],
       "resource:///modules/asrouter/PanelTestProvider.sys.mjs": [
         "../../../browser/components/asrouter/modules/PanelTestProvider.sys.mjs"
+      ],
+      "resource:///modules/asrouter/PinnableSitesProvider.sys.mjs": [
+        "../../../browser/components/asrouter/modules/PinnableSitesProvider.sys.mjs"
       ],
       "resource:///modules/asrouter/PreonboardingSplash.sys.mjs": [
         "../../../browser/components/asrouter/modules/PreonboardingSplash.sys.mjs"

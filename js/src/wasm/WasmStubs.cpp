@@ -3030,12 +3030,31 @@ bool wasm::GenerateContBaseFrameStub(jit::MacroAssembler& masm,
     }
   }
 
-  wasm::CallSiteDesc callSite(CallSiteKind::FuncRef);
-  wasm::CalleeDesc callee = wasm::CalleeDesc::wasmFuncRef();
-  CodeOffset fastCallOffset;
-  CodeOffset slowCallOffset;
-  masm.wasmCallRef(callSite, callee, &fastCallOffset, &slowCallOffset, nullptr,
-                   nullptr);
+  // InstanceReg, the pinned registers and the realm already belong to the
+  // funcref's instance (see ContStack::prepare), so call it directly. Nothing
+  // below uses the instance after the call, so the call is marked slow without
+  // restoring it: a cross-instance return_call from the callee then collapses
+  // its frame without a hidden return_call trampoline frame.
+#  ifdef DEBUG
+  Label sameInstance;
+  masm.branchPtr(
+      Assembler::Equal,
+      Address(WasmCallRefReg, FunctionExtended::offsetOfExtendedSlot(
+                                  FunctionExtended::WASM_INSTANCE_SLOT)),
+      InstanceReg, &sameInstance);
+  masm.breakpoint();
+  masm.bind(&sameInstance);
+#  endif
+  masm.storePtr(InstanceReg, Address(masm.getStackPointer(),
+                                     WasmCallerInstanceOffsetBeforeCall));
+  masm.storePtr(InstanceReg, Address(masm.getStackPointer(),
+                                     WasmCalleeInstanceOffsetBeforeCall));
+  masm.loadPtr(Address(WasmCallRefReg,
+                       FunctionExtended::offsetOfExtendedSlot(
+                           FunctionExtended::WASM_FUNC_UNCHECKED_ENTRY_SLOT)),
+               WasmCallRefCallScratchReg0);
+  masm.wasmMarkedSlowCall(wasm::CallSiteDesc(CallSiteKind::FuncRef),
+                          WasmCallRefCallScratchReg0);
 
   // The current stack pointer might not match the one before the call if the
   // callee performed a tail call, so recover it from FP before reading the

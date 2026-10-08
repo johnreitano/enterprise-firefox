@@ -364,7 +364,13 @@ export class ActivityStreamMessageChannel {
       this._renderLayersListeners.delete(browser);
     }
 
-    this.onActionFromContent({ type: at.NEW_TAB_UNLOAD }, tabDetails.portID);
+    this.onActionFromContent(
+      {
+        type: at.NEW_TAB_UNLOAD,
+        _target: { browser, window: browser.documentGlobal },
+      },
+      tabDetails.portID
+    );
   }
 
   /**

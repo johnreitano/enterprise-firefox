@@ -29,9 +29,5 @@ support-files = [
 ["test_conformance__limits__gl-min-attribs.html"]
 
 ["test_conformance__limits__gl-min-textures.html"]
-skip-if = [
-  "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland'",
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11'",
-]
 
 ["test_conformance__limits__gl-min-uniforms.html"]

@@ -282,7 +282,16 @@ def _collect(pipe, poll_interval):
             updated_known_processes = dict()
             for p in psutil.process_iter():
                 pid = p.pid
-                create_time = p.create_time()
+                try:
+                    with p.oneshot():
+                        create_time = p.create_time()
+                        # Zombies have exited, they just haven't been waited
+                        # for by their parent yet.
+                        if p.status() == psutil.STATUS_ZOMBIE:
+                            continue
+                except psutil.Error:
+                    # The process exited or isn't accessible.
+                    continue
                 # If the process creation time does not match, a new process reused a pid.
                 if pid in known_processes and create_time == known_processes[pid][0]:
                     updated_known_processes[pid] = known_processes[pid]

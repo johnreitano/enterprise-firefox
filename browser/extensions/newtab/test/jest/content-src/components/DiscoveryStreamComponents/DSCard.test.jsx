@@ -11,6 +11,7 @@ import {
   DSSource,
   PlaceholderDSCard,
 } from "content-src/components/DiscoveryStreamComponents/DSCard/DSCard";
+import { SafeAnchor } from "content-src/components/DiscoveryStreamComponents/SafeAnchor/SafeAnchor";
 import { actionCreators as ac } from "common/Actions.mjs";
 import { INITIAL_STATE } from "common/Reducers.sys.mjs";
 import React from "react";
@@ -73,6 +74,26 @@ describe("<DSCard>", () => {
     const anchor = container.querySelector("a.ds-card-link");
     expect(anchor).toBeInTheDocument();
     expect(anchor).toHaveAttribute("href", "https://foo.com");
+  });
+
+  it("should label an organic card link for dwell time", () => {
+    const renderSpy = jest.spyOn(SafeAnchor.prototype, "render");
+    act(() => cardRef.current.forceUpdate());
+    expect(renderSpy.mock.contexts.at(-1).props).toHaveProperty(
+      "dwellLabel",
+      "story_organic"
+    );
+    renderSpy.mockRestore();
+  });
+
+  it("should label a sponsored card link for dwell time", () => {
+    const renderSpy = jest.spyOn(SafeAnchor.prototype, "render");
+    setProps({ flightId: "12345" });
+    expect(renderSpy.mock.contexts.at(-1).props).toHaveProperty(
+      "dwellLabel",
+      "story_sponsored"
+    );
+    renderSpy.mockRestore();
   });
 
   it("should pass onLinkClick prop", () => {

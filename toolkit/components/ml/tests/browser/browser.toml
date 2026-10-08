@@ -84,7 +84,6 @@ skip-if = [
   "asan",
   "debug",
   "os == 'android'",
-  "tsan",
   "verify",
 ]
 
@@ -134,7 +133,6 @@ skip-if = [
   "asan",
   "debug",
   "os == 'android'",
-  "tsan",
   "verify",
 ]
 

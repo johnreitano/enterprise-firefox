@@ -12,6 +12,7 @@ import io.mockk.verify
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -46,6 +47,7 @@ import org.mozilla.fenix.NavGraphDirections
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.AppStore
 import org.mozilla.fenix.components.appstate.AppState
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -141,7 +143,7 @@ class ExtensionsMenuItemProviderTest {
         )
         assertEquals(MenuAction.Navigate.ManageExtensions, item.onClickEvent)
         // The icon warning about this is multicolored, which only a drawable is shown as it is, without a tint.
-        assertTrue(item.icon is MenuItemIconDrawable)
+        assertIs<MenuItemIconDrawable>(item.icon)
         // Only that icon warns about it, the item itself is not colored as a warning.
         assertEquals(MenuItemState.DEFAULT, item.state)
     }
@@ -351,10 +353,21 @@ class ExtensionsMenuItemProviderTest {
         return provider.itemFlow.value
     }
 
-    private fun TestScope.provider(browserStore: BrowserStore = browserStoreWith()) =
+    @Test
+    fun `GIVEN the menu was opened from home WHEN building the item THEN ignore the selected tab`() = runTest {
+        val item = provider(browserStoreWith(extension(INSTALLED_ID)), MenuTarget.Home).itemFlow.value
+
+        assertNotEquals(MenuItemSummary(text = Text.String(ACTION_TITLE)), item?.summary)
+    }
+
+    private fun TestScope.provider(
+        browserStore: BrowserStore = browserStoreWith(),
+        target: MenuTarget = MenuTarget.BrowserTab,
+    ) =
         ExtensionsMenuItemProvider(
             context = testContext,
             browserStore = browserStore,
+            target = target,
             addonManager = addonManager,
             // Both are scopes that runTest runs and then cancels at the end of each test.
             viewLifecycleScope = backgroundScope,

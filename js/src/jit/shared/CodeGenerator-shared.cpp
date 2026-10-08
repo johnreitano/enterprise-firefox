@@ -202,6 +202,11 @@ bool CodeGeneratorShared::generateOutOfLineCode() {
       return false;
     }
 
+    if (deoptJumpPending_) {
+      masm.jump(&deoptLabel_);
+      deoptJumpPending_ = false;
+    }
+
     // Add native => bytecode mapping entries for OOL->sites.
     // Not enabled on wasm yet since it doesn't contain bytecode mappings.
     if (!gen->compilingWasm()) {
@@ -234,7 +239,7 @@ void CodeGeneratorShared::bailoutFrom(Label* label, LSnapshot* snapshot) {
   InlineScriptTree* tree = snapshot->mir()->block()->trackedTree();
   auto* ool = new (alloc()) LambdaOutOfLineCode([=, this](OutOfLineCode& ool) {
     masm.push(Imm32(snapshot->snapshotOffset()));
-    masm.jump(&deoptLabel_);
+    jumpToDeoptLabel();
   });
 
   // All bailout code is associated with the bytecodeSite of the block we are

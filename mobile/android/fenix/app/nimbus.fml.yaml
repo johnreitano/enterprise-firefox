@@ -852,6 +852,10 @@ features:
           Controls the network.android_doh.autoselect_enabled pref and automatically chooses a DoH provider when Default Protection mode is selected.
         type: Boolean
         default: false
+    defaults:
+      - channel: nightly
+        value:
+          autoselect-enabled: true
 
   private-browsing-lock:
     description: Allows enabling and disabling the private browsing mode lock via an authentication screen.
@@ -1097,29 +1101,6 @@ features:
       - channel: developer
         value:
           allowed-regions: ["XX"]
-
-  native-share-sheet:
-    description: Feature to enable the Native Share Sheet for users on Firefox on Android.
-    variables:
-      enabled:
-        description: If true, Native Share Sheet is enabled.
-        type: Boolean
-        default: true
-    defaults:
-      - channel: developer
-        value:
-          enabled: true
-      - channel: nightly
-        value:
-          enabled: true
-
-  add-shortcuts-improvement:
-    description: Feature to enable Add Shortcuts improvement for users on Firefox on Android.
-    variables:
-      enabled:
-        description: If true, Add Shortcuts improvement is enabled.
-        type: Boolean
-        default: true
 
   show-more-shortcuts:
     description: Feature to show expand/collapse buttons for shortcuts on the homepage.

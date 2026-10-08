@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/// <reference path="./moz-select.tagmap.d.ts" />
+
 import {
   createRef,
   html,
@@ -45,7 +47,7 @@ import { MozBaseInputElement, MozLitElement } from "../lit-utils.mjs";
  * @property {number} selectedIndex - The index of the currently selected option.
  * @property {boolean} usePanelList - Whether or not to render a panel. Depends on options using icons.
  */
-export default class MozSelect extends MozBaseInputElement {
+export class MozSelect extends MozBaseInputElement {
   static properties = {
     size: { type: String, reflect: true },
     options: { type: Array, state: true },

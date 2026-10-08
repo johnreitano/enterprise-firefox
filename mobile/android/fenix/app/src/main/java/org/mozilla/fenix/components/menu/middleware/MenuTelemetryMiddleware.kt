@@ -153,10 +153,10 @@ class MenuTelemetryMiddleware<S : State, A : Action>(private val accessPoint: Me
                     )
                 )
 
-            is MenuAction.MenuBanner ->
+            is MenuAction.DefaultBrowserMenuBannerClicked ->
                 Events.browserMenuAction.record(Events.BrowserMenuActionExtra(item = "menu_banner"))
 
-            MenuAction.DismissMenuBanner ->
+            MenuAction.DefaultBrowserMenuBannerDismissed ->
                 Events.browserMenuAction.record(Events.BrowserMenuActionExtra(item = "dismiss_menu_banner"))
 
             MenuAction.CustomizeReaderView -> ReaderMode.appearance.record(NoExtras())

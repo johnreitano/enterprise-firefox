@@ -15,6 +15,7 @@ import androidx.work.workDataOf
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.util.Date
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlinx.coroutines.CancellationException
@@ -26,6 +27,7 @@ import mozilla.components.support.base.android.NotificationsDelegate
 import mozilla.components.support.base.log.logger.Logger
 import mozilla.components.support.utils.DateTimeProvider
 import mozilla.components.support.utils.DefaultDateTimeProvider
+import org.mozilla.fenix.GleanMetrics.Pings
 import org.mozilla.fenix.GleanMetrics.TrackingProtection
 import org.mozilla.fenix.utils.Settings
 
@@ -73,6 +75,7 @@ class PrivacyReportNotificationWorker(
         }
 
         try {
+            recordWorkerRun()
             ensurePrivacyReportNotificationChannelExists(applicationContext)
 
             val notSentReason = notSentReason()
@@ -103,6 +106,8 @@ class PrivacyReportNotificationWorker(
                 showPrivacyReportNotification(applicationContext, notificationsDelegate, content)
             }
         } finally {
+            Pings.privacyReportNotification.submit(Pings.privacyReportNotificationReasonCodes.workerRun)
+
             if (!isStopped && settings.weeklyPrivacyNotificationFeatureFlagEnabled) {
                 // Reschedule based on the intended time (not actual execution time) to avoid drift from worker delays.
                 scheduleNext(
@@ -114,6 +119,15 @@ class PrivacyReportNotificationWorker(
         }
 
         return Result.success()
+    }
+
+    /**
+     * Report that the worker ran. The run count is incremented before any work so that runs cancelled before the ping
+     * is submitted show up as gaps in the submitted run counts.
+     */
+    private fun recordWorkerRun() {
+        TrackingProtection.privacyReportNotificationWorkerRunCount.add()
+        TrackingProtection.privacyReportNotificationWorkerRan.record()
     }
 
     /**
@@ -194,6 +208,8 @@ class PrivacyReportNotificationWorker(
             )
 
             logger.info("Registered the privacy report notification worker.")
+
+            recordWorkerScheduled(now)
         }
 
         /**
@@ -320,6 +336,14 @@ class PrivacyReportNotificationWorker(
                         " the coroutine was cancelled."
                 )
             }
+
+            TrackingProtection.privacyReportNotificationWorkerScheduled.set(false)
+        }
+
+        /** Report that the worker is scheduled. */
+        private fun recordWorkerScheduled(nowMillis: Long) {
+            TrackingProtection.privacyReportNotificationScheduledAt.set(Date(nowMillis))
+            TrackingProtection.privacyReportNotificationWorkerScheduled.set(true)
         }
     }
 }

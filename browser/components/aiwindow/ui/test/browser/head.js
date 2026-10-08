@@ -110,7 +110,7 @@ let gIntentEngineStub;
 // Minimal RS records returned by the global getRemoteClient stub.
 // Version numbers must match FEATURE_MAJOR_VERSIONS in models/Utils.sys.mjs.
 const MOCK_RS_RECORDS = [
-  ["chat", 11],
+  ["chat", 12],
   ["title-generation", 1],
   ["tab-group-naming", 1],
   ["conversation-starters-sidebar-system", 1],
@@ -211,7 +211,7 @@ const MOCK_RS_RECORDS = [
       version: "v10.0",
     },
     // TODO 2053495
-    // v11 records for mistral release (browser.smartwindow.mistralRelease pref)
+    // v12 records for mistral release (browser.smartwindow.mistralRelease pref)
     {
       kind: "params",
       feature: "chat",
@@ -221,7 +221,7 @@ const MOCK_RS_RECORDS = [
       purpose: "chat",
       parameters: {},
       prompts: "Test system prompt.",
-      version: "v11.0",
+      version: "v12.0",
       is_default: true,
     },
     {
@@ -239,7 +239,7 @@ const MOCK_RS_RECORDS = [
       service_type: "ai",
       purpose: "chat",
       parameters: {},
-      version: "v11.0",
+      version: "v12.0",
     },
     {
       kind: "params",
@@ -257,7 +257,7 @@ const MOCK_RS_RECORDS = [
       purpose: "chat",
       parameters: {},
       prompts: "Test system prompt.",
-      version: "v11.0",
+      version: "v12.0",
     },
     {
       kind: "params",
@@ -274,7 +274,7 @@ const MOCK_RS_RECORDS = [
       service_type: "ai",
       purpose: "chat",
       parameters: {},
-      version: "v11.0",
+      version: "v12.0",
     },
     // The relevant-memories module is loaded for the chat model, so it resolves
     // via the "generic" fallback rather than is_default like the v1 records.

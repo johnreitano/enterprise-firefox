@@ -39,6 +39,7 @@ import {
   isSpaceOverridden,
   isSpacesActive,
   resolveAutoMinimizeDelayMs,
+  selectFirstSlotWidget,
   selectWidgetsRowAd,
   SPACE_IDS,
 } from "common/PageLayoutVariants.mjs";
@@ -304,6 +305,13 @@ function Widgets({ widgetIds }) {
     for (const id of Object.keys(widgetEnabledMap)) {
       widgetEnabledMap[id] &&= widgetIds.includes(id);
     }
+  }
+
+  // @experiment(remove) { bug 2078816 }
+  // The first stories card slot shows this widget instead.
+  const firstSlotWidget = selectFirstSlotWidget(prefs);
+  if (firstSlotWidget) {
+    widgetEnabledMap[firstSlotWidget] = false;
   }
 
   const widgetOrder = resolveWidgetOrder(prefs);

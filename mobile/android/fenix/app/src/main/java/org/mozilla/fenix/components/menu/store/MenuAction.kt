@@ -62,11 +62,11 @@ sealed class MenuAction : MenuEvent {
     /** [MenuAction] dispatched to move the current private tab to a non-private tab. */
     data object MoveToNonPrivateTab : MenuAction()
 
-    /** [MenuAction] dispatched when it's a new installation of Firefox. */
-    data object MenuBanner : MenuAction()
+    /** [MenuAction] dispatched when the default browser banner is clicked. */
+    data object DefaultBrowserMenuBannerClicked : MenuAction()
 
-    /** [MenuAction] dispatched when menu banner should be dismissed. */
-    data object DismissMenuBanner : MenuAction()
+    /** [MenuAction] dispatched when default browser menu banner is dismissed. */
+    data object DefaultBrowserMenuBannerDismissed : MenuAction()
 
     /**
      * [MenuAction] dispatched when the extension state is updated.

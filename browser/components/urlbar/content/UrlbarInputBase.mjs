@@ -231,8 +231,7 @@ ${
       </div>
       <div class="urlbarView"
            popover="manual"
-           role="group"
-           tooltip="aHTMLTooltip">
+           role="group">
         <div class="urlbarView-background"/>
         <div class="urlbarView-results"
              role="listbox"/>

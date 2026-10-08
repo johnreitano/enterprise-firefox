@@ -1248,3 +1248,27 @@ add_task(async function hideLocalSearchModes() {
 
   await SpecialPowers.popPrefEnv();
 });
+
+add_task(async function test_local_search_mode_shortcuts() {
+  let popup = await UrlbarTestUtils.openSearchModeSwitcher(window);
+
+  let tabsItem = popup.querySelector("panel-item.search-button-tabs");
+  Assert.equal(
+    tabsItem.getAttribute("shortcut"),
+    ShortcutUtils.prettifyShortcut(document.getElementById("key_searchTabs")),
+    "The Tabs item shows the Search Tabs shortcut"
+  );
+
+  for (let item of popup.querySelectorAll(
+    "panel-item.searchmode-switcher-local:not(.search-button-tabs)"
+  )) {
+    Assert.ok(
+      !item.hasAttribute("shortcut"),
+      `${item.className} has no shortcut`
+    );
+  }
+
+  let popupHidden = UrlbarTestUtils.searchModeSwitcherPopupClosed(window);
+  popup.hide();
+  await popupHidden;
+});

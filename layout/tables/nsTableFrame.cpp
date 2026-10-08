@@ -3796,10 +3796,10 @@ void BCMapCellInfo::SetInfo(nsTableRowFrame* aNewRow, int32_t aColIndex,
   if (1 == mRowSpan) {
     mEndRow = mStartRow;
   } else {
-    mEndRow = mStartRow->GetNextRow();
+    mEndRow = mStartRow->GetNextRowAcrossFragments();
     if (mEndRow) {
       for (int32_t span = 2; mEndRow && span < mRowSpan; span++) {
-        mEndRow = mEndRow->GetNextRow();
+        mEndRow = mEndRow->GetNextRowAcrossFragments();
       }
       NS_ASSERTION(mEndRow, "spanned row not found");
     } else {
@@ -4750,8 +4750,9 @@ void BCMapCellInfo::SetColumn(int32_t aColX) {
 }
 
 void BCMapCellInfo::IncrementRow(bool aResetToBStartRowOfCell) {
-  mCurrentRowFrame =
-      aResetToBStartRowOfCell ? mStartRow : mCurrentRowFrame->GetNextRow();
+  mCurrentRowFrame = aResetToBStartRowOfCell
+                         ? mStartRow
+                         : mCurrentRowFrame->GetNextRowAcrossFragments();
 }
 
 BCCellBorder BCMapCellInfo::GetBStartEdgeBorder() {
@@ -5764,17 +5765,6 @@ BCPaintBorderIterator::BCPaintBorderIterator(nsTableFrame* aTable)
   mNumTableCols = mTable->GetColCount();
 }
 
-// Returns the row after aRow within aRow's own row group, or null if aRow is
-// the last one. Unlike nsTableRowFrame::GetNextRow(), this never continues into
-// the row group's next-in-flow, whose rows belong to a different table
-// continuation (i.e. another page) and are laid out in its coordinate space.
-static nsTableRowFrame* GetNextRowInSameRowGroup(nsTableRowFrame* aRow) {
-  nsIFrame* sibling = aRow->GetNextSibling();
-  MOZ_ASSERT(!sibling || static_cast<nsTableRowFrame*>(do_QueryFrame(sibling)),
-             "How do we have a non-row sibling?");
-  return static_cast<nsTableRowFrame*>(sibling);
-}
-
 bool BCPaintBorderIterator::SetDamageArea(const nsRect& aDirtyRect) {
   nsSize containerSize = mTable->GetSize();
   LogicalRect dirtyRect(mTableWM, aDirtyRect, containerSize);
@@ -5786,7 +5776,7 @@ bool BCPaintBorderIterator::SetDamageArea(const nsRect& aDirtyRect) {
   for (uint32_t rgIdx = 0; rgIdx < mRowGroups.Length() && !done; rgIdx++) {
     nsTableRowGroupFrame* rgFrame = mRowGroups[rgIdx];
     for (nsTableRowFrame* rowFrame = rgFrame->GetFirstRow(); rowFrame;
-         rowFrame = GetNextRowInSameRowGroup(rowFrame)) {
+         rowFrame = rowFrame->GetNextRow()) {
       // get the row rect relative to the table rather than the row group
       nscoord rowBSize = rowFrame->BSize(mTableWM);
       const nscoord onePx = mTable->PresContext()->DevPixelsToAppUnits(1);

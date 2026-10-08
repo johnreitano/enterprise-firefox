@@ -81,6 +81,26 @@ export const SearchSERPTelemetryUtils = {
   },
 };
 
+/**
+ * The possible outcomes of the phase that checks a SERP for the presence of
+ * ads before it is categorized.
+ */
+const PRESCAN = {
+  FOUND: "found",
+  NONE_FOUND: "none_found",
+  NOT_RUN: "not_run",
+};
+
+/**
+ * The possible outcomes of the phase that categorizes the components of a
+ * SERP.
+ */
+const SCAN = {
+  COMPLETE: "complete",
+  ERROR: "error",
+  NOT_RUN: "not_run",
+};
+
 const AD_COMPONENTS = [
   SearchSERPTelemetryUtils.COMPONENTS.AD_CAROUSEL,
   SearchSERPTelemetryUtils.COMPONENTS.AD_IMAGE_ROW,
@@ -694,6 +714,7 @@ class TelemetryHandler {
       item.browserTelemetryStateMap.set(browser, {
         adsReported: false,
         adImpressionsReported: false,
+        prescan: PRESCAN.NOT_RUN,
         impressionId,
         urlToComponentMap: null,
         impressionInfo,
@@ -715,6 +736,7 @@ class TelemetryHandler {
         browserTelemetryStateMap: new WeakMap().set(browser, {
           adsReported: false,
           adImpressionsReported: false,
+          prescan: PRESCAN.NOT_RUN,
           impressionId,
           urlToComponentMap: null,
           impressionInfo,
@@ -1899,7 +1921,8 @@ class ContentHandler {
   }
 
   /**
-   * Logs telemetry for a page with adverts, if it is one of the partner search
+   * Records the outcome of the prescan for a page and, if the page has
+   * adverts, logs telemetry for it, if it is one of the partner search
    * provider pages that we're tracking.
    *
    * @param {object} info
@@ -1915,14 +1938,22 @@ class ContentHandler {
     let item = this._findItemForBrowser(browser);
     if (!item) {
       lazy.logConsole.warn(
-        "Expected to report URI for",
+        "Expected to report the prescan outcome for",
         info.url,
-        "with ads but couldn't find the information"
+        "but couldn't find the information"
       );
       return;
     }
 
     let telemetryState = item.browserTelemetryStateMap.get(browser);
+    if (!info.hasAds) {
+      if (telemetryState.prescan == PRESCAN.NOT_RUN) {
+        telemetryState.prescan = PRESCAN.NONE_FOUND;
+      }
+      return;
+    }
+    telemetryState.prescan = PRESCAN.FOUND;
+
     if (telemetryState.adsReported) {
       lazy.logConsole.debug(
         "Ad was previously reported for browser with URI",
@@ -2026,6 +2057,22 @@ class ContentHandler {
   }
 
   /**
+   * Records an ad impression for ads that were found in the prescan but could
+   * not be categorized into an ad component.
+   *
+   * @param {object} telemetryState
+   *   The telemetry state of the SERP the ads were found on.
+   */
+  _recordUncategorizedAdImpression(telemetryState) {
+    lazy.logConsole.debug("Counting uncategorized ads");
+    Glean.serp.adImpression.record({
+      impression_id: telemetryState.impressionId,
+      component: SearchSERPTelemetryUtils.COMPONENTS.AD_UNCATEGORIZED,
+    });
+    telemetryState.adImpressionsReported = true;
+  }
+
+  /**
    * Records a page action from a SERP page. Normally, actions are tracked in
    * parent process by observing network events but some actions are not
    * possible to detect outside of subscribing to the child process.
@@ -2108,6 +2155,8 @@ class ContentHandler {
         shopping_tab_displayed:
           info.elementBasedAttributes?.shopping_tab_displayed ?? "false",
         has_ai_summary: info.elementBasedAttributes?.has_ai_summary ?? "false",
+        prescan: telemetryState.prescan,
+        scan: info.scan,
       });
 
       telemetryState.impressionRecorded = true;
@@ -2119,7 +2168,17 @@ class ContentHandler {
         ...restImpressionInfo,
         ...urlBasedAttributes,
         ...info.elementBasedAttributes,
+        prescan: telemetryState.prescan,
+        scan: info.scan,
       });
+
+      if (
+        info.scan == SCAN.ERROR &&
+        telemetryState.prescan == PRESCAN.FOUND &&
+        !telemetryState.adImpressionsReported
+      ) {
+        this._recordUncategorizedAdImpression(telemetryState);
+      }
       Services.obs.notifyObservers(null, "reported-page-with-impression");
     } else if (telemetryState.impressionRecorded) {
       lazy.logConsole.debug("Impression already recorded for browser.");
@@ -2146,6 +2205,8 @@ class ContentHandler {
         impressionInfo.urlBasedAttributes?.is_shopping_page ?? "false",
       shopping_tab_displayed: "unknown",
       has_ai_summary: "unknown",
+      prescan: telemetryState.prescan,
+      scan: SCAN.NOT_RUN,
     });
 
     telemetryState.impressionRecorded = true;
@@ -2158,7 +2219,13 @@ class ContentHandler {
       ...urlBasedAttributes,
       shopping_tab_displayed: "unknown",
       has_ai_summary: "unknown",
+      prescan: telemetryState.prescan,
+      scan: SCAN.NOT_RUN,
     });
+
+    if (telemetryState.prescan == PRESCAN.FOUND) {
+      this._recordUncategorizedAdImpression(telemetryState);
+    }
     Services.obs.notifyObservers(null, "reported-page-with-impression");
   }
 

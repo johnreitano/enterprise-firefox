@@ -29,6 +29,7 @@ import org.mozilla.fenix.R
 import org.mozilla.fenix.components.AppStore
 import org.mozilla.fenix.components.appstate.AppState
 import org.mozilla.fenix.components.menu.MenuFragmentDirections
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -136,9 +137,13 @@ class ReportBrokenSiteMenuItemProviderTest {
     }
 
     // The item is kept up to date on a scope that runTest cancels at the end of each test.
-    private fun TestScope.provider(browserStore: BrowserStore) =
+    private fun TestScope.provider(
+        browserStore: BrowserStore,
+        target: MenuTarget = MenuTarget.BrowserTab,
+    ) =
         ReportBrokenSiteMenuItemProvider(
             browserStore = browserStore,
+            target = target,
             settings = settings,
             webCompatReporterMoreInfoSender = webCompatReporterMoreInfoSender,
             appStore = appStore,

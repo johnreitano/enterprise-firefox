@@ -603,6 +603,9 @@ export class TopSite extends React.PureComponent {
           data: Object.assign(this.props.link, {
             event: { altKey, button, ctrlKey, metaKey, shiftKey },
             is_sponsored: !!this.props.link.sponsored_tile_id,
+            dwell_label: isSponsored(this.props.link)
+              ? "topsite_sponsored"
+              : "topsite_organic",
           }),
         })
       );

@@ -20,6 +20,7 @@ import mozilla.components.feature.tabs.TabsUseCases
 import mozilla.components.ui.icons.R as iconsR
 import org.junit.Test
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -86,8 +87,15 @@ class MoveToNormalTabsMenuItemProviderTest {
         assertFalse(provider.handles(MenuAction.FindInPage))
     }
 
-    private fun createProvider(browserStore: BrowserStore) =
-        MoveToNormalTabsMenuItemProvider(browserStore = browserStore, migratePrivateTab = migratePrivateTab)
+    private fun createProvider(
+        browserStore: BrowserStore,
+        target: MenuTarget = MenuTarget.BrowserTab,
+    ) =
+        MoveToNormalTabsMenuItemProvider(
+            browserStore = browserStore,
+            target = target,
+            migratePrivateTab = migratePrivateTab,
+        )
 
     private fun browserStore(isPrivate: Boolean) =
         BrowserStore(

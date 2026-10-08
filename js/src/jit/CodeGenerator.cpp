@@ -2625,22 +2625,6 @@ static bool PrepareAndExecuteRegExp(MacroAssembler& masm, Register regexp,
   return true;
 }
 
-// Shift a bit within a 32-bit word from one bit position to another.
-// Both FromBitMask and ToBitMask must have a single bit set.
-template <uint32_t FromBitMask, uint32_t ToBitMask>
-static void ShiftFlag32(MacroAssembler& masm, Register reg) {
-  static_assert(std::has_single_bit(FromBitMask));
-  static_assert(std::has_single_bit(ToBitMask));
-  static_assert(FromBitMask != ToBitMask);
-  constexpr uint32_t fromShift = std::countr_zero(FromBitMask);
-  constexpr uint32_t toShift = std::countr_zero(ToBitMask);
-  if (fromShift < toShift) {
-    masm.lshift32(Imm32(toShift - fromShift), reg);
-  } else {
-    masm.rshift32(Imm32(fromShift - toShift), reg);
-  }
-}
-
 static void EmitInitDependentStringBase(MacroAssembler& masm,
                                         Register dependent, Register base,
                                         Register temp1, Register temp2,
@@ -2669,11 +2653,14 @@ static void EmitInitDependentStringBase(MacroAssembler& masm,
     //   flags |= ~(flags | ~ATOM_BIT) << (DEPENDED_ON_BIT - ATOM_BIT)
     //
     masm.nor32(Imm32(~StringFlags::ATOM_BIT), temp1, temp2);
-    ShiftFlag32<StringFlags::ATOM_BIT, StringFlags::DEPENDED_ON_BIT>(masm,
-                                                                     temp2);
-    masm.or32(temp2, temp1);
+    constexpr uint32_t AtomIndex = std::countr_zero(StringFlags::ATOM_BIT);
+    constexpr uint32_t DependedOnIndex =
+        std::countr_zero(StringFlags::DEPENDED_ON_BIT);
+    static_assert(AtomIndex < DependedOnIndex);
+    constexpr uint32_t ShiftAmount = DependedOnIndex - AtomIndex;
+    masm.lshift32ThenOr(Imm32(ShiftAmount), temp1, temp2);
+    masm.store32(temp2, Address(base, JSString::offsetOfFlags()));
     masm.movePtr(base, temp2);
-    masm.store32(temp1, Address(temp2, JSString::offsetOfFlags()));
   }
   masm.bind(&markedDependedOn);
 

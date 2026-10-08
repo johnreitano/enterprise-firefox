@@ -10,6 +10,7 @@ const { AITabStore } = ChromeUtils.importESModule(
 const EXPECTED_COLUMNS = {
   uuid: "TEXT",
   conv_id: "TEXT",
+  tool_conv_id: "TEXT",
   slug: "TEXT",
   version: "INTEGER",
   title: "TEXT",
@@ -51,8 +52,8 @@ add_task(async function test_schema_version() {
   );
   Assert.equal(
     version,
-    2,
-    "Schema version is 2 after the unique-index migration"
+    3,
+    "Schema version is 3 after the tool_conv_id migration"
   );
 });
 
@@ -73,6 +74,30 @@ add_task(async function test_aitab_pages_columns() {
   Assert.ok(columns.conv_id.notNull, "conv_id is NOT NULL");
   Assert.ok(columns.slug.notNull, "slug is NOT NULL");
   Assert.ok(columns.title.notNull, "title is NOT NULL");
+
+  // The chat a page belongs to is not optional; the conversation it was
+  // composed in is unknown for every row written before the column existed.
+  Assert.ok(
+    !columns.tool_conv_id.notNull,
+    "tool_conv_id is nullable, so a page with no known generation " +
+      "conversation is still storable"
+  );
+});
+
+/**
+ * A downgrade lowers the schema version without undoing the schema, so the
+ * next upgrade replays every migration over a database that already has the
+ * changes. Adding a column is the step that does not tolerate that by itself.
+ */
+add_task(async function test_migrations_can_be_replayed() {
+  await AITabStore.applyMigrations(1);
+
+  const columns = await getTableColumns(AITabStore.connection, "aitab_pages");
+  Assert.deepEqual(
+    Object.keys(columns).sort(),
+    Object.keys(EXPECTED_COLUMNS).sort(),
+    "Replaying the migrations leaves the columns as they were"
+  );
 });
 
 add_task(async function test_slug_version_index_is_unique() {
@@ -135,6 +160,7 @@ add_task(async function test_minted_slugs_keep_counting() {
 add_task(async function test_create_inserts_first_version() {
   const created = await AITabStore.create({
     convId: "conv-create",
+    toolConvId: "tool-conv-create",
     slug: "slug-create",
     title: "Created page",
     context: { source: "tabs" },
@@ -149,6 +175,12 @@ add_task(async function test_create_inserts_first_version() {
   Assert.equal(rows.length, 1, "One row persisted for the new tab");
   Assert.equal(rows[0].version, 1, "Persisted version is 1");
   Assert.equal(rows[0].slug, "slug-create", "slug persisted verbatim");
+  Assert.equal(
+    rows[0].toolConvId,
+    "tool-conv-create",
+    "the generation conversation is persisted alongside the chat's id"
+  );
+  Assert.equal(created.toolConvId, "tool-conv-create", "and is returned");
   Assert.equal(rows[0].title, "Created page", "title persisted");
   Assert.deepEqual(rows[0].context, { source: "tabs" }, "context round-trips");
   Assert.deepEqual(
@@ -160,6 +192,21 @@ add_task(async function test_create_inserts_first_version() {
     rows[0].localState,
     { checked: true },
     "localState round-trips"
+  );
+});
+
+add_task(async function test_tool_conv_id_defaults_to_null() {
+  const created = await AITabStore.create({
+    convId: "conv-no-tool",
+    slug: "slug-no-tool",
+    title: "No generation conversation",
+  });
+
+  Assert.equal(created.toolConvId, null, "The field defaults to null");
+  Assert.equal(
+    (await AITabStore.getBySlug("slug-no-tool")).toolConvId,
+    null,
+    "And reads back as null rather than undefined"
   );
 });
 
@@ -376,5 +423,113 @@ add_task(async function test_delete_by_slug_is_scoped_to_one_tab() {
     (await AITabStore.getBySlug("bystander-slug"))?.title,
     "Keep me",
     "A tab belonging to another conversation is left alone"
+  );
+});
+
+add_task(async function test_delete_versions_before_keeps_the_newest() {
+  await AITabStore.create({
+    convId: "conv-prune",
+    slug: "prune-slug",
+    title: "V1",
+  });
+  await AITabStore.edit({
+    convId: "conv-prune",
+    slug: "prune-slug",
+    title: "V2",
+  });
+  const kept = await AITabStore.edit({
+    convId: "conv-prune",
+    slug: "prune-slug",
+    title: "V3",
+  });
+
+  await AITabStore.deleteVersionsBefore("prune-slug", kept.version);
+
+  Assert.deepEqual(
+    await AITabStore.getVersionsBySlug("prune-slug"),
+    [3],
+    "Only the version that was kept is left"
+  );
+  Assert.equal(
+    (await AITabStore.getBySlug("prune-slug")).title,
+    "V3",
+    "The page still loads by slug"
+  );
+
+  // The numbering is not reset by the prune, so a later write cannot collide
+  // with a version that was already handed out.
+  const next = await AITabStore.edit({
+    convId: "conv-prune",
+    slug: "prune-slug",
+    title: "V4",
+  });
+  Assert.equal(
+    next.version,
+    4,
+    "The next version continues above the kept one"
+  );
+});
+
+add_task(async function test_delete_versions_before_spares_other_slugs() {
+  await AITabStore.create({
+    convId: "conv-spare",
+    slug: "spare-slug",
+    title: "V1",
+  });
+  const kept = await AITabStore.edit({
+    convId: "conv-spare",
+    slug: "spare-slug",
+    title: "V2",
+  });
+  await AITabStore.create({
+    convId: "conv-spare-other",
+    slug: "spare-other-slug",
+    title: "V1",
+  });
+
+  await AITabStore.deleteVersionsBefore("spare-slug", kept.version);
+
+  Assert.deepEqual(
+    await AITabStore.getVersionsBySlug("spare-other-slug"),
+    [1],
+    "Another tab's only version is not pruned by its version number"
+  );
+});
+
+/**
+ * Migrates a v2 database forward for real. Every other test here runs against
+ * a database created from the current schema, which already has the column, so
+ * nothing else executes the ALTER. Stands the v2 shape back up on the live
+ * connection instead of shipping a fixture database, which is why it goes
+ * last: dropping the column discards the values the tests above stored in it.
+ */
+add_task(async function test_tool_conv_id_is_added_to_a_v2_database() {
+  await AITabStore.connection.execute(
+    "ALTER TABLE aitab_pages DROP COLUMN tool_conv_id"
+  );
+
+  await AITabStore.applyMigrations(2);
+
+  const columns = await getTableColumns(AITabStore.connection, "aitab_pages");
+  Assert.ok(columns.tool_conv_id, "The column is added to a v2 database");
+  Assert.equal(columns.tool_conv_id.type, "TEXT", "It is added as TEXT");
+  Assert.ok(
+    !columns.tool_conv_id.notNull,
+    "It is nullable, so the rows already there stay valid without a backfill"
+  );
+
+  // The rows that predate the column read back with no generation
+  // conversation rather than failing to parse, which is what lets a page
+  // stored under v2 still load.
+  const page = await AITabStore.create({
+    convId: "conv-migrated",
+    slug: "migrated-slug",
+    title: "Stored after the migration",
+  });
+  Assert.equal(page.toolConvId, null, "A page still stores without one");
+  Assert.equal(
+    (await AITabStore.getBySlug("migrated-slug")).toolConvId,
+    null,
+    "And reads back as null"
   );
 });

@@ -174,6 +174,9 @@ export class NewTabMessaging {
       case at.UNINIT:
         this.uninit();
         break;
+      case at.NEW_TAB_UNLOAD:
+        this.browserSet.delete(action._target?.browser);
+        break;
       case at.MESSAGE_IMPRESSION:
         this.handleImpression(action.data);
         break;

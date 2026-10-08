@@ -2992,9 +2992,10 @@ with only_when(requires_wasm_sandboxing & compile_environment):
     option(env="WASM_CFLAGS", nargs=1, help="Options to pass to WASM_CC")
 
     @depends("WASM_CFLAGS", wasm_compile_flags)
+    @imports(_from="mozshellutil", _import="split")
     def wasm_cflags(value, wasm_compile_flags):
         if value:
-            return wasm_compile_flags + value
+            return wasm_compile_flags + split(value[0])
         else:
             return wasm_compile_flags
 
@@ -3003,9 +3004,10 @@ with only_when(requires_wasm_sandboxing & compile_environment):
     option(env="WASM_CXXFLAGS", nargs=1, help="Options to pass to WASM_CXX")
 
     @depends("WASM_CXXFLAGS", wasm_compile_flags)
+    @imports(_from="mozshellutil", _import="split")
     def wasm_cxxflags(value, wasm_compile_flags):
         if value:
-            return wasm_compile_flags + value
+            return wasm_compile_flags + split(value[0])
         else:
             return wasm_compile_flags
 

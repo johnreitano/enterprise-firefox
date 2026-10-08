@@ -28,6 +28,7 @@ import org.mozilla.fenix.R
 import org.mozilla.fenix.components.AppStore
 import org.mozilla.fenix.components.appstate.AppState
 import org.mozilla.fenix.components.appstate.SupportedMenuNotifications
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -171,9 +172,11 @@ class OpenInAppMenuItemProviderTest {
         browserStore: BrowserStore = browserStoreWithSelectedTab(),
         appStore: AppStore = appStore(isHighlighted = false),
         appLinksUseCases: AppLinksUseCases,
+        target: MenuTarget = MenuTarget.BrowserTab,
     ) =
         OpenInAppMenuItemProvider(
             browserStore = browserStore,
+            target = target,
             appStore = appStore,
             appLinksUseCases = appLinksUseCases,
             settings = settings,

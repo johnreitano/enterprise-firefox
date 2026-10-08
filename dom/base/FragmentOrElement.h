@@ -50,27 +50,6 @@ struct CustomElementData;
 }  // namespace mozilla
 
 /**
- * Tearoff to use for nodes to implement nsISupportsWeakReference
- */
-class nsNodeSupportsWeakRefTearoff final : public nsISupportsWeakReference {
- public:
-  explicit nsNodeSupportsWeakRefTearoff(nsINode* aNode) : mNode(aNode) {}
-
-  // nsISupports
-  NS_DECL_CYCLE_COLLECTING_ISUPPORTS_FINAL
-
-  // nsISupportsWeakReference
-  NS_DECL_NSISUPPORTSWEAKREFERENCE
-
-  NS_DECL_CYCLE_COLLECTION_CLASS(nsNodeSupportsWeakRefTearoff)
-
- private:
-  ~nsNodeSupportsWeakRefTearoff() = default;
-
-  nsCOMPtr<nsINode> mNode;
-};
-
-/**
  * A generic base class for DOM elements and document fragments,
  * implementing many nsIContent, nsINode and Element methods.
  */

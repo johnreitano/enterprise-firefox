@@ -25,9 +25,6 @@ prefs = [
 ["browser_ConsoleStoragePBTest_perwindowpb.js"]
 
 ["browser_alert_from_about_blank.js"]
-skip-if = [
-  "os == 'win' && os_version == '11.26200' && asan", # Bug 2019745
-]
 
 ["browser_autofocus_background.js"]
 
@@ -90,9 +87,6 @@ support-files = ["file_empty.html"]
 
 ["browser_hasActivePeerConnections.js"]
 support-files = ["create_webrtc_peer_connection.html"]
-skip-if = [
-  "os == 'win' && debug", # Bug 1742012
-]
 
 ["browser_hasbeforeunload.js"]
 https_first_disabled = true
@@ -109,15 +103,9 @@ https_first_disabled = true
 fail-if = [
   "true",
 ]
-skip-if = [
-  "tsan", # Times out on TSan intermittently.
-]
 
 ["browser_localStorage_fis.js"]
 tags = "dom-storage"
-skip-if = [
-  "tsan",
-]
 
 ["browser_localStorage_privatestorageevent.js"]
 tags = "dom-storage"

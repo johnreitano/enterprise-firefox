@@ -19,6 +19,7 @@ import mozilla.components.ui.icons.R as iconsR
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -62,12 +63,16 @@ class SaveAsPdfMenuItemProviderTest {
         assertFalse(provider.handles(MenuAction.PrintRequested))
     }
 
-    private fun createProvider() =
+    private fun singleTabStore() =
+        BrowserStore(BrowserState(tabs = listOf(createTab("https://mozilla.org", id = TAB_ID)), selectedTabId = TAB_ID))
+
+    private fun createProvider(
+        browserStore: BrowserStore = singleTabStore(),
+        target: MenuTarget = MenuTarget.BrowserTab,
+    ) =
         SaveAsPdfMenuItemProvider(
-            browserStore =
-                BrowserStore(
-                    BrowserState(tabs = listOf(createTab("https://mozilla.org", id = TAB_ID)), selectedTabId = TAB_ID)
-                ),
+            browserStore = browserStore,
+            target = target,
             saveToPdf = saveToPdf,
         )
 

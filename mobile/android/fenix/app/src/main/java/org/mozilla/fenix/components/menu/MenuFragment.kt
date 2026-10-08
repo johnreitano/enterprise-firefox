@@ -27,12 +27,13 @@ import androidx.core.view.WindowInsetsCompat.Type.systemBars
 import androidx.fragment.compose.content
 import androidx.lifecycle.coroutineScope
 import androidx.navigation.fragment.findNavController
+import androidx.navigation.fragment.navArgs
 import com.google.android.material.R as materialR
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import kotlin.LazyThreadSafetyMode.NONE
+import kotlin.getValue
 import mozilla.components.compose.menu.Menu
 import mozilla.components.compose.menu.store.MenuState
 import mozilla.components.compose.menu.store.MenuStore
@@ -46,49 +47,15 @@ import mozilla.components.support.utils.ext.top
 import mozilla.telemetry.glean.private.NoExtras
 import org.mozilla.fenix.GleanMetrics.Events
 import org.mozilla.fenix.R
-import org.mozilla.fenix.addons.ExtensionsMenuItemProvider
-import org.mozilla.fenix.bookmarks.BookmarkMenuItemProvider
-import org.mozilla.fenix.bookmarks.BookmarksScreenMenuItemProvider
-import org.mozilla.fenix.browser.BackMenuItemProvider
-import org.mozilla.fenix.browser.DesktopSiteMenuItemProvider
-import org.mozilla.fenix.browser.ForwardMenuItemProvider
-import org.mozilla.fenix.browser.RefreshMenuItemProvider
-import org.mozilla.fenix.browser.ShareMenuItemProvider
-import org.mozilla.fenix.browser.applinks.OpenInAppMenuItemProvider
-import org.mozilla.fenix.browser.menu.MoreMenuItemsProvider
-import org.mozilla.fenix.browser.menu.MoveToNormalTabsMenuItemProvider
-import org.mozilla.fenix.browser.readermode.ReaderViewMenuItemProvider
-import org.mozilla.fenix.collections.SaveToCollectionMenuItemProvider
-import org.mozilla.fenix.components.FindInPageMenuItemProvider
-import org.mozilla.fenix.components.accounts.MozillaAccountMenuItemProvider
 import org.mozilla.fenix.components.menu.compose.MenuDialogBottomSheet
 import org.mozilla.fenix.components.menu.compose.MenuHandleState
 import org.mozilla.fenix.components.menu.middleware.MenuMiddleware
 import org.mozilla.fenix.components.menu.middleware.MenuTelemetryMiddleware
-import org.mozilla.fenix.downloads.DownloadsMenuItemProvider
 import org.mozilla.fenix.ext.isToolbarAtBottom
+import org.mozilla.fenix.ext.openSetDefaultBrowserOption
 import org.mozilla.fenix.ext.requireComponents
-import org.mozilla.fenix.home.topsites.ShortcutMenuItemProvider
-import org.mozilla.fenix.ipprotection.VpnMenuItemProvider
-import org.mozilla.fenix.library.history.HistoryMenuItemProvider
-import org.mozilla.fenix.pdf.SaveAsPdfMenuItemProvider
-import org.mozilla.fenix.print.PrintMenuItemProvider
-import org.mozilla.fenix.settings.SettingsMenuItemProvider
-import org.mozilla.fenix.settings.deletebrowsingdata.DefaultDeleteBrowsingDataController
-import org.mozilla.fenix.settings.deletebrowsingdata.DefaultDeleteBrowsingDataController.DataStorage
-import org.mozilla.fenix.settings.deletebrowsingdata.DefaultDeleteBrowsingDataController.DeleteDataUseCases
-import org.mozilla.fenix.settings.deletebrowsingdata.DefaultDeleteBrowsingDataController.Stores
-import org.mozilla.fenix.settings.deletebrowsingdata.DeleteBrowsingDataController
-import org.mozilla.fenix.settings.deletebrowsingdata.QuitMenuItemProvider
-import org.mozilla.fenix.settings.logins.PasswordsMenuItemProvider
-import org.mozilla.fenix.shortcut.AddToHomeScreenMenuItemProvider
-import org.mozilla.fenix.summarization.SummarizePageMenuItemProvider
 import org.mozilla.fenix.theme.FirefoxTheme
 import org.mozilla.fenix.translations.TranslationsEnabledSettings
-import org.mozilla.fenix.translations.TranslationsMenuItemProvider
-import org.mozilla.fenix.webcompat.DefaultWebCompatReporterMoreInfoSender
-import org.mozilla.fenix.webcompat.ReportBrokenSiteMenuItemProvider
-import org.mozilla.fenix.webcompat.middleware.DefaultWebCompatReporterRetrievalService
 
 private const val EXPANDED_OFFSET = 56
 private const val HIDING_FRICTION = 0.9f
@@ -97,6 +64,7 @@ private const val MENU_ANIMATION_START_OFFSET_RATIO = 0.2f
 
 /** A bottom sheet fragment hosting the customizable menu. */
 class MenuFragment : BottomSheetDialogFragment() {
+    private val args by navArgs<MenuFragmentArgs>()
     private val snackbarHostState = SnackbarHostState()
     private var bottomSheetBehavior: BottomSheetBehavior<View>? = null
 
@@ -228,200 +196,39 @@ class MenuFragment : BottomSheetDialogFragment() {
         return orientationMaxHeight - topBarHeight
     }
 
-    /** Pure function to get the [MenuItemProvider] for any [FenixMenuItem]. */
-    @Suppress("LongMethod", "CyclomaticComplexMethod")
-    private fun buildMenuItemsProvidersResolver(): (FenixMenuItem) -> MenuItemProvider = { item ->
-        when (item) {
-            FenixMenuItem.CustomizeReaderView ->
-                ReaderViewMenuItemProvider(
-                    browserStore = requireComponents.core.store,
-                    appStore = requireComponents.appStore,
-                    scope = viewLifecycleOwner.lifecycle.coroutineScope,
-                )
+    private fun buildMenuItemProvidersFactory(): MenuItemProvidersFactory {
+        val components = requireComponents
+        val context = requireContext()
+        val activity = requireActivity()
 
-            FenixMenuItem.IPProtection ->
-                VpnMenuItemProvider(
-                    ipProtectionStore = requireComponents.ipProtection.store,
-                    scope = viewLifecycleOwner.lifecycle.coroutineScope,
-                )
-
-            FenixMenuItem.Bookmark ->
-                BookmarkMenuItemProvider(
-                    browserStore = requireComponents.core.store,
-                    bookmarksStorage = requireComponents.core.bookmarksStorage,
-                    addBookmark = requireComponents.useCases.bookmarksUseCases.addBookmark,
-                    appStore = requireComponents.appStore,
-                    scope = viewLifecycleOwner.lifecycle.coroutineScope,
-                    applicationScope = requireComponents.applicationScope,
-                )
-
-            FenixMenuItem.FindInPage -> FindInPageMenuItemProvider(appStore = requireComponents.appStore)
-
-            FenixMenuItem.DesktopSite ->
-                DesktopSiteMenuItemProvider(
-                    browserStore = requireComponents.core.store,
-                    requestDesktopSite = requireComponents.useCases.sessionUseCases.requestDesktopSite,
-                    scope = viewLifecycleOwner.lifecycle.coroutineScope,
-                )
-            FenixMenuItem.Extensions ->
-                ExtensionsMenuItemProvider(
-                    context = requireContext().applicationContext,
-                    browserStore = requireComponents.core.store,
-                    addonManager = requireComponents.addonManager,
-                    viewLifecycleScope = viewLifecycleOwner.lifecycle.coroutineScope,
-                    applicationScope = requireComponents.applicationScope,
-                    appStore = requireComponents.appStore,
-                    fenixBrowserUseCases = requireComponents.useCases.fenixBrowserUseCases,
-                )
-            is FenixMenuItem.More ->
-                MoreMenuItemsProvider(
-                    browserStore = requireComponents.core.store,
-                    summarizationSettings = requireComponents.core.summarizeFeatureSettings,
-                    scope = viewLifecycleOwner.lifecycle.coroutineScope,
-                )
-
-            FenixMenuItem.Translate ->
-                TranslationsMenuItemProvider(
-                    browserStore = requireComponents.core.store,
-                    translationsSettings = TranslationsEnabledSettings.dataStore(requireContext()),
-                    scope = viewLifecycleOwner.lifecycle.coroutineScope,
-                )
-
-            FenixMenuItem.SummarizePage ->
-                SummarizePageMenuItemProvider(
-                    browserStore = requireComponents.core.store,
-                    summarizationSettings = requireComponents.core.summarizeFeatureSettings,
-                    eligibilityChecker = requireComponents.core.summarizationEligibilityChecker,
-                    scope = viewLifecycleOwner.lifecycle.coroutineScope,
-                )
-
-            FenixMenuItem.Back ->
-                BackMenuItemProvider(
-                    browserStore = requireComponents.core.store,
-                    goBack = requireComponents.useCases.sessionUseCases.goBack,
-                    scope = viewLifecycleOwner.lifecycle.coroutineScope,
-                )
-
-            FenixMenuItem.Forward ->
-                ForwardMenuItemProvider(
-                    browserStore = requireComponents.core.store,
-                    goForward = requireComponents.useCases.sessionUseCases.goForward,
-                    scope = viewLifecycleOwner.lifecycle.coroutineScope,
-                )
-
-            FenixMenuItem.Share ->
-                ShareMenuItemProvider(
-                    browserStore = requireComponents.core.store,
-                    shareUseCases = requireComponents.useCases.shareUseCases,
-                )
-
-            FenixMenuItem.Refresh ->
-                RefreshMenuItemProvider(
-                    browserStore = requireComponents.core.store,
-                    reload = requireComponents.useCases.sessionUseCases.reload,
-                    stopLoading = requireComponents.useCases.sessionUseCases.stopLoading,
-                    scope = viewLifecycleOwner.lifecycle.coroutineScope,
-                )
-
-            FenixMenuItem.MoveToNormalTabs ->
-                MoveToNormalTabsMenuItemProvider(
-                    browserStore = requireComponents.core.store,
-                    migratePrivateTab = requireComponents.useCases.tabsUseCases.migratePrivateTabUseCase,
-                )
-
-            FenixMenuItem.ReportBrokenSite ->
-                ReportBrokenSiteMenuItemProvider(
-                    browserStore = requireComponents.core.store,
-                    settings = requireComponents.settings,
-                    webCompatReporterMoreInfoSender = buildWebCompatReporterMoreInfoSender(),
-                    appStore = requireComponents.appStore,
-                    fenixBrowserUseCases = requireComponents.useCases.fenixBrowserUseCases,
-                    scope = viewLifecycleOwner.lifecycle.coroutineScope,
-                )
-
-            FenixMenuItem.Shortcut ->
-                ShortcutMenuItemProvider(
-                    browserStore = requireComponents.core.store,
-                    pinnedSiteStorage = requireComponents.core.pinnedSiteStorage,
-                    areShortcutsEnabled = requireComponents.settings.showTopSitesFeature,
-                    topSitesUseCases = requireComponents.useCases.topSitesUseCase,
-                    appStore = requireComponents.appStore,
-                    settings = requireComponents.settings,
-                    materialAlertDialogBuilder = MaterialAlertDialogBuilder(requireContext()),
-                    scope = viewLifecycleOwner.lifecycle.coroutineScope,
-                    applicationScope = requireComponents.applicationScope,
-                )
-
-            FenixMenuItem.AddToHomeScreen ->
-                AddToHomeScreenMenuItemProvider(
-                    browserStore = requireComponents.core.store,
-                    webAppUseCases = requireComponents.useCases.webAppUseCases,
-                    settings = requireComponents.settings,
-                    scope = viewLifecycleOwner.lifecycle.coroutineScope,
-                )
-
-            FenixMenuItem.SaveToCollection ->
-                SaveToCollectionMenuItemProvider(
-                    settings = requireComponents.settings,
-                    tabCollectionStorage = requireComponents.core.tabCollectionStorage,
-                    browserStore = requireComponents.core.store,
-                )
-
-            FenixMenuItem.OpenInApp ->
-                OpenInAppMenuItemProvider(
-                    browserStore = requireComponents.core.store,
-                    appStore = requireComponents.appStore,
-                    appLinksUseCases = requireComponents.useCases.appLinksUseCases,
-                    settings = requireComponents.settings,
-                    scope = viewLifecycleOwner.lifecycle.coroutineScope,
-                )
-
-            FenixMenuItem.SaveAsPdf ->
-                SaveAsPdfMenuItemProvider(
-                    browserStore = requireComponents.core.store,
-                    saveToPdf = requireComponents.useCases.sessionUseCases.saveToPdf,
-                )
-
-            FenixMenuItem.Print ->
-                PrintMenuItemProvider(
-                    isAndroidAutomotiveAvailable = requireContext().isAndroidAutomotiveAvailable(),
-                    browserStore = requireComponents.core.store,
-                    printContent = requireComponents.useCases.sessionUseCases.printContent,
-                )
-
-            FenixMenuItem.History -> HistoryMenuItemProvider()
-
-            FenixMenuItem.Bookmarks -> BookmarksScreenMenuItemProvider()
-
-            FenixMenuItem.Downloads ->
-                DownloadsMenuItemProvider(
-                    appStore = requireComponents.appStore,
-                    scope = viewLifecycleOwner.lifecycle.coroutineScope,
-                )
-
-            FenixMenuItem.Passwords ->
-                PasswordsMenuItemProvider(isAutofillSupported = requireComponents.settings.isAutofillSupported)
-
-            FenixMenuItem.MozillaAccount ->
-                MozillaAccountMenuItemProvider(
-                    syncStore = requireComponents.backgroundServices.syncStore,
-                    httpClient = requireComponents.core.client,
-                    context = requireContext(),
-                    accessPoint = MenuAccessPoint.Browser,
-                    scope = viewLifecycleOwner.lifecycle.coroutineScope,
-                )
-
-            FenixMenuItem.Settings -> SettingsMenuItemProvider()
-
-            FenixMenuItem.Quit ->
-                QuitMenuItemProvider(
-                    appName = getString(R.string.app_name),
-                    deletesBrowsingDataOnQuit = requireComponents.settings.shouldDeleteBrowsingDataOnQuit,
-                    deleteBrowsingDataController = { deleteBrowsingDataController },
-                    quitApplicationDelegate = requireActivity()::finishAndRemoveTask,
-                    applicationScope = requireComponents.applicationScope,
-                )
-        }
+        return MenuItemProvidersFactory(
+            context = context,
+            accessPoint = args.accessPoint,
+            target = if (args.accessPoint == MenuAccessPoint.Home) MenuTarget.Home else MenuTarget.BrowserTab,
+            browserStore = components.core.store,
+            appStore = components.appStore,
+            ipProtectionStore = components.ipProtection.store,
+            syncStore = components.backgroundServices.syncStore,
+            httpClient = components.core.client,
+            historyStorage = components.core.historyStorage,
+            bookmarksStorage = components.core.bookmarksStorage,
+            pinnedSiteStorage = components.core.pinnedSiteStorage,
+            tabCollectionStorage = components.core.tabCollectionStorage,
+            permissionStorage = components.core.permissionStorage,
+            useCases = components.useCases,
+            addonManager = components.addonManager,
+            engine = components.core.engine,
+            settings = components.settings,
+            summarizeFeatureSettings = components.core.summarizeFeatureSettings,
+            summarizeEligibilityChecker = components.core.summarizationEligibilityChecker,
+            translationsSettings = TranslationsEnabledSettings.dataStore(context),
+            isAndroidAutomotiveAvailable = context.isAndroidAutomotiveAvailable(),
+            materialAlertDialogBuilder = MaterialAlertDialogBuilder(context),
+            quitApplicationDelegate = activity::finishAndRemoveTask,
+            setAsDefaultBrowserDelegate = activity::openSetDefaultBrowserOption,
+            menuViewScope = viewLifecycleOwner.lifecycle.coroutineScope,
+            applicationScope = components.applicationScope,
+        )
     }
 
     private fun buildMenuStore(initialState: MenuState): MenuStore {
@@ -432,7 +239,7 @@ class MenuFragment : BottomSheetDialogFragment() {
             middleware =
                 listOf(
                     MenuMiddleware(
-                        browserMenuBuilder = BrowserMenuBuilder(menuItemsRegistry),
+                        menuBuilder = MenuBuilder(menuItemsRegistry),
                         eventRouter =
                             MenuItemEventRouter(
                                 registry = menuItemsRegistry,
@@ -440,44 +247,25 @@ class MenuFragment : BottomSheetDialogFragment() {
                             ),
                         scope = viewLifecycleOwner.lifecycle.coroutineScope,
                     ),
-                    MenuTelemetryMiddleware(accessPoint = MenuAccessPoint.Browser),
+                    MenuTelemetryMiddleware(accessPoint = args.accessPoint),
                 ),
         )
     }
 
     private fun buildMenuItemsRegistry() =
         MenuItemsRegistry(
-            configuration =
-                BrowserMenuBuilder.buildDefaultConfiguration(
+            configuration = buildMenuConfigurationFor(args.accessPoint),
+            resolver = buildMenuItemProvidersFactory()::buildProviderFor,
+        )
+
+    private fun buildMenuConfigurationFor(menuAccessPoint: MenuAccessPoint) =
+        when (menuAccessPoint) {
+            MenuAccessPoint.Browser ->
+                MenuConfigurations.browser(
                     isToolbarAtBottom = requireContext().isToolbarAtBottom(),
                     isExpandedToolbarEnabled = requireComponents.settings.shouldUseExpandedToolbar,
-                ),
-            resolver = buildMenuItemsProvidersResolver(),
-        )
-
-    // Only ever needed by users who asked for their data to be deleted when they quit, and only once they do.
-    private val deleteBrowsingDataController: DeleteBrowsingDataController by
-        lazy(NONE) {
-            DefaultDeleteBrowsingDataController(
-                deleteDataUseCases =
-                    DeleteDataUseCases(
-                        removeAllTabs = requireComponents.useCases.tabsUseCases.removeAllTabs,
-                        removeAllDownloads = requireComponents.useCases.downloadUseCases.removeAllDownloads,
-                    ),
-                dataStorage =
-                    DataStorage(
-                        history = requireComponents.core.historyStorage,
-                        permissions = requireComponents.core.permissionStorage,
-                    ),
-                stores = Stores(appStore = requireComponents.appStore, browserStore = requireComponents.core.store),
-                engine = requireComponents.core.engine,
-                settings = requireComponents.settings,
-            )
+                )
+            MenuAccessPoint.Home -> MenuConfigurations.home()
+            MenuAccessPoint.External -> MenuConfigurations.customTab()
         }
-
-    private fun buildWebCompatReporterMoreInfoSender() =
-        DefaultWebCompatReporterMoreInfoSender(
-            webCompatReporterRetrievalService =
-                DefaultWebCompatReporterRetrievalService(browserStore = requireComponents.core.store)
-        )
 }

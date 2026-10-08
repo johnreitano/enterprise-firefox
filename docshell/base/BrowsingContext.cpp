@@ -424,6 +424,8 @@ BrowsingContext::FieldValues BrowsingContext::ComputeInitialFields(
   fields.Get<IDX_ShouldDelayMediaFromStart>() =
       !parentBC && StaticPrefs::media_block_autoplay_until_in_foreground();
 
+  fields.Get<IDX_HistoryID>() = nsID::GenerateUUID();
+
   return fields;
 }
 
@@ -467,7 +469,6 @@ already_AddRefed<BrowsingContext> BrowsingContext::CreateDetached(
 
   FieldValues fields = ComputeInitialFields(parentWC, aOpener, group, aType);
   fields.Get<IDX_Name>() = aName;
-  fields.Get<IDX_HistoryID>() = nsID::GenerateUUID();
   fields.Get<IDX_IsPopupRequested>() = aOptions.isPopupRequested;
   fields.Get<IDX_TopLevelCreatedByWebContent>() =
       aOptions.topLevelCreatedByWebContent;

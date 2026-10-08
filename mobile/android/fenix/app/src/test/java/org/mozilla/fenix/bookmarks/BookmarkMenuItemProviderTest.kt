@@ -33,6 +33,7 @@ import org.mozilla.fenix.R
 import org.mozilla.fenix.components.AppStore
 import org.mozilla.fenix.components.appstate.AppAction.BookmarkAction
 import org.mozilla.fenix.components.bookmarks.BookmarksUseCase
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -144,9 +145,11 @@ class BookmarkMenuItemProviderTest {
     private fun TestScope.provider(
         browserStore: BrowserStore = browserStoreWithSelectedTab(),
         bookmarksStorage: BookmarksStorage,
+        target: MenuTarget = MenuTarget.BrowserTab,
     ) =
         BookmarkMenuItemProvider(
             browserStore = browserStore,
+            target = target,
             bookmarksStorage = bookmarksStorage,
             addBookmark = addBookmark,
             appStore = appStore,

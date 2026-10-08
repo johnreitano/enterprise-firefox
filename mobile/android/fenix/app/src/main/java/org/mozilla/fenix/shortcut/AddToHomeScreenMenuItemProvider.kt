@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import mozilla.components.browser.state.selector.selectedTab
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
@@ -23,6 +22,7 @@ import org.mozilla.fenix.R
 import org.mozilla.fenix.components.menu.MenuFragmentDirections
 import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.store.MenuAction
 import org.mozilla.fenix.utils.Settings
 
@@ -30,6 +30,7 @@ import org.mozilla.fenix.utils.Settings
  * [MenuItemProvider] for the menu item allowing to add the current webpage as a shortcut on the device's home screen.
  *
  * @param browserStore [BrowserStore] used to get information about the current webpage.
+ * @param target [MenuTarget] for which this menu item would be shown for.
  * @param webAppUseCases [WebAppUseCases] used to know whether and how that webpage can be added to the home screen, and
  *   to add it.
  * @param settings [Settings] for remembering that the user added a page to the home screen.
@@ -37,7 +38,8 @@ import org.mozilla.fenix.utils.Settings
  *   the home screen.
  */
 class AddToHomeScreenMenuItemProvider(
-    browserStore: BrowserStore,
+    private val browserStore: BrowserStore,
+    private val target: MenuTarget,
     private val webAppUseCases: WebAppUseCases,
     private val settings: Settings,
     private val scope: CoroutineScope,
@@ -48,11 +50,12 @@ class AddToHomeScreenMenuItemProvider(
 
     override val itemFlow: StateFlow<MenuItem?> =
         browserStore.stateFlow
-            .map { state -> addToHomeScreenItem(hasPageShown = state.selectedTab != null) }
+            .map { state -> addToHomeScreenItem(hasPageShown = target.browserSessionFrom(state) != null) }
             .stateIn(
                 scope = scope,
                 started = SharingStarted.Eagerly,
-                initialValue = addToHomeScreenItem(hasPageShown = browserStore.state.selectedTab != null),
+                initialValue =
+                    addToHomeScreenItem(hasPageShown = target.browserSessionFrom(browserStore.state) != null),
             )
 
     /**
@@ -83,6 +86,8 @@ class AddToHomeScreenMenuItemProvider(
      * which the user is first asked to confirm the name it will have on the home screen.
      */
     override fun onEvent(event: MenuEvent, menu: MenuHost) {
+        if (target.browserSessionFrom(browserStore.state) == null) return
+
         settings.installPwaOpened = true
 
         when (webAppUseCases.isInstallable()) {

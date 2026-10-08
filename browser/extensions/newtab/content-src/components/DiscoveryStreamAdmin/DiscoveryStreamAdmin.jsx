@@ -182,6 +182,13 @@ const PAGE_LAYOUTS_INFO = {
       "Nova, plus a large sponsored card at the end of the first widget row. " +
       "At one card column it sits second. It stays large when minimized.",
   },
+  // @experiment(remove) { bug 2078816 }
+  [PAGE_LAYOUT_VARIANTS.WIDGET_FIRST_CONTENT_SLOT]: {
+    label: "Widget in first content slot",
+    description:
+      "A widget occupies the first card of Popular Today. " +
+      "pageLayouts.widgetFirstContentSlot.widget picks the widget type.",
+  },
 };
 
 // Falls back to the raw pref value for a variant with no PAGE_LAYOUTS_INFO entry.

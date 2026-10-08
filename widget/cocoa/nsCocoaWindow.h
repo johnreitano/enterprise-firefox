@@ -506,6 +506,7 @@ class nsCocoaWindow final : public nsIWidget {
   void CocoaWindowWillEnterFullscreen(bool aFullscreen);
   void CocoaWindowDidEnterFullscreen(bool aFullscreen);
   void CocoaWindowDidResize();
+  void SaveRestoredBounds();
   void CocoaSendToplevelActivateEvents();
   void CocoaSendToplevelDeactivateEvents();
 

@@ -20,11 +20,10 @@ const TYPEABLE_CHARACTER =
  * (see XULMenuParentElement::FindMenuWithShortcut), which fails when another
  * item claims that letter as its accesskey, or when the label starts with
  * punctuation, an emoji or a character typed through an IME, such as Chinese,
- * Japanese or Korean. Such an item may share its accesskey with other items.
- * In a menupopup the key then cycles through them; a panel-list activates the
- * first (bug 2053735). An item with a non-empty label that has no typeable
- * letter or digit gets the lowest digit from 1 to 9 that no other item in the
- * popup uses.
+ * Japanese or Korean. Such an item may share its accesskey with other items,
+ * and the key then cycles through them. An item with a non-empty label that
+ * has no typeable letter or digit gets the lowest digit from 1 to 9 that no
+ * other item in the popup uses.
  *
  * When the popup's other items have no accesskeys, the items get none either,
  * so that they don't take the first letter of another item's label.

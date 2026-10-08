@@ -1630,6 +1630,12 @@ bool Decoder::decodeOp22(const Instruction* instruction) const {
       return formatRdRj("revh.d", word);
     case op_vpcnt_b:
       return formatSimdVdVj("vpcnt.b", word);
+    case op_vpcnt_h:
+      return formatSimdVdVj("vpcnt.h", word);
+    case op_vpcnt_w:
+      return formatSimdVdVj("vpcnt.w", word);
+    case op_vpcnt_d:
+      return formatSimdVdVj("vpcnt.d", word);
     case op_vneg_b:
       return formatSimdVdVj("vneg.b", word);
     case op_vneg_h:
@@ -1728,6 +1734,8 @@ bool Decoder::decodeOp20(const Instruction* instruction) const {
       return formatSimdRdVjImm("vpickve2gr.w", word, 2, false);
     case op_vpickve2gr_wu:
       return formatSimdRdVjImm("vpickve2gr.wu", word, 2, false);
+    case op_vreplvei_w:
+      return formatSimdVdVjImm("vreplvei.w", word, 2, false);
     default:
       return false;
   }
@@ -1740,6 +1748,8 @@ bool Decoder::decodeOp21(const Instruction* instruction) const {
       return formatSimdVdRjImm("vinsgr2vr.d", word, 1, false);
     case op_vpickve2gr_d:
       return formatSimdRdVjImm("vpickve2gr.d", word, 1, false);
+    case op_vreplvei_d:
+      return formatSimdVdVjImm("vreplvei.d", word, 1, false);
     default:
       return false;
   }
@@ -1754,6 +1764,8 @@ bool Decoder::decodeOp19(const Instruction* instruction) const {
       return formatSimdRdVjImm("vpickve2gr.h", word, 3, false);
     case op_vpickve2gr_hu:
       return formatSimdRdVjImm("vpickve2gr.hu", word, 3, false);
+    case op_vreplvei_h:
+      return formatSimdVdVjImm("vreplvei.h", word, 3, false);
     case op_vsllwil_h_b:
       return formatSimdVdVjImm("vsllwil.h.b", word, 3, false);
     case op_vsllwil_hu_bu:
@@ -1778,6 +1790,8 @@ bool Decoder::decodeOp18(const Instruction* instruction) const {
       return formatSimdRdVjImm("vpickve2gr.b", word, 4, false);
     case op_vpickve2gr_bu:
       return formatSimdRdVjImm("vpickve2gr.bu", word, 4, false);
+    case op_vreplvei_b:
+      return formatSimdVdVjImm("vreplvei.b", word, 4, false);
     case op_vsllwil_w_h:
       return formatSimdVdVjImm("vsllwil.w.h", word, 4, false);
     case op_vsllwil_wu_hu:

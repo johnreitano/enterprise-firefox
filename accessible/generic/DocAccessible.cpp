@@ -967,24 +967,24 @@ void DocAccessible::AttributeChanged(dom::Element* aElement,
     return;
   }
 
-  LocalAccessible* accessible = GetAccessible(aElement);
+  LocalAccessible* accessible = GetAccessibleOrDocument(aElement);
   if (!accessible) {
-    if (mContent == aElement) {
-      // The attribute change occurred on the root content of this
-      // DocAccessible, so handle it as an attribute change on this.
-      accessible = this;
-    } else {
-      if (aModType == AttrModType::Addition &&
-          aria::AttrCharacteristicsFor(aAttribute) & ATTR_GLOBAL) {
-        // The element doesn't have an Accessible, but a global ARIA attribute
-        // was just added, which means we should probably create an Accessible.
-        ContentInserted(aElement, aElement->GetNextSibling());
-        return;
-      }
-      // The element doesn't have an Accessible, so ignore the attribute
-      // change.
+    if (aModType == AttrModType::Addition &&
+        aria::AttrCharacteristicsFor(aAttribute) & ATTR_GLOBAL) {
+      // The element doesn't have an Accessible, but a global ARIA attribute
+      // was just added, which means we should probably create an Accessible.
+      ContentInserted(aElement, aElement->GetNextSibling());
       return;
     }
+    if (aAttribute == nsGkAtoms::contenteditable) {
+      // This element might have become editable, but it currently has no
+      // Accessible. Create one if appropriate.
+      ContentInserted(aElement, aElement->GetNextSibling());
+      return;
+    }
+    // The element doesn't have an Accessible, so ignore the attribute
+    // change.
+    return;
   }
 
   MOZ_ASSERT(accessible->IsBoundToParent() || accessible->IsDoc(),

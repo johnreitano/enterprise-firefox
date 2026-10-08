@@ -344,17 +344,10 @@ async function test_webpage_worker_redirected_to_ext_webaccessible({
     let expectedSharedWorkerResult = { hasEmittedErrorEvent: true };
     let assertMessage = "Expect new Worker to have emitted DOM event 'error'";
 
-    if (!testNestedWorker) {
-      if (AppConstants.MOZ_DIAGNOSTIC_ASSERT_ENABLED) {
-        expectedSharedWorkerResult = { skipped: true };
-        assertMessage +=
-          " and SharedWorker test be skipped due to MOZ_DIAGNOSTIC_ASSERT_ENABLED set to true";
-      } else {
-        expectedSharedWorkerResult.hasEmittedErrorEvent = {
-          errorOnConstructorCall: "AbortError",
-        };
-        assertMessage += " and new SharedWorker to raise an AbortError";
-      }
+    if (!testNestedWorker && AppConstants.MOZ_DIAGNOSTIC_ASSERT_ENABLED) {
+      expectedSharedWorkerResult = { skipped: true };
+      assertMessage +=
+        " and SharedWorker test be skipped due to MOZ_DIAGNOSTIC_ASSERT_ENABLED set to true";
     }
 
     Assert.deepEqual(

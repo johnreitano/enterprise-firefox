@@ -3981,7 +3981,7 @@ toolbar#nav-bar {
                     f.write(json.dumps(data))
 
         if "MOZ_AUTOMATION" in os.environ:
-            symbolicate_profiles()
+            symbolicate_profiles(symbol_dir=options.symbolsPath)
 
         self.handleShutdownProfile(options)
 

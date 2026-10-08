@@ -178,7 +178,7 @@ class BrowserToolbarIntegration(
             BrowserMenu(
                 browserStore = store,
                 appStore = toolbar.context.components.appStore,
-                resources = toolbar.context.resources,
+                context = toolbar.context,
             )
 
         return MenuStore(
@@ -195,11 +195,11 @@ class BrowserToolbarIntegration(
         val context = toolbar.context
         val menu =
             CustomTabMenu(
+                context = context,
                 browserStore = store,
                 customTabId = customTabId,
                 appName = context.getString(R.string.app_name),
                 isOnboardingTab = isOnboardingTab,
-                resources = context.resources,
             )
 
         return MenuStore(
