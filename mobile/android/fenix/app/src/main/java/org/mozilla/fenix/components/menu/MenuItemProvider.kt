@@ -11,9 +11,9 @@ import mozilla.components.compose.menu.store.MenuEvent
 /**
  * Provides the configuration of one menu item, owned by the feature that item belongs to.
  *
- * This is meant to be used with [BrowserMenuBuilder] which knows which items exist and in what order to show them while
- * the details for each menu item - what it looks like in each state, and where that state comes from - stay with the
- * code that owns the feature that the menu item relates to.
+ * This is meant to be used with a [MenuBuilder] which knows which items exist and in what order to show them while the
+ * details for each menu item - what it looks like in each state, and where that state comes from - stay with the code
+ * that owns the feature that the menu item relates to.
  */
 interface MenuItemProvider {
     /**
@@ -28,7 +28,7 @@ interface MenuItemProvider {
     val itemFlow: StateFlow<MenuItem?>
 
     /** Get if the given [event] is one this knows how to handle. */
-    fun handles(event: MenuEvent): Boolean = false
+    fun handles(event: MenuEvent): Boolean
 
     /**
      * Reacts to an [event] this provider [handles].
@@ -40,5 +40,5 @@ interface MenuItemProvider {
      * @param event The event to react to.
      * @param menu [MenuHost] for integrating with the current menu.
      */
-    fun onEvent(event: MenuEvent, menu: MenuHost) = Unit
+    fun onEvent(event: MenuEvent, menu: MenuHost)
 }

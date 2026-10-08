@@ -4,8 +4,11 @@
 
 package org.mozilla.focus.menu.browser
 
-import android.content.res.Resources
+import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.drawable.Drawable
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toDrawable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -20,6 +23,7 @@ import mozilla.components.feature.webcompat.reporter.WebCompatReporterFeature.WE
 import mozilla.components.lib.state.ext.flow
 import mozilla.components.support.base.log.logger.Logger
 import mozilla.components.support.ktx.android.util.dpToPx
+import org.mozilla.focus.R
 
 private const val ICON_SIZE_DP = 24
 
@@ -43,19 +47,19 @@ internal fun BrowserState.webCompatReporterAction(tab: SessionState? = selectedT
 /**
  * The icon which the WebCompat Reporter extension provides for the menu item reporting the current page.
  *
+ * @param context [Context] used to know in which size and color to show the icon.
  * @param browserStore [BrowserStore] from which to read the extension's action providing the icon.
- * @param resources [Resources] used to know in which size to load the icon.
  * @param action The extension's action for the page the menu is shown for.
  */
 internal class WebCompatReporterIcon(
+    private val context: Context,
     private val browserStore: BrowserStore,
-    private val resources: Resources,
     private val action: BrowserState.() -> Action?,
 ) {
     private val logger = Logger("WebCompatReporterIcon")
 
     /** The icon if it has already been loaded, for building a menu without waiting for it. */
-    var current: Bitmap? = null
+    var current: Drawable? = null
         private set
 
     /**
@@ -65,7 +69,7 @@ internal class WebCompatReporterIcon(
      * The extension may still be starting up while the menu is shown, in which case it has no icon to load yet, so this
      * waits for it to become available instead of giving up.
      */
-    fun flow(): Flow<Bitmap?> = flow {
+    fun flow(): Flow<Drawable?> = flow {
         emit(current)
 
         if (current == null) {
@@ -79,11 +83,14 @@ internal class WebCompatReporterIcon(
      * The extension renders its icon in the requested size, so it is loaded once and then kept for as long as shown.
      */
     @Suppress("TooGenericExceptionCaught")
-    private suspend fun load(loadIcon: suspend (Int) -> Bitmap?): Bitmap? {
-        val size = ICON_SIZE_DP.dpToPx(resources.displayMetrics)
+    private suspend fun load(loadIcon: suspend (Int) -> Bitmap?): Drawable? {
+        val size = ICON_SIZE_DP.dpToPx(context.resources.displayMetrics)
 
         return try {
-            loadIcon(size)?.also { current = it }
+            loadIcon(size)
+                ?.let { it.toDrawable(context.resources) }
+                ?.apply { setTint(ContextCompat.getColor(context, R.color.primaryText)) }
+                ?.also { current = it }
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (exception: Exception) {

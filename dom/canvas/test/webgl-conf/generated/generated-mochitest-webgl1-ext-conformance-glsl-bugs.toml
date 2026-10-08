@@ -151,8 +151,6 @@ skip-if = [
 ["test_conformance__glsl__bugs__sampler-struct-function-arg.html"]
 skip-if = [
   "os == 'android' && os_version == '14' && arch == 'aarch64'",
-  "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland'",
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11'",
 ]
 
 ["test_conformance__glsl__bugs__sequence-operator-evaluation-order.html"]
@@ -172,8 +170,6 @@ skip-if = [
 ["test_conformance__glsl__bugs__temp-expressions-should-not-crash.html"]
 skip-if = [
   "os == 'android' && os_version == '14' && arch == 'aarch64'",
-  "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland'",
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11'",
 ]
 
 ["test_conformance__glsl__bugs__unary-minus-operator-float-bug.html"]

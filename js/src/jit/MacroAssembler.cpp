@@ -2022,8 +2022,7 @@ void MacroAssembler::lookupStaticString(Register ch1, Register ch2,
   branch32(Assembler::Equal, ch2, Imm32(StaticStrings::INVALID_SMALL_CHAR),
            fail);
 
-  lshift32(Imm32(StaticStrings::SMALL_CHAR_BITS), ch1);
-  add32(ch2, ch1);
+  lshift32ThenAdd(Imm32(StaticStrings::SMALL_CHAR_BITS), ch2, ch1);
 
   // Look up the string from the computed index.
   movePtr(ImmPtr(&staticStrings.length2StaticTable), dest);
@@ -3139,10 +3138,9 @@ void MacroAssembler::emitMegamorphicCacheLookupByValueCommon(
   // outEntryPtr = ((outEntryPtr >> 3) + scratchHash) ^ (outEntryPtr >> 13)
   rshiftPtr(Imm32(MegamorphicCache::ShapeHashShift1), outEntryPtr);
   addPtr(outEntryPtr, scratchHash);
-  rshiftPtr(Imm32(MegamorphicCache::ShapeHashShift2 -
-                  MegamorphicCache::ShapeHashShift1),
-            outEntryPtr);
-  xorPtr(scratchHash, outEntryPtr);
+  rshiftPtrThenXor(Imm32(MegamorphicCache::ShapeHashShift2 -
+                         MegamorphicCache::ShapeHashShift1),
+                   scratchHash, outEntryPtr);
 
   // outEntryPtr %= MegamorphicCache::NumEntries
   constexpr size_t cacheSize = MegamorphicCache::NumEntries;
@@ -3359,12 +3357,11 @@ void MacroAssembler::emitMegamorphicCachedSetSlot(
   // outEntryPtr = obj->shape()
   loadPtr(Address(obj, JSObject::offsetOfShape()), scratch3);
 
-  movePtr(scratch3, scratch2);
-
   // scratch3 = (scratch3 >> 3) ^ (scratch3 >> 13) + idHash
-  rshiftPtr(Imm32(MegamorphicSetPropCache::ShapeHashShift1), scratch3);
-  rshiftPtr(Imm32(MegamorphicSetPropCache::ShapeHashShift2), scratch2);
-  xorPtr(scratch2, scratch3);
+  rshiftPtr(Imm32(MegamorphicSetPropCache::ShapeHashShift1), scratch3,
+            scratch2);
+  rshiftPtrThenXor(Imm32(MegamorphicSetPropCache::ShapeHashShift2), scratch2,
+                   scratch3);
 
   if constexpr (std::is_same_v<IdType, ValueOperand>) {
     loadAtomOrSymbolAndHash(id, scratch1, scratch2, &cacheMiss);
@@ -10557,10 +10554,8 @@ void MacroAssembler::prepareHashObject(Register setObj, ValueOperand value,
     add64(v1, v0);
 
     // mV1 = RotateLeft(mV1, 13);
-    rotateLeft64(Imm32(13), v1, v1, InvalidReg);
-
     // mV1 ^= mV0;
-    xor64(v0, v1);
+    rotateLeft64ThenXor(Imm32(13), v0, v1);
 
     // mV0 = RotateLeft(mV0, 32);
     rotateLeft64(Imm32(32), v0, v0, InvalidReg);
@@ -10569,28 +10564,22 @@ void MacroAssembler::prepareHashObject(Register setObj, ValueOperand value,
     add64(v3, v2);
 
     // mV3 = RotateLeft(mV3, 16);
-    rotateLeft64(Imm32(16), v3, v3, InvalidReg);
-
     // mV3 ^= mV2;
-    xor64(v2, v3);
+    rotateLeft64ThenXor(Imm32(16), v2, v3);
 
     // mV0 = WrappingAdd(mV0, mV3);
     add64(v3, v0);
 
     // mV3 = RotateLeft(mV3, 21);
-    rotateLeft64(Imm32(21), v3, v3, InvalidReg);
-
     // mV3 ^= mV0;
-    xor64(v0, v3);
+    rotateLeft64ThenXor(Imm32(21), v0, v3);
 
     // mV2 = WrappingAdd(mV2, mV1);
     add64(v1, v2);
 
     // mV1 = RotateLeft(mV1, 17);
-    rotateLeft64(Imm32(17), v1, v1, InvalidReg);
-
     // mV1 ^= mV2;
-    xor64(v2, v1);
+    rotateLeft64ThenXor(Imm32(17), v2, v1);
 
     // mV2 = RotateLeft(mV2, 32);
     rotateLeft64(Imm32(32), v2, v2, InvalidReg);

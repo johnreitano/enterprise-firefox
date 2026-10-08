@@ -3,9 +3,6 @@ head = "head.js"
 support-files = ["../shared-head.js"]
 
 ["test_active_configuration.js"]
-skip-if = [
-  "tsan", # Intermittent timeouts, bug 1781449
-]
 
 ["test_addProfilerMarker.js"]
 
@@ -62,7 +59,6 @@ skip-if = [
   "asan",
   "os == 'android' && verify", # bug 1757528
   "socketprocess_networking",
-  "tsan",
 ]
 
 ["test_feature_posix_signals.js"]

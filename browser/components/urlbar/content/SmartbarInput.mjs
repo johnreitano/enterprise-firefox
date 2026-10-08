@@ -213,8 +213,7 @@ ${
       </html:div>
       <html:div class="urlbarView"
             context=""
-            role="group"
-            tooltip="aHTMLTooltip">
+            role="group">
         <html:div id="urlbar-results"
                   class="urlbarView-results"
                   role="listbox"/>

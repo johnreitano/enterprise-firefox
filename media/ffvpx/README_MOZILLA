@@ -210,6 +210,10 @@ Finally, apply the patches:
   `1a6a186b80`). ffvpx does not ship the H.264 decoder. H.264 Vulkan stays
   off (`CONFIG_H264_VULKAN_HWACCEL` 0); the H.264 profile path then keeps
   PROGRESSIVE `pictureLayout`.
+- nvidia-compute-queue-cap.patch to cap NVIDIA compute queues to 1 like
+  graphics when `limit_queues` is unset, so unused compute queues do not
+  dominate `vkCreateDevice` time (bug 2068764). Transfer and video families
+  are unchanged. Drop this patch if it is ever fixed upstream.
 - vp8dsp-nasm-2.14-compat.patch to restore the `%if`-based register counts in
   `put_vp8_epel*_h6`/`_h4`. Upstream folded them into inline expressions, but
   nasm cannot parse a relational operator inside parentheses until 2.15, and

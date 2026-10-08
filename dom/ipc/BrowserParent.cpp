@@ -811,7 +811,7 @@ void BrowserParent::ActorDestroy(ActorDestroyReason why) {
   // Need to close undeleted ContentPermissionRequestParents before tab is
   // closed.
   // FIXME: Why is PContentPermissionRequest not managed by PBrowser?
-  nsTArray<PContentPermissionRequestParent*> parentArray =
+  nsTArray<RefPtr<ContentPermissionRequestParent>> parentArray =
       nsContentPermissionUtils::GetContentPermissionRequestParentById(mTabId);
   for (auto& permissionRequestParent : parentArray) {
     (void)PContentPermissionRequestParent::Send__delete__(

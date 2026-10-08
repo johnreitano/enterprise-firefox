@@ -218,9 +218,7 @@ class nsHtml5TreeBuilder::SanitizerState {
     if (location.mBefore && location.mBefore->GetParent() != location.mParent) {
       location.mBefore = nullptr;
     }
-    if (aBefore && aBefore->GetParent() == location.mParent) {
-      location.mBefore = aBefore;
-    }
+    MOZ_ASSERT(!aBefore, "refChild must be null");
     return location;
   }
 

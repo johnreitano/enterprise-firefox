@@ -102,10 +102,6 @@ https_first_disabled = true
 
 ["browser_usercontextid_tabdrop.js"]
 https_first_disabled = true
-skip-if = [
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && opt", # Bug 1984803
-  "os == 'win'", # Intermittent failure - bug 1268276
-]
 
 ["browser_windowName.js"]
 tags = "openwindow"

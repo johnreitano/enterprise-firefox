@@ -109,6 +109,20 @@ const TOP_STORIES_SECTION_NAME = "top_stories_section";
 const USER_INTERACTION_ACTIVE = "user-interaction-active-non-synthesized";
 const USER_INTERACTION_INACTIVE = "user-interaction-inactive-non-synthesized";
 
+// Labels newtab.opened_page_dwell_time accepts, mirroring metrics.yaml. The
+// label is chosen at the click site in content, so it is validated here rather
+// than trusted.
+const DWELL_LABELS = new Set([
+  "topsite_organic",
+  "topsite_sponsored",
+  "story_organic",
+  "story_sponsored",
+]);
+
+// Upper bound on the pages we track at once, so a session that opens many
+// links without going idle can't grow the map forever.
+const MAX_TRACKED_OPENED_PAGES = 100;
+
 /**
  * Glean session types for OHTTP ping optimization.
  * Determines whether events are queued or sent immediately to OHTTP ping.
@@ -227,6 +241,14 @@ export class TelemetryFeed {
    * know the user was interacting. Null before the first one.
    */
   #lastActiveAt = null;
+
+  /**
+   * Pages opened from a newtab, by the permanentKey of the browser showing
+   * them. Each entry runs the same dwell stopwatch as a newtab session and is
+   * finalized into newtab.opened_page_dwell_time when it stops being
+   * attributed.
+   */
+  #openedPages = new Map();
 
   constructor() {
     this.sessions = new Map();
@@ -857,7 +879,7 @@ export class TelemetryFeed {
 
   /**
    * The frontmost window, or null if Firefox is not the active application.
-   * Separate from isSessionInForeground so tests can stub it.
+   * Separate from isDwellTargetInForeground so tests can stub it.
    *
    * @returns {Window|null}
    */
@@ -875,18 +897,22 @@ export class TelemetryFeed {
   }
 
   /**
-   * Whether this session's newtab is the selected tab of the frontmost window.
-   * A preloaded newtab never qualifies because its browser isn't in a tab yet.
+   * Whether a dwell target's <browser> is the selected tab of the frontmost
+   * window. A preloaded newtab doesn't qualify because its browser isn't in a
+   * tab yet.
    *
    * Known gap: dragging the tab to another window gives it a new <browser>, so
-   * the session stops qualifying, and accruing, for the rest of its life.
+   * a newtab session stops qualifying.
    *
-   * @param  {object} session a session from this.sessions
+   * @param  {object} target a newtab session or an entry of this.#openedPages
    * @param  {Window|null} [activeWindow] the frontmost window, read if omitted
    * @returns {boolean}
    */
-  isSessionInForeground(session, activeWindow = this.getActiveChromeWindow()) {
-    const browser = session.browserRef?.deref();
+  isDwellTargetInForeground(
+    target,
+    activeWindow = this.getActiveChromeWindow()
+  ) {
+    const browser = target.browserRef?.deref();
     const win = browser?.documentGlobal;
     return (
       !!win &&
@@ -897,8 +923,19 @@ export class TelemetryFeed {
   }
 
   /**
-   * Interaction is under way. Start the stopwatch for the newtab in front of
-   * the user, and stop it for every other session.
+   * Everything running a dwell stopwatch: the newtab sessions and the pages
+   * they opened.
+   *
+   * @yields {object} a dwell target
+   */
+  *#dwellTargets() {
+    yield* this.sessions.values();
+    yield* this.#openedPages.values();
+  }
+
+  /**
+   * Start the stopwatch for whatever is in front of the user, and stop it for
+   * everything else.
    *
    * Foreground is rechecked on every notification, not just on
    * active/inactive changes. No foreground signal reaches this feed, so these
@@ -908,16 +945,25 @@ export class TelemetryFeed {
     this.#userActive = true;
     const now = this.now();
     this.#lastActiveAt = now;
-    // Read once for the whole sweep, and only when a session might ask for it.
-    const activeWindow = this.sessions.size
-      ? this.getActiveChromeWindow()
-      : null;
+    // Read once for the whole sweep, and only when a target might ask for it.
+    const activeWindow =
+      this.sessions.size || this.#openedPages.size
+        ? this.getActiveChromeWindow()
+        : null;
 
-    for (const session of this.sessions.values()) {
-      if (this.isSessionInForeground(session, activeWindow)) {
-        session.dwellStartedAt ??= now;
+    // Before the stopwatches, so a destination that finished loading since the
+    // last notification starts accruing in this sweep rather than the next.
+    this.#syncOpenedPages(now);
+
+    for (const target of this.#dwellTargets()) {
+      if (
+        // Newtab sessions have no committed flag. Only opened pages wait.
+        (target.committed ?? true) &&
+        this.isDwellTargetInForeground(target, activeWindow)
+      ) {
+        target.dwellStartedAt ??= now;
       } else {
-        this.#stopDwellClock(session, now);
+        this.#stopDwellClock(target, now);
       }
     }
   }
@@ -931,41 +977,147 @@ export class TelemetryFeed {
   #onUserInteractionInactive() {
     this.#userActive = false;
     const cutoff = this.#lastActiveAt ?? this.now();
-    for (const session of this.sessions.values()) {
-      this.#stopDwellClock(session, cutoff);
+    for (const target of this.#dwellTargets()) {
+      this.#stopDwellClock(target, cutoff);
     }
+    this.#syncOpenedPages(cutoff);
   }
 
   /**
-   * Start a session's stopwatch if the user is already interacting when the
-   * newtab becomes visible. Without this, a visit shorter than one interval
-   * would see no notification and record nothing.
+   * Start a target's stopwatch if the user is already interacting when it
+   * comes into view. Without this, a visit shorter than one interval would see
+   * no notification and record nothing.
    *
-   * @param  {object} session a session from this.sessions
+   * @param  {object} target a newtab session or an entry of this.#openedPages
    */
-  #startDwellClockIfActive(session) {
+  #startDwellClockIfActive(target) {
     if (
-      session.dwellStartedAt === null &&
+      target.dwellStartedAt === null &&
       this.#userActive &&
-      this.isSessionInForeground(session)
+      this.isDwellTargetInForeground(target)
     ) {
-      session.dwellStartedAt = this.now();
+      target.dwellStartedAt = this.now();
     }
   }
 
   /**
-   * Stop a session's stopwatch, crediting time up to `cutoff`. Clamped at zero,
-   * so a run that started after `cutoff` adds nothing instead of subtracting.
+   * Stop a target's stopwatch, crediting time up to `cutoff`.
    *
-   * @param  {object} session a session from this.sessions
+   * @param  {object} target a newtab session or an entry of this.#openedPages
    * @param  {number} [cutoff] a this.now() timestamp, defaulting to now
    */
-  #stopDwellClock(session, cutoff = this.now()) {
-    if (session.dwellStartedAt === null) {
+  #stopDwellClock(target, cutoff = this.now()) {
+    if (target.dwellStartedAt === null) {
       return;
     }
-    session.dwellTimeMs += Math.max(0, cutoff - session.dwellStartedAt);
-    session.dwellStartedAt = null;
+    target.dwellTimeMs += Math.max(0, cutoff - target.dwellStartedAt);
+    target.dwellStartedAt = null;
+  }
+
+  /**
+   * Handle DWELL_LINK_OPENED, which PlacesFeed dispatches once it knows the
+   * <browser> that will receive a link opened from the newtab. Starts
+   * measuring the active time the user spends on that page.
+   *
+   * @param  {object} action the Action object
+   */
+  handleDwellLinkOpened(action) {
+    const { browser, dwell_label } = action.data;
+    if (!browser || !DWELL_LABELS.has(dwell_label)) {
+      return;
+    }
+
+    // This <browser> may already be showing a page we are measuring, if the
+    // user came back to a newtab in it and clicked again. Finalize that one
+    // rather than lose what it accrued.
+    const key = browser.permanentKey;
+    const previous = this.#openedPages.get(key);
+    if (previous) {
+      this.#finalizeOpenedPage(previous);
+    }
+    if (this.#openedPages.size >= MAX_TRACKED_OPENED_PAGES) {
+      this.#finalizeOpenedPage(this.#openedPages.values().next().value);
+    }
+
+    this.#openedPages.set(key, {
+      key,
+      label: dwell_label,
+      browserRef: new WeakRef(browser),
+      dwellTimeMs: 0,
+      dwellStartedAt: null,
+      // Set by the first sweep that finds the destination loaded. Until then
+      // the newtab is still what the user is looking at, so nothing accrues.
+      committed: false,
+      windowId: null,
+    });
+  }
+
+  /**
+   * Bring the opened pages up to date with what their tabs are showing.
+   * Notice the destination once it has loaded, notice when the tab has moved
+   * on, and notice when the tab is gone.
+   *
+   * Sampled on the activity notifications rather than driven by a progress
+   * listener.
+   *
+   * @param  {number} cutoff a this.now() timestamp
+   */
+  #syncOpenedPages(cutoff) {
+    for (const page of [...this.#openedPages.values()]) {
+      const browser = page.browserRef.deref();
+      if (!browser?.isConnected) {
+        // The tab was closed, or dragged to another window, which swaps in a
+        // new <browser>.
+        this.#finalizeOpenedPage(page, cutoff);
+        continue;
+      }
+
+      // Identify the document, not its address. Same-document navigation, a
+      // fragment link or a pushState as the user scrolls, keeps the same
+      // window global, so reading on keeps being measured. A redirect never
+      // gets one at all, so the page we commit to is where the user landed
+      // rather than whatever the chain passed through, however slow it was.
+      const windowGlobal = browser.browsingContext?.currentWindowGlobal;
+      const windowId = windowGlobal?.innerWindowId;
+      const uri = windowGlobal?.documentURI;
+      // Only a real web page can be the page the newtab sent the user to.
+      // Rules out the about:blank a new tab starts on, an error page if the
+      // load fails, and about:newtab if the user goes back.
+      const isWebPage = uri?.scheme === "http" || uri?.scheme === "https";
+
+      if (!page.committed) {
+        if (isWebPage) {
+          page.committed = true;
+          page.windowId = windowId;
+        }
+      } else if (!isWebPage || windowId !== page.windowId) {
+        this.#finalizeOpenedPage(page, cutoff);
+      }
+    }
+  }
+
+  /**
+   * Stop measuring an opened page and record what it accrued.
+   *
+   * The sample accumulates on the client until the next metrics ping, so it
+   * belongs to no newtab visit.
+   *
+   * @param  {object} page an entry of this.#openedPages
+   * @param  {number} [cutoff] a this.now() timestamp, defaulting to now
+   */
+  #finalizeOpenedPage(page, cutoff = this.now()) {
+    this.#stopDwellClock(page, cutoff);
+    this.#openedPages.delete(page.key);
+
+    const dwellMs = Math.round(page.dwellTimeMs);
+    if (dwellMs > 0 && this.telemetryEnabled) {
+      // Optional chaining: metrics.yaml lives outside this add-on, so a
+      // train-hopped build can be running on a Firefox that predates the
+      // metric.
+      Glean.newtab.openedPageDwellTime?.[page.label]?.accumulateSingleSample(
+        dwellMs
+      );
+    }
   }
 
   /**
@@ -985,6 +1137,15 @@ export class TelemetryFeed {
     // alive past its tab. The preloaded-browser swap reuses this element, so
     // the reference survives it.
     session.browserRef = new WeakRef(action.data.browser);
+
+    // A newtab showing here means whatever page this <browser> was opened to
+    // is over. The location change usually gets there first. This covers any
+    // route to a newtab that does not, so the two metrics can never both be
+    // counting the same tab.
+    const opened = this.#openedPages.get(action.data.browser.permanentKey);
+    if (opened) {
+      this.#finalizeOpenedPage(opened);
+    }
   }
 
   /**
@@ -1813,6 +1974,9 @@ export class TelemetryFeed {
         break;
       case at.NEW_TAB_SCROLL:
         this.handleNewTabScroll(action);
+        break;
+      case at.DWELL_LINK_OPENED:
+        this.handleDwellLinkOpened(action);
         break;
       case at.SAVE_SESSION_PERF_DATA:
         this.saveSessionPerfData(au.getPortIdOfSender(action), action.data);
@@ -2978,6 +3142,11 @@ export class TelemetryFeed {
 
   uninit() {
     this._stopObservingNewtabPingPrefs();
+    // Record what the user is reading at shutdown. The sample waits,
+    // ping-lifetime, for the next metrics ping.
+    for (const page of [...this.#openedPages.values()]) {
+      this.#finalizeOpenedPage(page);
+    }
     // Must run before newtabContentPing.uninit(), which discards its own buffer.
     this.#flushBufferedEventsOnUninit();
     this.newtabContentPing.uninit();

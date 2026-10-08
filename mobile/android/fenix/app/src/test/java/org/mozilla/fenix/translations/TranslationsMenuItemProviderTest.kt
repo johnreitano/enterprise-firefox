@@ -32,6 +32,7 @@ import mozilla.components.ui.icons.R as iconsR
 import org.junit.Test
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.menu.MenuFragmentDirections
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -147,9 +148,11 @@ class TranslationsMenuItemProviderTest {
         browserStore: BrowserStore = browserStore(),
         translationsSettings: TranslationsEnabledSettings = TranslationsEnabledSettings.inMemory(true),
         isFeatureEnabled: Boolean = true,
+        target: MenuTarget = MenuTarget.BrowserTab,
     ) =
         TranslationsMenuItemProvider(
             browserStore = browserStore,
+            target = target,
             translationsSettings = translationsSettings,
             scope = backgroundScope,
             isFeatureEnabled = isFeatureEnabled,

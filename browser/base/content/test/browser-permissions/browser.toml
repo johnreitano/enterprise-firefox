@@ -22,7 +22,6 @@ skip-if = [
 ["browser_canvas_fingerprinting_resistance.js"]
 skip-if = [
   "debug",
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && asan", # Bug 1522069
 ]
 
 ["browser_canvas_rfp_exclusion.js"]

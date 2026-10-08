@@ -21,6 +21,7 @@ import mozilla.components.compose.menu.data.StandardMenuItem
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.compose.menu.ui.MenuItemState
 import org.junit.Test
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -162,10 +163,16 @@ class MoreMenuItemsProviderTest {
         isPrivate: Boolean = false,
         hasTab: Boolean = true,
         settings: SummarizationFeatureDiscoveryConfiguration = discoverySettings(highlight),
+        target: MenuTarget = MenuTarget.BrowserTab,
     ): MoreMenuItemsProvider {
         val tab = createTab(url = "https://mozilla.org", private = isPrivate)
         val browserStore = BrowserStore(BrowserState(tabs = listOf(tab), selectedTabId = tab.id.takeIf { hasTab }))
-        return MoreMenuItemsProvider(browserStore, settings, backgroundScope)
+        return MoreMenuItemsProvider(
+            browserStore,
+            target,
+            settings,
+            backgroundScope,
+        )
     }
 
     private companion object {

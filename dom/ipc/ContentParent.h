@@ -543,7 +543,8 @@ class ContentParent final : public PContentParent,
 
   mozilla::ipc::IPCResult RecvNotifyShutdownSuccess();
 
-  PContentPermissionRequestParent* AllocPContentPermissionRequestParent(
+  already_AddRefed<PContentPermissionRequestParent>
+  AllocPContentPermissionRequestParent(
       const nsTArray<PermissionRequest>& aRequests, nsIPrincipal* aPrincipal,
       nsIPrincipal* aTopLevelPrincipal, const bool& aIsHandlingUserInput,
       const bool& aMaybeUnsafePermissionDelegate, const TabId& aTabId,
@@ -555,9 +556,6 @@ class ContentParent final : public PContentParent,
       nsIPrincipal* aTopLevelPrincipal, const bool& aIsHandlingUserInput,
       const bool& aMaybeUnsafePermissionDelegate, const TabId& tabId,
       const bool& aIgnoreAllowSitePermission) override;
-
-  bool DeallocPContentPermissionRequestParent(
-      PContentPermissionRequestParent* actor);
 
   void ForkNewProcess(bool aBlocking);
 

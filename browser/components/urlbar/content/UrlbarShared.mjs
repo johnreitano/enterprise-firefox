@@ -33,6 +33,8 @@ import UrlbarPrefs from "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs"
  *   The telemetry label for recording searches in this mode.
  * @property {string} uiLabel
  *   The L10n ID to use for the UI label.
+ * @property {string} [keyId]
+ *   The ID of the browser window's <key> element that enters the search mode.
  */
 
 /**
@@ -460,6 +462,7 @@ export const UrlbarShared = {
         pref: "shortcuts.tabs",
         telemetryLabel: "tabs",
         uiLabel: "urlbar-searchmode-tabs4",
+        keyId: "key_searchTabs",
       },
       {
         source: this.RESULT_SOURCE.HISTORY,

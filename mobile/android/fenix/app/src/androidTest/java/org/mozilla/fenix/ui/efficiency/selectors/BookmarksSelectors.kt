@@ -267,11 +267,19 @@ object BookmarksSelectors : SelectorContainer {
         )
 
     @Suppress("FunctionName")
-    fun BOOKMARK_ITEM(title: String = "") =
+    fun BOOKMARK_ITEM_TITLE(title: String = "") =
         Selector(
             strategy = SelectorStrategy.COMPOSE_BY_TEXT_MERGED,
             value = title,
             description = "Bookmark item or folder with title: $title",
+        )
+
+    @Suppress("FunctionName")
+    fun BOOKMARK_ITEM_URL(url: String = "") =
+        Selector(
+            strategy = SelectorStrategy.COMPOSE_BY_TEXT_SUBSTRING,
+            value = url,
+            description = "Bookmark item or folder with URL: $url",
         )
 
     @Suppress("FunctionName")

@@ -4,6 +4,7 @@
 
 package org.mozilla.fenix.components.menu.fake
 
+import mozilla.components.compose.menu.data.BannerMenuItem
 import mozilla.components.compose.menu.data.ExpandableMenuItem
 import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.StandardMenuItem
@@ -15,4 +16,5 @@ fun MenuItem.reachableEvents(): List<MenuEvent> =
         is StandardMenuItem -> listOfNotNull(onClickEvent, onLongClickEvent, onShownEvent, actionButton?.onClickEvent)
         is ExpandableMenuItem ->
             listOfNotNull(onClickEvent, onLongClickEvent) + subMenuItems.flatMap { it.reachableEvents() }
+        is BannerMenuItem -> listOf(onClickEvent, onDismissEvent)
     }

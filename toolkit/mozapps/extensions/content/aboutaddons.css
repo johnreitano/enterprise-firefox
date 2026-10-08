@@ -241,6 +241,8 @@ message-bar-stack {
 /* Add-on cards */
 
 .addon.card {
+  --card-cover-image-padding: 0;
+
   margin-bottom: 16px;
   transition:
     opacity 150ms,
@@ -270,7 +272,7 @@ addon-card:not([expanded]) > .addon.card:hover {
 }
 
 addon-card[expanded] .addon.card {
-  padding-bottom: 0;
+  --card-padding-block-end: 0;
 }
 
 .addon-card-collapsed {
@@ -345,13 +347,16 @@ theme-preview {
    * the toolbar color is exactly the same as the theme card background
    * color). */
   border-bottom: var(--border-width) solid var(--border-color-deemphasized);
-}
 
-/* The Nova theme preview svg mirrors itself through link-parameters, and so
- * it must not be mirrored as a whole like the other theme preview images
- * (see .card-heading-image:dir(rtl) in common-shared.css). */
-.card-heading-image[src="chrome://mozapps/content/extensions/default-theme/preview-nova.svg"]:dir(rtl) {
-  transform: none;
+  &:dir(rtl) {
+    transform: scaleX(-1);
+  }
+
+  /* The Nova theme preview svg mirrors itself through link-parameters, and so
+  * it must not be mirrored as a whole like the other theme preview images. */
+  &[src="chrome://mozapps/content/extensions/default-theme/preview-nova.svg"]:dir(rtl) {
+    transform: none;
+  }
 }
 
 .card-heading-icon {

@@ -430,17 +430,43 @@ class PrivacyReportNotificationSchedulerTest {
             assertNull(TrackingProtection.privacyReportNotificationAvailability.testGetValue())
         }
 
-    private class CountingDateTimeProvider(
-        private val delegate: DateTimeProvider =
-            FakeDateTimeProvider(currentTime = PRIVACY_REPORT_NOTIFICATION_FAKE_NOW)
-    ) : DateTimeProvider {
-        var callCount = 0
-            private set
+    @Test
+    fun `GIVEN the feature is enabled and notifications are allowed WHEN updatePrivacyReportNotificationWorker is called THEN the worker is reported as scheduled`() =
+        runTest {
+            every { settings.shouldUseTrackingProtection } returns true
+            every { settings.weeklyPrivacyNotificationFeatureFlagEnabled } returns true
+            every { settings.onboardingCompletedTimestamp } returns 1_000L
 
-        override fun currentLocalDate(): LocalDate = delegate.currentLocalDate().also { callCount++ }
+            shadowOf(testContext.getSystemService(NotificationManager::class.java)).setNotificationsEnabled(true)
 
-        override fun currentZoneId(): ZoneId = delegate.currentZoneId().also { callCount++ }
+            scheduler.updatePrivacyReportNotificationWorker(
+                dateTimeProvider = FakeDateTimeProvider(currentTime = PRIVACY_REPORT_NOTIFICATION_FAKE_NOW)
+            )
 
-        override fun currentTimeMillis(): Long = delegate.currentTimeMillis().also { callCount++ }
-    }
+            assertTrue(TrackingProtection.privacyReportNotificationWorkerScheduled.testGetValue()!!)
+        }
+
+    @Test
+    fun `GIVEN tracking protection is disabled WHEN updatePrivacyReportNotificationWorker is called THEN the worker is reported as not scheduled`() =
+        runTest {
+            every { settings.shouldUseTrackingProtection } returns false
+            every { settings.weeklyPrivacyNotificationFeatureFlagEnabled } returns true
+
+            scheduler.updatePrivacyReportNotificationWorker()
+
+            assertFalse(TrackingProtection.privacyReportNotificationWorkerScheduled.testGetValue()!!)
+        }
+}
+
+private class CountingDateTimeProvider(
+    private val delegate: DateTimeProvider = FakeDateTimeProvider(currentTime = PRIVACY_REPORT_NOTIFICATION_FAKE_NOW)
+) : DateTimeProvider {
+    var callCount = 0
+        private set
+
+    override fun currentLocalDate(): LocalDate = delegate.currentLocalDate().also { callCount++ }
+
+    override fun currentZoneId(): ZoneId = delegate.currentZoneId().also { callCount++ }
+
+    override fun currentTimeMillis(): Long = delegate.currentTimeMillis().also { callCount++ }
 }

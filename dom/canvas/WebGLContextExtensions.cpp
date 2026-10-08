@@ -36,6 +36,7 @@ const char* GetExtensionName(const WebGLExtensionID ext) {
     WEBGL_EXTENSION_IDENTIFIER(EXT_texture_compression_bptc)
     WEBGL_EXTENSION_IDENTIFIER(EXT_texture_compression_rgtc)
     WEBGL_EXTENSION_IDENTIFIER(EXT_texture_filter_anisotropic)
+    WEBGL_EXTENSION_IDENTIFIER(EXT_texture_mirror_clamp_to_edge)
     WEBGL_EXTENSION_IDENTIFIER(EXT_texture_norm16)
     WEBGL_EXTENSION_IDENTIFIER(MOZ_debug)
     WEBGL_EXTENSION_IDENTIFIER(OES_draw_buffers_indexed)
@@ -161,6 +162,9 @@ RefPtr<ClientWebGLExtensionBase> ClientWebGLContext::GetExtension(
           return MakeRefPtr<ClientWebGLExtensionCompressedTextureRGTC>(*this);
         case WebGLExtensionID::EXT_texture_filter_anisotropic:
           return MakeRefPtr<ClientWebGLExtensionTextureFilterAnisotropic>(
+              *this);
+        case WebGLExtensionID::EXT_texture_mirror_clamp_to_edge:
+          return MakeRefPtr<ClientWebGLExtensionTextureMirrorClampToEdge>(
               *this);
         case WebGLExtensionID::EXT_texture_norm16:
           return MakeRefPtr<ClientWebGLExtensionTextureNorm16>(*this);
@@ -301,6 +305,9 @@ bool WebGLContext::IsExtensionSupported(WebGLExtensionID ext) const {
     case WebGLExtensionID::EXT_texture_filter_anisotropic:
       return gl->IsExtensionSupported(
           gl::GLContext::EXT_texture_filter_anisotropic);
+
+    case WebGLExtensionID::EXT_texture_mirror_clamp_to_edge:
+      return gl->IsSupported(gl::GLFeature::texture_mirror_clamp_to_edge);
 
     case WebGLExtensionID::EXT_texture_norm16:
       return WebGLExtensionTextureNorm16::IsSupported(this);
@@ -464,6 +471,9 @@ void WebGLContext::RequestExtension(const WebGLExtensionID ext,
       break;
     case WebGLExtensionID::EXT_texture_filter_anisotropic:
       slot = std::make_unique<WebGLExtensionTextureFilterAnisotropic>(this);
+      break;
+    case WebGLExtensionID::EXT_texture_mirror_clamp_to_edge:
+      slot = std::make_unique<WebGLExtensionTextureMirrorClampToEdge>(this);
       break;
     case WebGLExtensionID::EXT_texture_norm16:
       slot = std::make_unique<WebGLExtensionTextureNorm16>(this);

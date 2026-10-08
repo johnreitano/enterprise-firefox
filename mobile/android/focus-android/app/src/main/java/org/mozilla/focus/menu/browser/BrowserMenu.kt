@@ -4,8 +4,8 @@
 
 package org.mozilla.focus.menu.browser
 
-import android.content.res.Resources
-import android.graphics.Bitmap
+import android.content.Context
+import android.graphics.drawable.Drawable
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import kotlinx.coroutines.flow.Flow
@@ -20,7 +20,7 @@ import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.MenuItemBadge
 import mozilla.components.compose.menu.data.MenuItemsGroup
 import mozilla.components.compose.menu.data.StandardMenuItem
-import mozilla.components.compose.menu.ui.MenuItemIconBitmap
+import mozilla.components.compose.menu.ui.MenuItemIconDrawable
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.compose.menu.ui.MenuItemState
 import mozilla.components.lib.state.ext.flow
@@ -42,9 +42,9 @@ private const val SETTINGS_GROUP_ID = "settings"
 class BrowserMenu(
     private val browserStore: BrowserStore,
     private val appStore: AppStore,
-    resources: Resources,
+    context: Context,
 ) : MenuItems {
-    private val reporterIcon = WebCompatReporterIcon(browserStore, resources) { webCompatReporterAction() }
+    private val reporterIcon = WebCompatReporterIcon(context, browserStore) { webCompatReporterAction() }
 
     override val menuGroups: Flow<List<MenuItemsGroup>> =
         combine(browserStore.flow(), reporterIcon.flow()) { state, icon -> menuGroupsFor(state, icon) }
@@ -54,7 +54,7 @@ class BrowserMenu(
 
     private fun menuGroupsFor(
         browserState: BrowserState,
-        reportSiteIssueIcon: Bitmap?,
+        reportSiteIssueIcon: Drawable?,
     ): List<MenuItemsGroup> {
         val tab = browserState.selectedTab
         val url = tab?.content?.url
@@ -88,7 +88,7 @@ private data class MenuStatus(
     val canAddShortcut: Boolean,
     val canAddToHomeScreen: Boolean,
     val reportSiteIssueTitle: String?,
-    val reportSiteIssueIcon: Bitmap?,
+    val reportSiteIssueIcon: Drawable?,
 )
 
 private fun MenuStatus.toMenuGroups(): List<MenuItemsGroup> =
@@ -189,7 +189,7 @@ private fun MenuStatus.desktopSiteItem(): MenuItem? {
 private fun MenuStatus.reportSiteIssueItem(): MenuItem? = reportSiteIssueTitle?.let { title ->
     StandardMenuItem(
         title = Text.String(title),
-        icon = reportSiteIssueIcon?.let { MenuItemIconBitmap(it) },
+        icon = reportSiteIssueIcon?.let { MenuItemIconDrawable(it) },
         onClickEvent = MenuItemTapped(ToolbarMenu.Item.ReportSiteIssue),
     )
 }

@@ -4,8 +4,8 @@
 
 package org.mozilla.focus.menu.browser
 
-import android.content.res.Resources
-import android.graphics.Bitmap
+import android.content.Context
+import android.graphics.drawable.Drawable
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import kotlinx.coroutines.flow.Flow
@@ -21,7 +21,7 @@ import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.MenuItemBadge
 import mozilla.components.compose.menu.data.MenuItemsGroup
 import mozilla.components.compose.menu.data.StandardMenuItem
-import mozilla.components.compose.menu.ui.MenuItemIconBitmap
+import mozilla.components.compose.menu.ui.MenuItemIconDrawable
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.compose.menu.ui.MenuItemState
 import mozilla.components.lib.state.ext.flow
@@ -40,22 +40,23 @@ private const val CUSTOM_ITEMS_GROUP_ID = "custom_items"
 /**
  * The menu shown while browsing in a custom tab.
  *
+ * @param context [Context] used to know in which size and color to show the icon the WebCompat Reporter extension
+ *   provides.
  * @param browserStore [BrowserStore] used to know the state of the current page.
  * @param customTabId Id of the custom tab this menu is shown for.
  * @param appName Name of this application, shown in the item for opening the current page in it.
  * @param isOnboardingTab Whether this is an onboarding custom tab, from which the current page cannot be opened
  *   somewhere else.
- * @param resources [Resources] used to know in which size to load the icon the WebCompat Reporter extension provides.
  */
 class CustomTabMenu(
+    context: Context,
     private val browserStore: BrowserStore,
     private val customTabId: String,
     private val appName: String,
     private val isOnboardingTab: Boolean,
-    resources: Resources,
 ) : MenuItems {
     private val reporterIcon =
-        WebCompatReporterIcon(browserStore, resources) { webCompatReporterAction(findCustomTab(customTabId)) }
+        WebCompatReporterIcon(context, browserStore) { webCompatReporterAction(findCustomTab(customTabId)) }
 
     /** Attributes the menu to this application, which opened the custom tab of another one. */
     val attribution =
@@ -73,7 +74,7 @@ class CustomTabMenu(
 
     private fun menuGroupsFor(
         browserState: BrowserState,
-        reportSiteIssueIcon: Bitmap?,
+        reportSiteIssueIcon: Drawable?,
     ): List<MenuItemsGroup> {
         val customTab = browserState.findCustomTab(customTabId)
         val reportSiteIssueAction = browserState.webCompatReporterAction(customTab)
@@ -104,7 +105,7 @@ private data class CustomTabMenuStatus(
     val canOpenSomewhereElse: Boolean,
     val appName: String,
     val reportSiteIssueTitle: String?,
-    val reportSiteIssueIcon: Bitmap?,
+    val reportSiteIssueIcon: Drawable?,
     val customItems: List<CustomTabMenuItem>,
 )
 
@@ -178,7 +179,7 @@ private fun CustomTabMenuStatus.desktopSiteItem(): MenuItem? {
 private fun CustomTabMenuStatus.reportSiteIssueItem(): MenuItem? = reportSiteIssueTitle?.let { title ->
     StandardMenuItem(
         title = Text.String(title),
-        icon = reportSiteIssueIcon?.let { MenuItemIconBitmap(it) },
+        icon = reportSiteIssueIcon?.let { MenuItemIconDrawable(it) },
         onClickEvent = MenuItemTapped(ToolbarMenu.CustomTabItem.ReportSiteIssue),
     )
 }

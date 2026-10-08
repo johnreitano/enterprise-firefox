@@ -863,6 +863,13 @@ interface EXT_texture_compression_rgtc {
     const GLenum COMPRESSED_SIGNED_RED_GREEN_RGTC2_EXT = 0x8DBE;
 };
 
+// https://registry.khronos.org/webgl/extensions/EXT_texture_mirror_clamp_to_edge/
+[LegacyNoInterfaceObject,
+ Exposed=(Window,Worker)]
+interface EXT_texture_mirror_clamp_to_edge {
+    const GLenum MIRROR_CLAMP_TO_EDGE_EXT = 0x8743;
+};
+
 // https://www.khronos.org/registry/webgl/extensions/EXT_texture_norm16/
 [LegacyNoInterfaceObject,
  Exposed=(Window,Worker)]

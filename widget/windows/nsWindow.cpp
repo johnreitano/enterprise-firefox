@@ -208,7 +208,7 @@
 #include "InputData.h"
 #include "mozilla/TaskController.h"
 #include "mozilla/gfx/DeviceManagerDx.h"
-#include "mozilla/layers/APZInputBridge.h"
+#include "mozilla/layers/APZBridge.h"
 #include "mozilla/layers/IAPZCTreeManager.h"
 #include "mozilla/layers/InputAPZContext.h"
 #include "mozilla/layers/KnowsCompositor.h"
@@ -897,7 +897,7 @@ void nsWindow::SendAnAPZEvent(InputData& aEvent) {
 
   APZEventResult result;
   if (mAPZC) {
-    result = mAPZC->InputBridge()->ReceiveInputEvent(aEvent);
+    result = mAPZC->Bridge()->ReceiveInputEvent(aEvent);
   }
   if (result.GetStatus() == nsEventStatus_eConsumeNoDefault) {
     return;

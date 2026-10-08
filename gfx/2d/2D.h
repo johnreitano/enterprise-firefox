@@ -340,7 +340,7 @@ class LinearGradientPatternT : public Pattern {
  public:
   /// For constructor parameter description, see member data documentation.
   LinearGradientPatternT(const Point& aBegin, const Point& aEnd,
-                         RefPtr<GradientStops> aStops,
+                         REF<GradientStops> aStops,
                          const Matrix& aMatrix = Matrix())
       : mBegin(aBegin),
         mEnd(aEnd),
@@ -350,7 +350,8 @@ class LinearGradientPatternT : public Pattern {
   PatternType GetType() const override { return PatternType::LINEAR_GRADIENT; }
 
   Pattern* CloneWeak() const override {
-    return new Weak(mBegin, mEnd, do_AddRef(mStops), mMatrix);
+    return new Weak(mBegin, mEnd, ThreadSafeWeakPtr<GradientStops>{mStops},
+                    mMatrix);
   }
 
   bool IsWeak() const override {
@@ -400,7 +401,7 @@ class RadialGradientPatternT : public Pattern {
   /// For constructor parameter description, see member data documentation.
   RadialGradientPatternT(const Point& aCenter1, const Point& aCenter2,
                          Float aRadius1, Float aRadius2,
-                         RefPtr<GradientStops> aStops,
+                         REF<GradientStops> aStops,
                          const Matrix& aMatrix = Matrix())
       : mCenter1(aCenter1),
         mCenter2(aCenter2),
@@ -412,8 +413,8 @@ class RadialGradientPatternT : public Pattern {
   PatternType GetType() const override { return PatternType::RADIAL_GRADIENT; }
 
   Pattern* CloneWeak() const override {
-    return new Weak(mCenter1, mCenter2, mRadius1, mRadius2, do_AddRef(mStops),
-                    mMatrix);
+    return new Weak(mCenter1, mCenter2, mRadius1, mRadius2,
+                    ThreadSafeWeakPtr<GradientStops>{mStops}, mMatrix);
   }
 
   bool IsWeak() const override {
@@ -462,7 +463,7 @@ class ConicGradientPatternT : public Pattern {
  public:
   /// For constructor parameter description, see member data documentation.
   ConicGradientPatternT(const Point& aCenter, Float aAngle, Float aStartOffset,
-                        Float aEndOffset, RefPtr<GradientStops> aStops,
+                        Float aEndOffset, REF<GradientStops> aStops,
                         const Matrix& aMatrix = Matrix())
       : mCenter(aCenter),
         mAngle(aAngle),
@@ -475,7 +476,7 @@ class ConicGradientPatternT : public Pattern {
 
   Pattern* CloneWeak() const override {
     return new Weak(mCenter, mAngle, mStartOffset, mEndOffset,
-                    do_AddRef(mStops), mMatrix);
+                    ThreadSafeWeakPtr<GradientStops>{mStops}, mMatrix);
   }
 
   bool IsWeak() const override {
@@ -523,7 +524,7 @@ class SurfacePatternT : public Pattern {
 
  public:
   /// For constructor parameter description, see member data documentation.
-  SurfacePatternT(RefPtr<SourceSurface> aSourceSurface, ExtendMode aExtendMode,
+  SurfacePatternT(REF<SourceSurface> aSourceSurface, ExtendMode aExtendMode,
                   const Matrix& aMatrix = Matrix(),
                   SamplingFilter aSamplingFilter = SamplingFilter::GOOD,
                   const IntRect& aSamplingRect = IntRect())
@@ -536,8 +537,8 @@ class SurfacePatternT : public Pattern {
   PatternType GetType() const override { return PatternType::SURFACE; }
 
   Pattern* CloneWeak() const override {
-    return new Weak(do_AddRef(mSurface), mExtendMode, mMatrix, mSamplingFilter,
-                    mSamplingRect);
+    return new Weak(ThreadSafeWeakPtr<SourceSurface>{mSurface}, mExtendMode,
+                    mMatrix, mSamplingFilter, mSamplingRect);
   }
 
   bool IsWeak() const override {

@@ -9,8 +9,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import mozilla.components.browser.state.selector.selectedTab
 import mozilla.components.browser.state.state.BrowserState
+import mozilla.components.browser.state.state.SessionState
 import mozilla.components.browser.state.state.TabSessionState
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
@@ -26,6 +26,7 @@ import org.mozilla.fenix.R
 import org.mozilla.fenix.components.menu.MenuFragmentDirections
 import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.store.MenuAction
 import org.mozilla.fenix.nimbus.FxNimbus
 
@@ -36,12 +37,14 @@ import org.mozilla.fenix.nimbus.FxNimbus
  *
  * @param browserStore [BrowserStore] used to know whether the current page can be or already is translated, and to get
  *   the current page to translate.
+ * @param target [MenuTarget] for which this menu item would be shown for.
  * @param translationsSettings [TranslationsEnabledSettings] whether the user turned translations off.
  * @param scope [CoroutineScope] used to keep the item up to date for as long as it can be shown.
  * @param isFeatureEnabled whether the translations feature is enabled.
  */
 class TranslationsMenuItemProvider(
     private val browserStore: BrowserStore,
+    private val target: MenuTarget,
     translationsSettings: TranslationsEnabledSettings,
     scope: CoroutineScope,
     private val isFeatureEnabled: Boolean = FxNimbus.features.translations.value().mainFlowBrowserMenuEnabled,
@@ -63,19 +66,19 @@ class TranslationsMenuItemProvider(
     private fun BrowserState.translationsItem(isEnabled: Boolean): MenuItem? {
         if (!isEnabled || !isFeatureEnabled || translationEngine.isEngineSupported != true) return null
 
-        val selectedTab = selectedTab ?: return null
+        val tab = target.browserSessionFrom(this) ?: return null
 
-        return when (selectedTab.translationsState.isTranslated) {
-            true -> translatedItem(language = translatedLanguage(selectedTab))
+        return when (tab.translationsState.isTranslated) {
+            true -> translatedItem(language = translatedLanguage(tab))
             // Reader view shows a stripped down version of the page and a PDF is not a page at all.
-            else -> translatableItem(canTranslate = !selectedTab.readerState.active && !selectedTab.content.isPdf)
+            else -> translatableItem(canTranslate = !tab.isReaderViewActive() && !tab.content.isPdf)
         }
     }
 
     /** The language the current page was translated to, named the way the user would name it. */
-    private fun BrowserState.translatedLanguage(selectedTab: TabSessionState): String? {
+    private fun BrowserState.translatedLanguage(tab: SessionState): String? {
         val translatedTo =
-            selectedTab.translationsState.translationEngineState?.requestedTranslationPair?.toLanguage ?: return null
+            tab.translationsState.translationEngineState?.requestedTranslationPair?.toLanguage ?: return null
 
         return translationEngine.supportedLanguages?.findLanguage(translatedTo)?.localizedDisplayName
     }
@@ -83,13 +86,13 @@ class TranslationsMenuItemProvider(
     override fun handles(event: MenuEvent) = event == MenuAction.Navigate.Translate
 
     override fun onEvent(event: MenuEvent, menu: MenuHost) {
-        menu.navigate(
-            MenuFragmentDirections.actionMenuFragmentToTranslationsDialogFragment(
-                sessionId = browserStore.state.selectedTabId
-            )
-        )
+        val tabId = target.browserSessionFrom(browserStore.state)?.id ?: return
+
+        menu.navigate(MenuFragmentDirections.actionMenuFragmentToTranslationsDialogFragment(sessionId = tabId))
     }
 }
+
+private fun SessionState.isReaderViewActive() = (this as? TabSessionState)?.readerState?.active == true
 
 private fun translatedItem(language: String?) =
     StandardMenuItem(

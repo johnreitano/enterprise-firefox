@@ -1412,6 +1412,8 @@ sync-syncing-across-devices-heading = You are syncing these items across all you
 
 sync-syncing-across-devices-heading-2 = Data synced across devices
 
+sync-syncing-across-devices-heading-3 = Data syncing on this device
+
 sync-syncing-across-devices-empty-state2 =
     .label = Manage synced data
     .description = You aren’t syncing anything… yet. Start syncing to get all of your data on all your devices.

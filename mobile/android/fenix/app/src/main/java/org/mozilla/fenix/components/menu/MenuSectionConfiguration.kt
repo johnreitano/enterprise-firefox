@@ -13,6 +13,9 @@ sealed interface FenixExpandableMenuItem {
 
 /** All items that can be shown in the menu. */
 sealed interface FenixMenuItem {
+    /** A banner allowing to set this application as the default browser. */
+    data object DefaultBrowserBanner : FenixMenuItem
+
     /** A menu item allowing to customize the reader view. */
     data object CustomizeReaderView : FenixMenuItem
 

@@ -23,6 +23,7 @@ const lazy = XPCOMUtils.declareLazy({
 
 class TabGroupsList extends MozLitElement {
   static properties = {
+    rowRole: { type: String, attribute: "row-role" },
     _openGroups: { type: Array, state: true },
     _savedGroups: { type: Array, state: true },
     _defaultGroupName: { type: String, state: true },
@@ -30,6 +31,7 @@ class TabGroupsList extends MozLitElement {
 
   constructor() {
     super();
+    this.rowRole = "";
     this._openGroups = [];
     this._savedGroups = [];
     this._defaultGroupName = "";
@@ -100,6 +102,7 @@ class TabGroupsList extends MozLitElement {
     return html`
       <button
         class="tab-group-row subviewbutton"
+        role=${this.rowRole || nothing}
         data-tab-group-id=${group.id}
         ?data-saved=${!isOpen}
         data-l10n-id=${!isOpen ? "tab-group-menu-closed-tab-group" : nothing}

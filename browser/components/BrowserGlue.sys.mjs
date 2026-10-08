@@ -1655,7 +1655,10 @@ BrowserGlue.prototype = {
     try {
       const win = browser.documentGlobal;
       const shellService = win.getShellService();
-      const isNowDefault = shellService.isDefaultBrowser(false, false);
+      const isNowDefault = await shellService.isDefaultBrowserAsync(
+        false,
+        false
+      );
       const resultEnum =
         (isNowDefault ? 0 : 1) * 2 +
         (shellService.shouldCheckDefaultBrowser ? 1 : 0);

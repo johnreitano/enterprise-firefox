@@ -57,6 +57,7 @@ const SIMPLETEST_OVERRIDES = [
   "info",
   "expectAssertions",
   "requestCompleteLog",
+  "registerCleanupFunction",
 ];
 
 // An uncaught error with one of these names, from any process, fails the

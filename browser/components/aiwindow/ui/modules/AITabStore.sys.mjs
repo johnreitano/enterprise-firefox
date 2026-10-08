@@ -21,6 +21,7 @@ import {
   GET_AITAB_PAGES_BY_CONV_ID,
   DELETE_AITAB_PAGES_BY_SLUG,
   SLUG_EXISTS,
+  DELETE_AITAB_VERSIONS_BEFORE,
 } from "moz-src:///browser/components/aiwindow/ui/modules/AITabSql.sys.mjs";
 import { SQLiteStoreBase } from "moz-src:///browser/components/aiwindow/ui/modules/SQLiteStoreBase.sys.mjs";
 import {
@@ -78,7 +79,7 @@ class AITabStore extends SQLiteStoreBase {
    * titles, which repeat, so this is the layer that settles who holds one.
    *
    * @param {object} page - Page fields: convId, slug, title, and optional
-   *   context, components, localState
+   *   toolConvId, context, components, localState
    * @returns {Promise<object>} The persisted page (with the slug it was
    *   stored under, plus generated uuid, version, and timestamps)
    */
@@ -92,7 +93,7 @@ class AITabStore extends SQLiteStoreBase {
    * existing version (use create instead).
    *
    * @param {object} page - Page fields: convId, slug, title, and optional
-   *   context, components, localState
+   *   toolConvId, context, components, localState
    * @returns {Promise<object>} The newly persisted version
    */
   async edit(page) {
@@ -172,17 +173,37 @@ class AITabStore extends SQLiteStoreBase {
   }
 
   /**
+   * Deletes every version of the tab with the given slug older than
+   * `version`, leaving that one as the only version of the page.
+   *
+   * The version numbers of the rows that remain are untouched, so the next
+   * write still lands above them: this prunes history without resetting it.
+   *
+   * @param {string} slug
+   * @param {number} version - The version to keep.
+   */
+  async deleteVersionsBefore(slug, version) {
+    await this.#ensureConnection();
+
+    await this.connection.execute(DELETE_AITAB_VERSIONS_BEFORE, {
+      slug,
+      version,
+    });
+  }
+
+  /**
    * Deletes every version of the tab with the given slug.
    *
    * Keyed on slug rather than conv_id to use the (slug, version) index. The
    * UNIQUE constraint on that index means a slug belongs to exactly one
    * conversation, so this cannot reach another tab's rows.
    *
-   * The conversation lives in a different database file, so nothing cascades
-   * from here: callers must also delete it through
-   * `ConversationStore.deleteConversationById`. Delete the pages first — a
-   * conversation left without pages is invisible, whereas pages left without
-   * a conversation still load by slug.
+   * The conversation each row names in `tool_conv_id` lives in a different
+   * database file, so nothing cascades from here: callers must also delete it
+   * through `ConversationStore.deleteConversationById`, using an id read off
+   * the page before this call takes the row that carries it. Delete the pages
+   * first — a conversation left without pages is unreachable, whereas pages
+   * left without a conversation still load by slug.
    *
    * @param {string} slug
    */
@@ -202,6 +223,7 @@ class AITabStore extends SQLiteStoreBase {
     return {
       uuid: row.getResultByName("uuid"),
       convId: row.getResultByName("conv_id"),
+      toolConvId: row.getResultByName("tool_conv_id"),
       slug: row.getResultByName("slug"),
       version: row.getResultByName("version"),
       title: row.getResultByName("title"),
@@ -226,6 +248,9 @@ class AITabStore extends SQLiteStoreBase {
    *
    * @param {object} page
    * @param {string} page.convId - Conversation id the page belongs to
+   * @param {?string} [page.toolConvId] - Id of the conversation the page was
+   *   composed in, in the ConversationStore. Null when it is not known, which
+   *   is the case for every page stored before the column existed.
    * @param {string} page.slug - Opaque URL token supplied by the caller
    * @param {string} page.title - Human-readable title of the page
    * @param {*} [page.context] - Context describing how the page was created
@@ -239,6 +264,7 @@ class AITabStore extends SQLiteStoreBase {
   async #insertNextVersion(
     {
       convId,
+      toolConvId = null,
       slug,
       title,
       context = null,
@@ -278,6 +304,7 @@ class AITabStore extends SQLiteStoreBase {
         await this.connection.executeCached(AITAB_PAGE_INSERT, {
           uuid,
           conv_id: convId,
+          tool_conv_id: toolConvId,
           slug: storedSlug,
           version,
           title,
@@ -300,6 +327,7 @@ class AITabStore extends SQLiteStoreBase {
     return {
       uuid,
       convId,
+      toolConvId,
       slug: storedSlug,
       version,
       title,

@@ -1319,10 +1319,26 @@ browsertime-webcodecs:
     description: Raptor (browsertime) WebCodecs test
     mozharness:
         extra-options:
-            - --extra-profiler-run
+            by-app:
+                firefox:
+                    - --extra-profiler-run
+                default:
+                    by-test-platform:
+                        # Chrome's out-of-process video capture service crashes on Windows when capturing
+                        # from the fake camera, so run it in the browser process there.
+                        windows.*:
+                            - --extra-profiler-run
+                            - --browsertime-arg=chrome.args=--enable-features=RunVideoCaptureServiceInBrowserProcess
+                        default:
+                            - --extra-profiler-run
     run-on-projects:
         by-app:
-            firefox: [autoland, mozilla-central]
+            firefox:
+                by-test-platform:
+                    linux.*shippable.*: [autoland, mozilla-central]
+                    windows.*shippable.*: [autoland, mozilla-central]
+                    macosx1470.*shippable.*: [autoland, mozilla-central]
+                    default: []
             default: []
     tier:
         by-app:

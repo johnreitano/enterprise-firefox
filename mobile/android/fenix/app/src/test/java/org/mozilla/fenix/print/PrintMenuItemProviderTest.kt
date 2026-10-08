@@ -20,6 +20,7 @@ import mozilla.components.feature.session.SessionUseCases
 import mozilla.components.ui.icons.R as iconsR
 import org.junit.Test
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -65,13 +66,18 @@ class PrintMenuItemProviderTest {
         assertFalse(provider.handles(MenuAction.SaveAsPdfRequested))
     }
 
-    private fun createProvider(isAndroidAutomotiveAvailable: Boolean) =
+    private fun singleTabStore() =
+        BrowserStore(BrowserState(tabs = listOf(createTab("https://mozilla.org", id = TAB_ID)), selectedTabId = TAB_ID))
+
+    private fun createProvider(
+        isAndroidAutomotiveAvailable: Boolean,
+        browserStore: BrowserStore = singleTabStore(),
+        target: MenuTarget = MenuTarget.BrowserTab,
+    ) =
         PrintMenuItemProvider(
             isAndroidAutomotiveAvailable = isAndroidAutomotiveAvailable,
-            browserStore =
-                BrowserStore(
-                    BrowserState(tabs = listOf(createTab("https://mozilla.org", id = TAB_ID)), selectedTabId = TAB_ID)
-                ),
+            browserStore = browserStore,
+            target = target,
             printContent = printContent,
         )
 

@@ -91,6 +91,14 @@ sealed class AppAction : Action {
 
     data class TopSitesChange(val topSites: List<TopSite>) : AppAction()
 
+    /**
+     * Action dispatched when the user has removed a top site.
+     *
+     * @property topSite The [TopSite] that was removed.
+     * @property shouldBlock Whether to add the top site to the blocklist.
+     */
+    data class RemoveTopSite(val topSite: TopSite, val shouldBlock: Boolean) : AppAction()
+
     data class RecentTabsChange(val recentTabs: List<RecentTab>) : AppAction()
 
     data class RemoveRecentTab(val recentTab: RecentTab) : AppAction()

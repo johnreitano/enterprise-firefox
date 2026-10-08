@@ -44,6 +44,7 @@ import org.mozilla.fenix.R
 import org.mozilla.fenix.components.AppStore
 import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.store.MenuAction
 import org.mozilla.fenix.components.usecases.FenixBrowserUseCases
 import org.mozilla.fenix.settings.SupportUtils.AMO_HOMEPAGE_FOR_ANDROID
@@ -57,6 +58,7 @@ private const val EXTENSION_ACTION_ICON_SIZE_DP = 24
  * @param context Application scoped [Context] needed for various system interactions. Must not be tied to a screen, as
  *   this provider can outlive the menu it was built for, see [applicationScope].
  * @param browserStore [BrowserStore] used to know what the extensions show for the current page.
+ * @param target [MenuTarget] for which this menu item would be shown for.
  * @param addonManager [AddonManager] used to query the extensions.
  * @param viewLifecycleScope [CoroutineScope] tied to the lifetime of the menu, on which to observe the extensions
  *   details.
@@ -68,6 +70,7 @@ private const val EXTENSION_ACTION_ICON_SIZE_DP = 24
 class ExtensionsMenuItemProvider(
     private val context: Context,
     private val browserStore: BrowserStore,
+    private val target: MenuTarget,
     private val addonManager: AddonManager,
     viewLifecycleScope: CoroutineScope,
     applicationScope: CoroutineScope,
@@ -85,7 +88,7 @@ class ExtensionsMenuItemProvider(
             ExtensionsStatus(
                 isProcessDisabled = browserStore.state.extensionsProcessDisabled,
                 hasInstalledExtensions = browserStore.state.extensions.values.any { !it.isBuiltIn },
-                actions = browserStore.state.webExtensionMenuActionsWithoutIcons(customTabId = null),
+                actions = browserStore.state.webExtensionMenuActionsWithoutIcons { target.browserSessionFrom(this) },
             )
         )
 
@@ -110,10 +113,9 @@ class ExtensionsMenuItemProvider(
 
     /** What each extension shows for the current page is what the user gets to interact with from this menu. */
     private suspend fun observeExtensionActions() {
-        browserStore.stateFlow.webExtensionMenuActions(customTabId = null, iconSize = actionIconSize).collect { actions
-            ->
-            extensions.update { it.copy(actions = actions) }
-        }
+        browserStore.stateFlow
+            .webExtensionMenuActions(iconSize = actionIconSize) { target.browserSessionFrom(this) }
+            .collect { actions -> extensions.update { it.copy(actions = actions) } }
     }
 
     private suspend fun resolveExtensions() {
@@ -213,7 +215,9 @@ class ExtensionsMenuItemProvider(
             browserStore.state.findWebExtensionMenuAction(
                 extensionId = event.extensionId,
                 isPageAction = event.isPageAction,
-            ) ?: return
+            ) {
+                target.browserSessionFrom(this)
+            } ?: return
 
         menu.dismiss()
         extensionAction.onClick()

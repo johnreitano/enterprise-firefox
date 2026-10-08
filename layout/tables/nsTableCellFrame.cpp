@@ -676,7 +676,7 @@ static nscoord CalcUnpaginatedBSize(nsTableCellFrame& aCellFrame,
   computedBSize -= aBlockDirBorderPadding;
   uint32_t rowX;
   for (row = firstRGInFlow->GetFirstRow(), rowX = 0; row;
-       row = row->GetNextRow(), rowX++) {
+       row = row->GetNextRowAcrossFragments(), rowX++) {
     if (rowX > rowIndex + rowSpan - 1) {
       break;
     } else if (rowX >= rowIndex) {

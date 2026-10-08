@@ -377,6 +377,7 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
                     container = binding.browserLayout,
                     browserStore = context.components.core.store,
                     listenStore = context.components.listenToPage.store,
+                    engineView = binding.engineView,
                     isAddressBarAtBottom = settings.toolbarPosition == ToolbarPosition.BOTTOM,
                     onListenClicked = {
                         context.components.core.store.state.selectedTab?.let { tab ->

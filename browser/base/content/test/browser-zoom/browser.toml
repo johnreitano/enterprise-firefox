@@ -36,9 +36,6 @@ https_first_disabled = true
 ["browser_sitespecific_video_zoom.js"]
 https_first_disabled = true
 support-files = ["../browser-general/video.webm"]
-skip-if = [
-  "os == 'win' && debug", # Bug 1315042
-]
 
 ["browser_subframe_textzoom.js"]
 
@@ -46,8 +43,6 @@ skip-if = [
 https_first_disabled = true
 skip-if = [
   "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland' && debug", # Bug 1652383
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && debug", # Bug 1652383
-  "os == 'win' && opt", # Bug 1652383
 ]
 
 ["browser_tooltip_zoom.js"]

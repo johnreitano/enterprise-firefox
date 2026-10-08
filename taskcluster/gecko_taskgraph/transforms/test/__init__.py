@@ -240,6 +240,9 @@ class TestDescriptionSchema(Schema, kw_only=True):
     # The different configurations that should be run against this task, defined
     # in the TEST_VARIANTS object in the variant.py transforms.
     variants: TOptional[list[str]] = None
+    # Keep variants in the treeherder group and put their suffix on the symbol
+    # instead of on the group name.
+    treeherder_group_variants: TOptional[bool] = None
     # Whether to run this task without any variants applied.
     run_without_variant: optionally_keyed_by("test-platform", bool, use_msgspec=True)  # type: ignore
     # The EC2 instance size to run these tests on.

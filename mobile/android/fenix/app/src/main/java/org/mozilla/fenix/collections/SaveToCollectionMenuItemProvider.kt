@@ -6,7 +6,6 @@ package org.mozilla.fenix.collections
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import mozilla.components.browser.state.selector.selectedTab
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
@@ -19,6 +18,7 @@ import org.mozilla.fenix.R
 import org.mozilla.fenix.components.TabCollectionStorage
 import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.store.MenuAction
 import org.mozilla.fenix.utils.Settings
 
@@ -28,11 +28,13 @@ import org.mozilla.fenix.utils.Settings
  * @param settings [Settings] used to check whether the collections feature is enabled or not.
  * @param tabCollectionStorage [TabCollectionStorage] allowing to check what collections currently exist.
  * @param browserStore [BrowserStore] used to get the current tab to add to a collection.
+ * @param target [MenuTarget] for which this menu item would be shown for.
  */
 class SaveToCollectionMenuItemProvider(
     settings: Settings,
     tabCollectionStorage: TabCollectionStorage,
     private val browserStore: BrowserStore,
+    private val target: MenuTarget,
 ) : MenuItemProvider {
     override val itemFlow: StateFlow<MenuItem?> =
         MutableStateFlow(
@@ -54,7 +56,7 @@ class SaveToCollectionMenuItemProvider(
 
     override fun onEvent(event: MenuEvent, menu: MenuHost) {
         if (event !is MenuAction.Navigate.SaveToCollection) return
-        val tabId = browserStore.state.selectedTab?.id ?: return
+        val tabId = target.browserSessionFrom(browserStore.state)?.id ?: return
 
         menu.navigate(
             NavGraphDirections.actionGlobalCollectionCreationFragment(

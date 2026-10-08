@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { html, ifDefined } from "./vendor/lit.all.mjs";
-import { MozLitElement } from "./lit-utils.mjs";
+import { MozLitElement, hasModifierKey } from "./lit-utils.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://global/content/elements/moz-fieldset.mjs";
 
@@ -215,6 +215,9 @@ export class SelectControlBaseElement extends MozLitElement {
       // Ignore events from nested controls.
       return;
     }
+    if (hasModifierKey(event)) {
+      return;
+    }
     let directions = this.getNavigationDirections();
     switch (event.key) {
       case "Down":
@@ -241,13 +244,6 @@ export class SelectControlBaseElement extends MozLitElement {
       return NAVIGATION_DIRECTIONS.RTL;
     }
     return NAVIGATION_DIRECTIONS.LTR;
-  }
-
-  get isDocumentRTL() {
-    if (typeof Services !== "undefined") {
-      return Services.locale.isAppLocaleRTL;
-    }
-    return document.dir === "rtl";
   }
 
   navigate(direction) {

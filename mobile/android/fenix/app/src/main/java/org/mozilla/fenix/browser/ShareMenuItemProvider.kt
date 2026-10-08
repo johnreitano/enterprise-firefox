@@ -7,7 +7,6 @@ package org.mozilla.fenix.browser
 import androidx.navigation.NavDirections
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import mozilla.components.browser.state.selector.selectedTab
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
@@ -20,6 +19,7 @@ import org.mozilla.fenix.NavGraphDirections
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.middleware.getTabUrl
 import org.mozilla.fenix.components.menu.store.MenuAction
 import org.mozilla.fenix.components.share.ShareSource
@@ -29,10 +29,12 @@ import org.mozilla.fenix.components.usecases.ShareUseCases
  * [MenuItemProvider] for the menu item allowing to share the current page.
  *
  * @param browserStore [BrowserStore] used to get the current page.
+ * @param target [MenuTarget] for which this menu item would be shown for.
  * @param shareUseCases [ShareUseCases] for sharing the current page.
  */
 class ShareMenuItemProvider(
     private val browserStore: BrowserStore,
+    private val target: MenuTarget,
     private val shareUseCases: ShareUseCases,
 ) : MenuItemProvider {
     override val itemFlow: StateFlow<MenuItem?> =
@@ -51,7 +53,7 @@ class ShareMenuItemProvider(
      * menu is replaced with the screen for sharing it, which [ShareUseCases.shareUrl] asks for before returning.
      */
     override fun onEvent(event: MenuEvent, menu: MenuHost) {
-        val tab = browserStore.state.selectedTab ?: return
+        val tab = target.browserSessionFrom(browserStore.state) ?: return
         val url = tab.getTabUrl()
         val shareData = ShareData(title = tab.content.title, url = url, private = tab.content.private)
 

@@ -18,7 +18,8 @@ geckoview-junit:
         - geckoview-isolated-process
         - geckoview-isolated-process+no-fission
         - geckoview-zygote
-    treeherder-symbol: gv-junit
+    treeherder-symbol: gv-junit()
+    treeherder-group-variants: true
     loopback-video: true
     target: geckoview-androidTest.apk
     max-run-time:

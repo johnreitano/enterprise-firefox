@@ -212,6 +212,16 @@ export var TelemetryEnvironment = {
     gActiveExperimentStartupBuffer = new Map();
     return getGlobal();
   },
+
+  /**
+   * Intended for use in tests only.
+   *
+   * Returns the Promise for the most recent default-browser check.
+   *
+   */
+  testIsDefaultBrowser() {
+    return getGlobal()._isDefaultBrowserPromise;
+  },
 };
 
 const RECORD_PREF_STATE = TelemetryEnvironment.RECORD_PREF_STATE;
@@ -569,6 +579,10 @@ function EnvironmentCache() {
   // To guard against slowing down startup, defer gathering heavy environment
   // entries until the session is restored.
   this._sessionWasRestored = false;
+
+  // Set when a default-browser check starts after session restore, allowing
+  // tests to await its completion.
+  this._isDefaultBrowserPromise = null;
 
   // A map of listeners that will be called on environment changes.
   this._changeListeners = new Map();
@@ -1220,8 +1234,9 @@ EnvironmentCache.prototype = {
     // Make sure to have a settings section.
     this._currentEnvironment.settings = this._currentEnvironment.settings || {};
 
+    this._isDefaultBrowserPromise = this._isDefaultBrowser();
     this._currentEnvironment.settings.isDefaultBrowser =
-      await this._isDefaultBrowser();
+      await this._isDefaultBrowserPromise;
 
     Glean.browser.defaultAtLaunch.set(
       this._currentEnvironment.settings.isDefaultBrowser

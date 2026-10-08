@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/// <reference path="./panel-list.tagmap.d.ts" />
+
 import { checkAccessKeys } from "chrome://global/content/elements/accesskey-check.mjs";
 import { assignAutoAccessKeys } from "chrome://global/content/elements/auto-accesskey.mjs";
 
@@ -234,6 +236,8 @@ export class PanelList extends HTMLElement {
     return typeof Services !== "undefined";
   }
 
+  // FIXME: Use the MozLitElement isDocumentRTL getter in lit-utils.mjs once
+  // panel-list is a Lit element.
   isDocumentRTL() {
     if (this.hasServices()) {
       return Services.locale.isAppLocaleRTL;
@@ -575,24 +579,19 @@ export class PanelList extends HTMLElement {
           break;
         } else if (e.key === "Escape") {
           this.hide(undefined, { force: true });
-        } else if (!e.metaKey && !e.ctrlKey && !e.altKey) {
-          // Check if any of the children have an accesskey for this letter.
-          let item = this.querySelector(
-            `[accesskey="${e.key.toLowerCase()}"],
-              [accesskey="${e.key.toUpperCase()}"]`
-          );
-          if (item) {
-            // Prevent the host from receiving input events for this keypress.
-            e.preventDefault();
-            item.click();
-          } else if (this.#selectByFirstLetter(e.key)) {
-            e.preventDefault();
-            // The listener is registered on both this element and the
-            // document, and an outer list holding a submenu gets the event
-            // too, so a selection that leaves the panel open would otherwise
-            // advance once per listener.
-            e.stopPropagation();
-          }
+        } else if (
+          !e.metaKey &&
+          !e.ctrlKey &&
+          !e.altKey &&
+          this.#selectByKey(e.key)
+        ) {
+          // Prevent the host from receiving input events for this keypress.
+          e.preventDefault();
+          // The listener is registered on both this element and the
+          // document, and an outer list holding a submenu gets the event
+          // too, so a selection that leaves the panel open would otherwise
+          // advance once per listener.
+          e.stopPropagation();
         }
         break;
       case "focusin":
@@ -614,26 +613,29 @@ export class PanelList extends HTMLElement {
   }
 
   /**
-   * Selects the item whose label starts with a letter, among the items that
-   * carry no accesskey of their own. A `menupopup` selects its items this way,
-   * and a menu listing names a user chose - a container, a bookmark - can only
-   * be reached by keyboard this way, having no message to take an accesskey
-   * from.
+   * Selects the visible, enabled item with the pressed key as its accesskey,
+   * or else the item whose label starts with that letter, among the items that
+   * carry no accesskey of their own. When one item matches, it is activated;
+   * when several do, each press moves to the next one without activating it,
+   * as in a `menupopup`. A menu listing names a user chose - a container, a
+   * bookmark - can only be reached by keyboard through first letters, having
+   * no message to take an accesskey from.
    *
-   * Stands aside while an editable field outside the panel has focus. A
-   * panel-list that stays open over a focused field, as the Smartbar's mention
-   * panel does, filters itself from what the field receives, so the keystroke
-   * belongs to the field. Any other focus outside the panel, such as the
-   * anchor button or the document body after a XUL panel took focus on a
-   * mouse open, does not claim the letter. With focus outside every list, an
-   * open submenu takes the letter and its outer list stands aside.
+   * First letters stand aside while an editable field outside the panel has
+   * focus. A panel-list that stays open over a focused field, as the
+   * Smartbar's mention panel does, filters itself from what the field
+   * receives, so the keystroke belongs to the field. Any other focus outside
+   * the panel, such as the anchor button or the document body after a XUL
+   * panel took focus on a mouse open, does not claim the letter. With focus
+   * outside every list, an open submenu takes the key and its outer list
+   * stands aside.
    *
    * @param {string} key
    *   The pressed key.
    * @returns {boolean}
    *   Whether an item was activated or selected.
    */
-  #selectByFirstLetter(key) {
+  #selectByKey(key) {
     if (key.length != 1) {
       return false;
     }
@@ -648,37 +650,42 @@ export class PanelList extends HTMLElement {
       chain.push(el);
     }
     let focused = chain.find(el => this.contains(el));
-    if (!focused) {
-      let deepest = chain.at(-1);
-      if (
-        deepest?.isContentEditable ||
-        ["input", "textarea", "select"].includes(deepest?.localName)
-      ) {
-        return false;
-      }
-      // Both this list and its open submenu hear the keystroke through their
-      // document listeners.
-      if (
-        [...this.querySelectorAll("panel-item[submenu]")].some(
-          item => item.submenuPanel?.open
-        )
-      ) {
-        return false;
-      }
+    // Both this list and its open submenu hear the keystroke through their
+    // document listeners.
+    if (
+      !focused &&
+      [...this.querySelectorAll("panel-item[submenu]")].some(
+        item => item.submenuPanel?.open
+      )
+    ) {
+      return false;
     }
     let letter = key.toLowerCase();
-    // TODO(bug 2076174): Match the first character in the label that a key
-    // press can type.
-    let startsWithLetter = item =>
-      !item.hasAttribute("accesskey") &&
-      (item.label?.textContent ?? item.textContent)
-        .trim()
-        .charAt(0)
-        .toLowerCase() === letter;
     let items = [
       ...this.querySelectorAll("panel-item:not([hidden]):not([disabled])"),
     ];
-    let matches = items.filter(startsWithLetter);
+    let isMatch = item =>
+      item.getAttribute("accesskey")?.toLowerCase() === letter;
+    let matches = items.filter(isMatch);
+    if (!matches.length) {
+      let deepest = chain.at(-1);
+      if (
+        !focused &&
+        (deepest?.isContentEditable ||
+          ["input", "textarea", "select"].includes(deepest?.localName))
+      ) {
+        return false;
+      }
+      // TODO(bug 2076174): Match the first character in the label that a key
+      // press can type.
+      isMatch = item =>
+        !item.hasAttribute("accesskey") &&
+        (item.label?.textContent ?? item.textContent)
+          .trim()
+          .charAt(0)
+          .toLowerCase() === letter;
+      matches = items.filter(isMatch);
+    }
     if (!matches.length) {
       return false;
     }
@@ -686,11 +693,11 @@ export class PanelList extends HTMLElement {
       matches[0].click();
       return true;
     }
-    // Several items share the letter, so move to the next one after the
-    // focused item without activating it, wrapping around.
+    // Several items share the key, so move to the next one after the focused
+    // item without activating it, wrapping around.
     let after =
       items.findIndex(item => item == focused || item.contains(focused)) + 1;
-    let match = items.slice(after).find(startsWithLetter) ?? matches[0];
+    let match = items.slice(after).find(isMatch) ?? matches[0];
     match.focus();
     // Arrow navigation resumes from wherever the walker last stopped.
     this.focusWalker.currentNode = match;

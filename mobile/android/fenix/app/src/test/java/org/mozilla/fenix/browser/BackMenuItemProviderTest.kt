@@ -25,6 +25,7 @@ import mozilla.components.ui.icons.R as iconsR
 import org.junit.Test
 import org.mozilla.fenix.NavGraphDirections
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -116,8 +117,11 @@ class BackMenuItemProviderTest {
         assertFalse(provider.handles(MenuAction.Navigate.Settings))
     }
 
-    private fun createProvider(browserStore: BrowserStore, scope: CoroutineScope) =
-        BackMenuItemProvider(browserStore = browserStore, goBack = goBack, scope = scope)
+    private fun createProvider(
+        browserStore: BrowserStore,
+        scope: CoroutineScope,
+        target: MenuTarget = MenuTarget.BrowserTab,
+    ) = BackMenuItemProvider(browserStore = browserStore, target = target, goBack = goBack, scope = scope)
 
     private fun browserStore(canGoBack: Boolean) =
         BrowserStore(

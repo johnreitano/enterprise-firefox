@@ -31,10 +31,6 @@ support-files = [
 ["test_conformance__glsl__functions__glsl-function-atan-xy.html"]
 
 ["test_conformance__glsl__functions__glsl-function-atan.html"]
-skip-if = [
-  "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland'",
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11'",
-]
 
 ["test_conformance__glsl__functions__glsl-function-ceil.html"]
 

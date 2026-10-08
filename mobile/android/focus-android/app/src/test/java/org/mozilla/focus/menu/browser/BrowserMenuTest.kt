@@ -5,6 +5,7 @@
 package org.mozilla.focus.menu.browser
 
 import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
@@ -18,7 +19,8 @@ import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.MenuItemsGroup
-import mozilla.components.compose.menu.ui.MenuItemIconBitmap
+import mozilla.components.compose.menu.ui.MenuItemIcon
+import mozilla.components.compose.menu.ui.MenuItemIconDrawable
 import mozilla.components.compose.menu.ui.MenuItemState
 import mozilla.components.concept.engine.webextension.Action
 import mozilla.components.feature.top.sites.TopSite
@@ -188,9 +190,9 @@ class BrowserMenuTest {
 
     @Test
     fun `GIVEN the reporter starts up while the menu is shown THEN load its icon once it is available`() = runTest {
-        val icon: Bitmap = mock()
+        val icon = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
         val store = BrowserStore(browserState)
-        val menu = BrowserMenu(store, AppStore(appState), testContext.resources)
+        val menu = BrowserMenu(store, AppStore(appState), testContext)
         var groups = emptyList<MenuItemsGroup>()
         backgroundScope.launch { menu.menuGroups.collect { groups = it } }
         runCurrent()
@@ -200,7 +202,7 @@ class BrowserMenuTest {
         store.dispatch(WebExtensionAction.InstallWebExtensionAction(loadable))
         runCurrent()
 
-        assertEquals(MenuItemIconBitmap(icon), groups.flatMap { it.items }.item(Item.ReportSiteIssue).icon)
+        assertEquals(icon, groups.flatMap { it.items }.item(Item.ReportSiteIssue).icon.bitmap)
     }
 
     @Test
@@ -225,6 +227,9 @@ class BrowserMenuTest {
 
     private fun menu(state: BrowserState = browserState, appState: AppState = this.appState) =
         BrowserMenu(BrowserStore(state), AppStore(appState), mock())
+
+    private val MenuItemIcon?.bitmap
+        get() = ((this as MenuItemIconDrawable).icon as BitmapDrawable).bitmap
 
     private fun List<MenuItem>.item(item: Item) = single { it.onClickEvent == MenuItemTapped(item) }
 

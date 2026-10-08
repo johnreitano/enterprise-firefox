@@ -11,9 +11,6 @@ prefs = [
 ]
 
 ["browser_action_searchengine.js"]
-skip-if = [
-  "os == 'win' && asan", # Bug 1834810
-]
 
 ["browser_action_searchengine_alias.js"]
 

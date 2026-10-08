@@ -25,6 +25,7 @@ import mozilla.components.feature.session.SessionUseCases
 import mozilla.components.ui.icons.R as iconsR
 import org.junit.Test
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -140,9 +141,13 @@ class RefreshMenuItemProviderTest {
         assertFalse(provider.handles(MenuAction.Navigate.Settings))
     }
 
-    private fun TestScope.provider(browserStore: BrowserStore) =
+    private fun TestScope.provider(
+        browserStore: BrowserStore,
+        target: MenuTarget = MenuTarget.BrowserTab,
+    ) =
         RefreshMenuItemProvider(
             browserStore = browserStore,
+            target = target,
             reload = reload,
             stopLoading = stopLoading,
             scope = backgroundScope,

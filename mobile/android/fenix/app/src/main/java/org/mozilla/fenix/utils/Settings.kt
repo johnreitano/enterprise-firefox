@@ -2625,13 +2625,6 @@ class Settings(
             default = { FxNimbus.features.adsClientForStories.value().enabled },
         )
 
-    /** Indicates if Add Shortcuts improvement is enabled. */
-    var enableAddShortcutsImprovement by
-        booleanPreference(
-            key = appContext.getPreferenceKey(R.string.pref_key_enable_add_shortcuts_improvement),
-            default = { FxNimbus.features.addShortcutsImprovement.value().enabled },
-        )
-
     /** Indicates if more shortcuts should be shown. */
     var showMoreShortcuts by
         booleanPreference(
@@ -3331,7 +3324,7 @@ class Settings(
     var nativeShareSheetEnabled by
         booleanPreference(
             key = appContext.getPreferenceKey(R.string.pref_key_native_share_sheet),
-            default = { FxNimbus.features.nativeShareSheet.value().enabled },
+            default = true,
         )
 
     var googleLensIntegrationEnabled by

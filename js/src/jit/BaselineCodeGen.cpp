@@ -5552,10 +5552,9 @@ bool BaselineCodeGen<Handler>::emitReturn() {
     }
   }
 
-  // Only emit the jump if this JSOp::RetRval is not the last instruction.
-  // Not needed for last instruction, because last instruction flows
-  // into return label.
-  if (!handler.isDefinitelyLastOp()) {
+  // Only emit the jump if this is not the last reachable instruction, which
+  // flows into the return label.
+  if (!handler.isLastReachableOp()) {
     masm.jump(&return_);
   }
 

@@ -212,6 +212,53 @@ describe("<CardSections />", () => {
     expect(container.querySelector(".ds-card.placeholder")).toBeInTheDocument();
   });
 
+  // @experiment(remove) { bug 2078816 }
+  it.each([
+    ["crossword", ".crossword"],
+    ["pictureOfTheDay", ".picture-of-the-day"],
+  ])("should render %s large in its tile", (widgetId, selector) => {
+    const state = {
+      ...INITIAL_STATE,
+      Prefs: {
+        ...INITIAL_STATE.Prefs,
+        values: {
+          ...INITIAL_STATE.Prefs.values,
+          "nova.enabled": true,
+          "feeds.section.topstories": true,
+          "feeds.system.topstories": true,
+          "pageLayouts.variant": "widget-first-content-slot",
+          "pageLayouts.widgetFirstContentSlot.widget": widgetId,
+          "widgets.enabled": true,
+          [`widgets.system.${widgetId}.enabled`]: true,
+          [`widgets.${widgetId}.enabled`]: true,
+        },
+      },
+    };
+    const { container } = renderCardSections(
+      {
+        data: {
+          ...DEFAULT_PROPS.data,
+          sections: [
+            {
+              ...DEFAULT_PROPS.data.sections[0],
+              data: [
+                { type: "widget", widgetId },
+                ...DEFAULT_PROPS.data.sections[0].data,
+              ],
+            },
+          ],
+        },
+      },
+      state
+    );
+    const cell = container.querySelector(".section-widget");
+    expect(cell.className).toContain("col-1-large col-1-position-0");
+    expect(cell.querySelector(`${selector}.large-widget`)).toBeInTheDocument();
+    expect(container.querySelector("article.ds-card").className).toContain(
+      "col-1-position-2"
+    );
+  });
+
   it("should pass correct props to DSCard", () => {
     const { container } = renderCardSections();
     const firstCard = container.querySelector("article.ds-card");

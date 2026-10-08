@@ -5285,7 +5285,7 @@ bool ContentParent::DeallocPWebrtcGlobalParent(PWebrtcGlobalParent* aActor) {
 }
 #endif
 
-PContentPermissionRequestParent*
+already_AddRefed<PContentPermissionRequestParent>
 ContentParent::AllocPContentPermissionRequestParent(
     const nsTArray<PermissionRequest>& aRequests, nsIPrincipal* aPrincipal,
     nsIPrincipal* aTopLevelPrincipal, const bool& aIsHandlingUserInput,
@@ -5301,10 +5301,9 @@ ContentParent::AllocPContentPermissionRequestParent(
     return nullptr;
   }
 
-  nsIPrincipal* topPrincipal = aTopLevelPrincipal;
+  nsCOMPtr<nsIPrincipal> topPrincipal = aTopLevelPrincipal;
   if (!topPrincipal) {
-    nsCOMPtr<nsIPrincipal> principal = tp->GetContentPrincipal();
-    topPrincipal = principal;
+    topPrincipal = tp->GetContentPrincipal();
   }
   return nsContentPermissionUtils::CreateContentPermissionRequestParent(
       tp->GetOwnerElement(), aPrincipal, topPrincipal, aIsHandlingUserInput,
@@ -5317,16 +5316,9 @@ mozilla::ipc::IPCResult ContentParent::RecvPContentPermissionRequestConstructor(
     nsIPrincipal* aTopLevelPrincipal, const bool& aIsHandlingUserInput,
     const bool& aMaybeUnsafePermissionDelegate, const TabId& tabId,
     const bool& aIgnoreAllowSitePermission) {
-  nsContentPermissionUtils::InitContentPermissionRequestParent(
-      aActor, std::move(aRequests));
+  mozilla::ipc::ActorCast<ContentPermissionRequestParent>(aActor)->Init(
+      std::move(aRequests));
   return IPC_OK();
-}
-
-bool ContentParent::DeallocPContentPermissionRequestParent(
-    PContentPermissionRequestParent* actor) {
-  nsContentPermissionUtils::NotifyRemoveContentPermissionRequestParent(actor);
-  delete actor;
-  return true;
 }
 
 already_AddRefed<PWebBrowserPersistDocumentParent>

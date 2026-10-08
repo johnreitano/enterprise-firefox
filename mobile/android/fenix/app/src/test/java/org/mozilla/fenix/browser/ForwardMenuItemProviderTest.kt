@@ -25,6 +25,7 @@ import mozilla.components.ui.icons.R as iconsR
 import org.junit.Test
 import org.mozilla.fenix.NavGraphDirections
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -117,8 +118,17 @@ class ForwardMenuItemProviderTest {
         assertFalse(provider.handles(MenuAction.Navigate.Settings))
     }
 
-    private fun createProvider(browserStore: BrowserStore, scope: CoroutineScope) =
-        ForwardMenuItemProvider(browserStore = browserStore, goForward = goForward, scope = scope)
+    private fun createProvider(
+        browserStore: BrowserStore,
+        scope: CoroutineScope,
+        target: MenuTarget = MenuTarget.BrowserTab,
+    ) =
+        ForwardMenuItemProvider(
+            browserStore = browserStore,
+            target = target,
+            goForward = goForward,
+            scope = scope,
+        )
 
     private fun browserStore(canGoForward: Boolean) =
         BrowserStore(

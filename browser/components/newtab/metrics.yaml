@@ -1805,6 +1805,39 @@ newtab:
     send_in_pings:
       - newtab
 
+  opened_page_dwell_time:
+    lifetime: ping
+    type: labeled_timing_distribution
+    time_unit: millisecond
+    description: >
+      Active time the user spent on a page opened from the newtab, in
+      milliseconds, labelled by what was clicked to open it. Measures how long
+      the user was interacting with the browser, anywhere in the window, while
+      that page was the selected tab of the focused window, not how long the
+      tab was open.
+
+      One sample per opened page. Samples accumulate per client and are
+      submitted with the metrics ping. The distribution in one ping covers
+      every page opened from a newtab since the previous metrics ping, and
+      belongs to no single newtab visit.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2062393
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2062393
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - sdowne@mozilla.com
+      - jbrown@mozilla.com
+    expires: never
+    labels:
+      - topsite_organic
+      - topsite_sponsored
+      - story_organic
+      - story_sponsored
+    send_in_pings:
+      - metrics
+
 newtab.search:
   enabled:
     lifetime: application

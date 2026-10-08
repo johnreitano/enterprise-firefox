@@ -175,7 +175,7 @@ struct EmbedderColorSchemes {
    * switched to another browser element this ID will remain the same but      \
    * hosted under the under the new browser element. */                        \
   FIELD(BrowserId, uint64_t, {.mCanSet = CanSet::Custom})                      \
-  FIELD(HistoryID, nsID, {.mCanSet = CanSet::Unrestricted})                    \
+  FIELD(HistoryID, nsID, {.mCanSet = CanSet::ParentOnly})                      \
   FIELD(InRDMPane, bool, {.mTopOnly = true, .mCanSet = CanSet::ParentOnly})    \
   FIELD(Loading, bool, {.mCanSet = CanSet::Unrestricted})                      \
   /* A field only set on top browsing contexts, which indicates that either:   \

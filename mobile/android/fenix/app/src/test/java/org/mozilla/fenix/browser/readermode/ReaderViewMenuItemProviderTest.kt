@@ -24,6 +24,7 @@ import org.junit.Test
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.AppStore
 import org.mozilla.fenix.components.appstate.AppAction.ReaderViewAction
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -81,8 +82,16 @@ class ReaderViewMenuItemProviderTest {
     }
 
     // The item is kept up to date on a scope that runTest cancels at the end of each test.
-    private fun TestScope.provider(browserStore: BrowserStore) =
-        ReaderViewMenuItemProvider(browserStore = browserStore, appStore = appStore, scope = backgroundScope)
+    private fun TestScope.provider(
+        browserStore: BrowserStore,
+        target: MenuTarget = MenuTarget.BrowserTab,
+    ) =
+        ReaderViewMenuItemProvider(
+            browserStore = browserStore,
+            target = target,
+            appStore = appStore,
+            scope = backgroundScope,
+        )
 
     private fun browserStore(isReaderViewActive: Boolean) =
         BrowserStore(

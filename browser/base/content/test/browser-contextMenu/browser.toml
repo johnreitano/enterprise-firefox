@@ -32,14 +32,12 @@ skip-if = [
 support-files = ["subtst_contextmenu_add_search_engine.html"]
 skip-if = [
   "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland'", # disabled on Linux due to bug 513558
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11'", # disabled on Linux due to bug 513558
 ]
 
 ["browser_contextmenu_badiframe.js"]
 https_first_disabled = true
 skip-if = [
   "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && socketprocess_networking",
-  "os == 'win'", # Bug 1719856
 ]
 
 ["browser_contextmenu_blocked_image_protocols.js"]
@@ -65,7 +63,6 @@ skip-if = [
 ["browser_contextmenu_input.js"]
 skip-if = [
   "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland'",
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11'",
 ]
 
 ["browser_contextmenu_inspect.js"]
@@ -88,9 +85,6 @@ skip-if = [
 ]
 
 ["browser_contextmenu_plaintextlinks.js"]
-skip-if = [
-  "a11y_checks", # Bugs 1858041 and 1835079 for causing intermittent crashes
-]
 
 ["browser_contextmenu_save_blocked.js"]
 skip-if = [
@@ -124,7 +118,6 @@ https_first_disabled = true
 skip-if = [
   "debug", # bug 1798233 - this trips assertions that seem harmless in opt and unlikely to occur in practical use.
   "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland'",
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11'",
 ]
 
 ["browser_contextmenu_touch.js"]

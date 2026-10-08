@@ -567,6 +567,25 @@ class BrowserToolbarMiddlewareTest {
     }
 
     @Test
+    fun `GIVEN menu customization is enabled WHEN clicking the menu button THEN open the customizable menu`() {
+        every { navController.currentDestination?.id } returns R.id.browserFragment
+        settings.isMenuCustomizationEnabled = true
+
+        val middleware = buildMiddleware()
+        val toolbarStore = buildStore(middleware)
+        val menuButton = toolbarStore.state.displayState.browserActionsEnd[2] as ActionButtonRes
+
+        toolbarStore.dispatch(menuButton.onClick as BrowserToolbarEvent)
+
+        verify {
+            navController.navigate(
+                BrowserFragmentDirections.actionBrowserFragmentToMenuFragment(accessPoint = MenuAccessPoint.Browser),
+                null,
+            )
+        }
+    }
+
+    @Test
     fun `GIVEN browsing in normal mode WHEN clicking the tab counter button THEN open the tabs tray in normal mode`() {
         every { navController.currentDestination?.id } returns R.id.browserFragment
         val browsingModeManager = SimpleBrowsingModeManager(Normal)

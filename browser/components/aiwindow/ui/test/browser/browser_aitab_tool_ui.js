@@ -69,7 +69,7 @@ async function startAITabGeneration(win, mockEngine) {
       {
         id: "aitab-call",
         function: {
-          name: "generate_aitab",
+          name: "generate_page",
           arguments: JSON.stringify({
             url_list: [SOURCE_URL],
             focus: "Lisbon hotels",
@@ -220,7 +220,7 @@ describe("AITab ToolUI", () => {
 
     await TestUtils.waitForCondition(
       () => conversation.securityProperties.untrustedInput,
-      "Wait for generate_aitab to commit the staged security flags"
+      "Wait for generate_page to commit the staged security flags"
     );
     Assert.equal(
       conversation.securityProperties.privateData,

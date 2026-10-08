@@ -2,7 +2,9 @@
 
 add_setup(async function () {
   // Force-enable tab animations
-  gReduceMotionOverride = false;
+  await SpecialPowers.pushPrefEnv({
+    set: [["ui.prefersReducedMotion", 0]],
+  });
 });
 
 /**

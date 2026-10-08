@@ -1864,13 +1864,8 @@ static bool CanUseSameRealmEnqueue(JSContext* cx, HandleObject reactionObj,
     }
   }
 
-  // When using JS::AddPromiseReactions{,IgnoringUnHandledRejection}, no actual
+  // When using JS::AddPromiseReactions{,IgnoringUnhandledRejection}, no actual
   // promise is created, so we might not have one here.
-  //
-  // Bug 1977691: This comment needs updating; I don't think
-  // JS::AddPromiseReactions happens without a promise anymore, _however_ async
-  // functions may not have a promise.
-  //
   //
   // Additionally, we might have an object here that isn't an instance of
   // Promise. This can happen if content overrides the value of

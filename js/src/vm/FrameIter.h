@@ -108,6 +108,9 @@ class JitFrameIter {
  protected:
   jit::JitActivation* act_ = nullptr;
   mozilla::MaybeOneOf<jit::JSJitFrameIter, wasm::WasmFrameIter> iter_ = {};
+  // Exit instance of the current wasm segment, recorded by settle() so GC
+  // traces it even when a return_call emptied the segment. See TraceJitFrames.
+  wasm::Instance* wasmExitInstance_ = nullptr;
   bool mustUnwindActivation_ = false;
 
   void settle();
@@ -125,6 +128,7 @@ class JitFrameIter {
   void reset() {
     MOZ_ASSERT(isSome());
     iter_.destroy();
+    wasmExitInstance_ = nullptr;
   }
 
   bool isJSJit() const {
@@ -142,6 +146,7 @@ class JitFrameIter {
   const wasm::WasmFrameIter& asWasm() const {
     return iter_.ref<wasm::WasmFrameIter>();
   }
+  wasm::Instance* wasmExitInstance() const { return wasmExitInstance_; }
 
   // Operations common to all frame iterators.
   const jit::JitActivation* activation() const { return act_; }

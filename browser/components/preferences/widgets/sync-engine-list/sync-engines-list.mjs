@@ -89,11 +89,18 @@ class SyncEnginesList extends MozLitElement {
   }
 
   syncedEnginesTemplate() {
+    let perDeviceSyncEnabled = Services.prefs.getBoolPref(
+      "services.sync.perDeviceEngineChoices",
+      false
+    );
+
     return html`<moz-box-item>
       <div class="engines-list-wrapper">
         <span
           id="heading"
-          data-l10n-id="sync-syncing-across-devices-heading-2"
+          data-l10n-id=${perDeviceSyncEnabled
+            ? "sync-syncing-across-devices-heading-3"
+            : "sync-syncing-across-devices-heading-2"}
         ></span>
         <div class="engines-list-container">
           ${this.engines.map(type => this.engineTemplate(type))}

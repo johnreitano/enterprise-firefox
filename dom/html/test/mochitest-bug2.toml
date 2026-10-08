@@ -391,9 +391,6 @@ skip-if = [
 run-if = [
   "os != 'android'", # Android: needs control of popup window size
 ]
-skip-if = [
-  "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland' && debug", # Bug 1856975
-]
 
 ["test_bug742030.html"]
 

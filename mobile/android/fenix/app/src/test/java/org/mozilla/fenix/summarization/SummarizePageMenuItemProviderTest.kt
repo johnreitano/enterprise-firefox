@@ -30,6 +30,7 @@ import mozilla.components.ui.icons.R as iconsR
 import org.junit.Test
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.menu.MenuFragmentDirections
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -192,9 +193,11 @@ class SummarizePageMenuItemProviderTest {
         browserStore: BrowserStore = browserStore(),
         settings: SummarizationFeatureDiscoveryConfiguration = settings(),
         eligibilityChecker: SummarizationEligibilityChecker = eligibilityChecker(isEligible = false),
+        target: MenuTarget = MenuTarget.BrowserTab,
     ) =
         SummarizePageMenuItemProvider(
             browserStore = browserStore,
+            target = target,
             summarizationSettings = settings,
             eligibilityChecker = eligibilityChecker,
             scope = backgroundScope,

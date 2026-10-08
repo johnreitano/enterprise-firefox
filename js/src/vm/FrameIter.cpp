@@ -58,6 +58,7 @@ JitFrameIter& JitFrameIter::operator=(const JitFrameIter& another) {
   MOZ_ASSERT(this != &another);
 
   act_ = another.act_;
+  wasmExitInstance_ = another.wasmExitInstance_;
   mustUnwindActivation_ = another.mustUnwindActivation_;
 
   if (isSome()) {
@@ -148,6 +149,7 @@ bool JitFrameIter::done() const {
 }
 
 void JitFrameIter::settle() {
+  wasmExitInstance_ = nullptr;
   if (isJSJit()) {
     const jit::JSJitFrameIter& jitFrame = asJSJit();
     if (jitFrame.type() != jit::FrameType::WasmToJSJit) {
@@ -181,8 +183,12 @@ void JitFrameIter::settle() {
 
     iter_.destroy();
     iter_.construct<wasm::WasmFrameIter>(act_, prevFP);
-    MOZ_ASSERT(!asWasm().done());
-    return;
+    if (asWasm().done()) {
+      // A return_call emptied this wasm segment, so no frame will be visited to
+      // trace the instance whose exit stub we entered through. Carry it out for
+      // GC (see TraceJitFrames), then fall through to the transition below.
+      wasmExitInstance_ = asWasm().exitInstance();
+    }
   }
 
   if (isWasm()) {

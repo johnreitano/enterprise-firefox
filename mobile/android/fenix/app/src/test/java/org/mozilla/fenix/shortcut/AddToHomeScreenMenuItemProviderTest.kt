@@ -27,6 +27,7 @@ import mozilla.components.ui.icons.R as iconsR
 import org.junit.Test
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.menu.MenuFragmentDirections
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -101,9 +102,11 @@ class AddToHomeScreenMenuItemProviderTest {
     private fun TestScope.provider(
         browserStore: BrowserStore = browserStoreWithSelectedTab(),
         webAppUseCases: WebAppUseCases,
+        target: MenuTarget = MenuTarget.BrowserTab,
     ) =
         AddToHomeScreenMenuItemProvider(
             browserStore = browserStore,
+            target = target,
             webAppUseCases = webAppUseCases,
             settings = settings,
             scope = backgroundScope,

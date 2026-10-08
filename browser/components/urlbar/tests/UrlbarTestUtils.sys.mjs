@@ -1271,6 +1271,7 @@ export class UrlbarInputBaseTestUtils {
     // urlbar's actual search mode object.
     let ignoreProperties = [
       "icon",
+      "keyId",
       "pref",
       "restrict",
       "telemetryLabel",

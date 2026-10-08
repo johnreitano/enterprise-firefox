@@ -306,10 +306,12 @@ tasks:
                         - widevine-linux
                     default: []
         variants:
+            - eme-signed
             - eme-wmf
             - geckoview-isolated-process
         run-on-projects:
             by-variant:
+                eme-signed: ['mozilla-central']
                 eme-wmf:
                     by-test-platform:
                         windows1.*-64.*: ['autoland', 'mozilla-central']
@@ -324,8 +326,18 @@ tasks:
                         windows1.*: []
                         default: built-projects
         mozharness:
+            requires-signed-builds:
+                by-variant:
+                    eme-signed: true
+                    default: false
             chunked: true
             extra-options:
+                # By default, we do not allow non-local domains to be used by
+                # Firefox when testing. The EME WPT tests require access to the
+                # test licensing server (lic.staging.drmtoday.com) to decrypt
+                # the content used in the tests. Android and Windows also
+                # require access to platform specific services. Without this,
+                # most of the tests will fail.
                 by-test-platform:
                     android.*:
                         - --test-type=testharness
@@ -334,11 +346,24 @@ tasks:
                         - --no-update-status-on-crash
                         - --setpref=network.socket.allowed_nonlocal_domains='lic.staging.drmtoday.com,www.googleapis.com'
                     windows.*:
-                        - --test-type=testharness
-                        - --default-exclude
-                        - --tag=eme
-                        - --no-update-status-on-crash
-                        - --setpref=network.socket.allowed_nonlocal_domains='lic.staging.drmtoday.com,test.playready.microsoft.com'
+                        by-variant:
+                            eme-wmf:
+                                - --test-type=testharness
+                                - --default-exclude
+                                - --tag=eme
+                                - --no-update-status-on-crash
+                                - --setpref=network.socket.allowed_nonlocal_domains='lic.staging.drmtoday.com,test.playready.microsoft.com'
+                                - --setpref=media.eme.playready.enabled=true
+                                - --setpref=media.wmf.media-engine.enabled=2
+                                - --setpref=media.wmf.media-engine.bypass-gfx-blocklist=true
+                                - --setpref=media.eme.mfcdm.origin-filter.enabled=0
+                            default:
+                                - --test-type=testharness
+                                - --default-exclude
+                                - --tag=eme
+                                - --no-update-status-on-crash
+                                - --setpref=network.socket.allowed_nonlocal_domains='lic.staging.drmtoday.com'
+                                - --setpref=media.eme.playready.enabled=false
                     default:
                         - --test-type=testharness
                         - --default-exclude

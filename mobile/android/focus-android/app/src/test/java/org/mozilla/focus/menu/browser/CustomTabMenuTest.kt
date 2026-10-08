@@ -5,6 +5,7 @@
 package org.mozilla.focus.menu.browser
 
 import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
@@ -21,7 +22,8 @@ import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.MenuItemsGroup
-import mozilla.components.compose.menu.ui.MenuItemIconBitmap
+import mozilla.components.compose.menu.ui.MenuItemIcon
+import mozilla.components.compose.menu.ui.MenuItemIconDrawable
 import mozilla.components.compose.menu.ui.MenuItemState
 import mozilla.components.concept.engine.webextension.Action
 import mozilla.components.feature.webcompat.reporter.WebCompatReporterFeature.WEBCOMPAT_REPORTER_EXTENSION_ID
@@ -135,7 +137,7 @@ class CustomTabMenuTest {
 
     @Test
     fun `GIVEN the reporter starts up while the custom tab menu is shown THEN load its own icon once`() = runTest {
-        val icon: Bitmap = mock()
+        val icon = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
         var iconLoads = 0
         val action =
             Action("Report broken site…", true, null, null, null, null) {}
@@ -163,7 +165,7 @@ class CustomTabMenuTest {
                 customTabId = customTab.id,
                 appName = APP_NAME,
                 isOnboardingTab = false,
-                resources = testContext.resources,
+                context = testContext,
             )
         var groups = emptyList<MenuItemsGroup>()
         backgroundScope.launch { menu.menuGroups.collect { groups = it } }
@@ -178,15 +180,15 @@ class CustomTabMenuTest {
         )
         runCurrent()
 
-        assertEquals(MenuItemIconBitmap(icon), groups.flatMap { it.items }.item(CustomTabItem.ReportSiteIssue).icon)
+        assertEquals(icon, groups.flatMap { it.items }.item(CustomTabItem.ReportSiteIssue).icon.bitmap)
         assertEquals(1, iconLoads)
 
         store.dispatch(ContentAction.UpdateLoadingStateAction(customTab.id, true))
         runCurrent()
         assertEquals(1, iconLoads)
         assertEquals(
-            MenuItemIconBitmap(icon),
-            menu.currentMenuGroups().flatMap { it.items }.item(CustomTabItem.ReportSiteIssue).icon,
+            icon,
+            menu.currentMenuGroups().flatMap { it.items }.item(CustomTabItem.ReportSiteIssue).icon.bitmap,
         )
     }
 
@@ -207,8 +209,11 @@ class CustomTabMenuTest {
             customTabId = customTab.id,
             appName = APP_NAME,
             isOnboardingTab = isOnboardingTab,
-            resources = mock(),
+            context = mock(),
         )
+
+    private val MenuItemIcon?.bitmap
+        get() = ((this as MenuItemIconDrawable).icon as BitmapDrawable).bitmap
 
     private fun List<MenuItem>.item(item: CustomTabItem) = single { it.onClickEvent == MenuItemTapped(item) }
 

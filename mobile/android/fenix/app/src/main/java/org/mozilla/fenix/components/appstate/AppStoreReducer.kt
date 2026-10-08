@@ -106,6 +106,10 @@ internal object AppStoreReducer {
                             else -> state.recentSyncedTabState
                         }
                 )
+            // Removing the top site updates the top sites storage, which the [DefaultTopSitesPresenter] observes and
+            // dispatches TopSitesChange action with the new top site list.
+            is AppAction.RemoveTopSite -> state
+
             is AppAction.DisbandSearchGroupAction ->
                 state.copy(
                     recentHistory =

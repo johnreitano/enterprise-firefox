@@ -10,8 +10,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import mozilla.components.browser.state.ext.getUrl
-import mozilla.components.browser.state.selector.selectedTab
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
@@ -28,6 +26,7 @@ import org.mozilla.fenix.components.appstate.AppAction.BookmarkAction
 import org.mozilla.fenix.components.bookmarks.BookmarksUseCase
 import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.middleware.getTabUrl
 import org.mozilla.fenix.components.menu.store.MenuAction
 import org.mozilla.fenix.components.metrics.MetricsUtils
@@ -35,7 +34,8 @@ import org.mozilla.fenix.components.metrics.MetricsUtils
 /**
  * [MenuItemProvider] for the menu item allowing to bookmark the current page, or to edit the bookmark it already has.
  *
- * @param browserStore [BrowserStore] used to know which page the item is about.
+ * @param browserStore [BrowserStore] allowing to integrate with the current open tabs.
+ * @param target [MenuTarget] for which this menu item would be shown for.
  * @param bookmarksStorage [BookmarksStorage] used to check whether that page is already bookmarked.
  * @param addBookmark [BookmarksUseCase.AddBookmarksUseCase] for bookmarking the current page.
  * @param appStore [AppStore] for informing the rest of the application about a new bookmark.
@@ -45,6 +45,7 @@ import org.mozilla.fenix.components.metrics.MetricsUtils
  */
 class BookmarkMenuItemProvider(
     private val browserStore: BrowserStore,
+    private val target: MenuTarget,
     bookmarksStorage: BookmarksStorage,
     private val addBookmark: BookmarksUseCase.AddBookmarksUseCase,
     private val appStore: AppStore,
@@ -54,7 +55,7 @@ class BookmarkMenuItemProvider(
     // Without a page shown there is nothing to bookmark. Knowing whether the shown page already is bookmarked means
     // reading from disk, which the menu should not wait for, so it starts out offered as not bookmarked.
     private val mutableItem =
-        MutableStateFlow<MenuItem?>(ADD_BOOKMARK_ITEM.takeIf { browserStore.state.selectedTab != null })
+        MutableStateFlow<MenuItem?>(ADD_BOOKMARK_ITEM.takeIf { target.browserSessionFrom(browserStore.state) != null })
 
     override val itemFlow: StateFlow<MenuItem?> = mutableItem.asStateFlow()
 
@@ -62,7 +63,7 @@ class BookmarkMenuItemProvider(
         // BookmarksStorage#getBookmarksWithUrl will run until completion even if the coroutine is canceled, so it is
         // deliberately run on a scope outliving this menu. As such it must not reference this provider, which would
         // then be leaked together with the menu it holds onto while waiting for the bookmarks.
-        val url = browserStore.state.selectedTab?.getUrl()
+        val url = target.browserSessionFrom(browserStore.state)?.getTabUrl()
         val mutableItem = mutableItem
         if (url != null) {
             applicationScope.launch {
@@ -98,7 +99,7 @@ class BookmarkMenuItemProvider(
     }
 
     private fun bookmarkCurrentPage(menu: MenuHost) {
-        val tab = browserStore.state.selectedTab ?: return
+        val tab = target.browserSessionFrom(browserStore.state) ?: return
         val url = tab.getTabUrl() ?: return
         val title = tab.content.title
 

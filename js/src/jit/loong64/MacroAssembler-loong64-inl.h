@@ -933,6 +933,37 @@ void MacroAssembler::rotateRight64(Imm32 count, Register64 src, Register64 dest,
   as_rotri_d(dest.reg, src.reg, count.value & 63);
 }
 
+// ===============================================================
+// Shift or rotate, then combine with another register
+
+void MacroAssembler::lshift32ThenAdd(Imm32 shift, Register rhs,
+                                     Register srcDest) {
+  MOZ_ASSERT(rhs != srcDest);
+  lshift32(shift, srcDest);
+  add32(rhs, srcDest);
+}
+
+void MacroAssembler::lshift32ThenOr(Imm32 shift, Register rhs,
+                                    Register srcDest) {
+  MOZ_ASSERT(rhs != srcDest);
+  lshift32(shift, srcDest);
+  or32(rhs, srcDest);
+}
+
+void MacroAssembler::rshiftPtrThenXor(Imm32 shift, Register rhs,
+                                      Register srcDest) {
+  MOZ_ASSERT(rhs != srcDest);
+  rshiftPtr(shift, srcDest);
+  xorPtr(rhs, srcDest);
+}
+
+void MacroAssembler::rotateLeft64ThenXor(Imm32 count, Register64 rhs,
+                                         Register64 srcDest) {
+  MOZ_ASSERT(rhs != srcDest);
+  rotateLeft64(count, srcDest, srcDest, InvalidReg);
+  xor64(rhs, srcDest);
+}
+
 // Bit counting functions
 
 void MacroAssembler::clz64(Register64 src, Register64 dest) {
@@ -945,6 +976,15 @@ void MacroAssembler::ctz64(Register64 src, Register64 dest) {
 
 void MacroAssembler::popcnt64(Register64 input, Register64 output,
                               Register tmp) {
+#if defined(ENABLE_JIT_SIMD)
+  if (LOONG64Flags::HasLsxExtension()) {
+    ScratchSimd128Scope scratch(asMasm());
+    as_vreplgr2vr_d(scratch, input.reg);
+    as_vpcnt_d(scratch, scratch);
+    as_vpickve2gr_d(output.reg, scratch, 0);
+    return;
+  }
+#endif
   UseScratchRegisterScope temps(asMasm());
   Register scratch = temps.Acquire();
   ma_move(output.reg, input.reg);
@@ -979,6 +1019,15 @@ void MacroAssembler::ctz32(Register src, Register dest, bool knownNotZero) {
 }
 
 void MacroAssembler::popcnt32(Register input, Register output, Register tmp) {
+#if defined(ENABLE_JIT_SIMD)
+  if (LOONG64Flags::HasLsxExtension()) {
+    ScratchSimd128Scope scratch(asMasm());
+    as_vreplgr2vr_w(scratch, input);
+    as_vpcnt_w(scratch, scratch);
+    as_vpickve2gr_wu(output, scratch, 0);
+    return;
+  }
+#endif
   // Equivalent to GCC output of std::popcount()
   ma_move(output, input);
   as_srai_w(tmp, input, 1);
@@ -2533,10 +2582,7 @@ void MacroAssembler::splatX16(Register src, FloatRegister dest) {
 
 void MacroAssembler::splatX16(uint32_t srcLane, FloatRegister src,
                               FloatRegister dest) {
-  UseScratchRegisterScope temps(asMasm());
-  const Register scratch = temps.Acquire();
-  extractLaneInt8x16(srcLane, src, scratch);
-  splatX16(scratch, dest);
+  as_vreplvei_b(dest, src, srcLane);
 }
 
 void MacroAssembler::splatX8(Register src, FloatRegister dest) {
@@ -2545,10 +2591,7 @@ void MacroAssembler::splatX8(Register src, FloatRegister dest) {
 
 void MacroAssembler::splatX8(uint32_t srcLane, FloatRegister src,
                              FloatRegister dest) {
-  UseScratchRegisterScope temps(asMasm());
-  const Register scratch = temps.Acquire();
-  extractLaneInt16x8(srcLane, src, scratch);
-  splatX8(scratch, dest);
+  as_vreplvei_h(dest, src, srcLane);
 }
 
 void MacroAssembler::splatX4(Register src, FloatRegister dest) {
@@ -2557,16 +2600,12 @@ void MacroAssembler::splatX4(Register src, FloatRegister dest) {
 
 void MacroAssembler::splatX4(FloatRegister src, FloatRegister dest) {
   // Splat |src[0]| to all 4 lanes in |dest|.
-  // <https://jia.je/unofficial-loongarch-intrinsics-guide/lsx/shuffling/#__m128i-__lsx_vshuf4i_w-__m128i-a-imm0_255-imm>
-  as_vshuf4i_w(dest, src, 0b00000000);
+  as_vreplvei_w(dest, src, 0);
 }
 
 void MacroAssembler::splatX2(FloatRegister src, FloatRegister dest) {
-  // Select |src[0]| from a 4-tuple (dest_old[0], dest_old[1], src[0], src[1])
-  // tuple, thus the immediate 0b10==2, and splat the result to all 2 lanes in
-  // |dest|.
-  // <https://jia.je/unofficial-loongarch-intrinsics-guide/lsx/shuffling/#__m128i-__lsx_vshuf4i_d-__m128i-a-__m128i-b-imm0_255-imm>
-  as_vshuf4i_d(dest, src, 0b00001010);
+  // Splat |src[0]| to all 2 lanes in |dest|.
+  as_vreplvei_d(dest, src, 0);
 }
 
 void MacroAssembler::extractLaneInt8x16(uint32_t lane, FloatRegister src,
@@ -2598,19 +2637,12 @@ void MacroAssembler::extractLaneInt32x4(uint32_t lane, FloatRegister src,
 
 void MacroAssembler::extractLaneFloat32x4(uint32_t lane, FloatRegister src,
                                           FloatRegister dest) {
-  // Each u2 determines the corresponding lane in |dest|. Spread all 4 lanes
-  // with the |lane|-th lane from src.
-  // See MacroAssembler::splatX4() for link to the Instrinsics Guide.
-  as_vshuf4i_w(dest, src, 0b01010101 * lane);
+  as_vreplvei_w(dest, src, lane);
 }
 
 void MacroAssembler::extractLaneFloat64x2(uint32_t lane, FloatRegister src,
                                           FloatRegister dest) {
-  // Only the 4 LSBs are used.
-  // We always want to select from |src| from a (dest_old[0], dest_old[1],
-  // src[0], src[1]) tuple, so OR 0b1010 to limit the scope to the latter two.
-  // See MacroAssembler::splatX2() for link to the Instrinsics Guide.
-  as_vshuf4i_d(dest, src, 0b00001010 | (0b00000101 * lane));
+  as_vreplvei_d(dest, src, lane);
 }
 
 void MacroAssembler::replaceLaneInt8x16(unsigned lane, Register rhs,
@@ -3030,11 +3062,9 @@ void MacroAssembler::q15MulrSatInt16x8(FloatRegister lhs, FloatRegister rhs,
                                        FloatRegister dest) {
   ScratchSimd128Scope scratch(*this);
   ScratchSimd128Scope2 scratch2(*this);
-  as_vxor_v(scratch, scratch, scratch);
-  as_vbitseti_w(scratch, scratch, 14);
+  loadConstantSimd128(SimdConstant::SplatX4(0x4000), scratch);
   as_vmaddwod_w_h(scratch, lhs, rhs);
-  as_vxor_v(scratch2, scratch2, scratch2);
-  as_vbitseti_w(scratch2, scratch2, 14);
+  loadConstantSimd128(SimdConstant::SplatX4(0x4000), scratch2);
   as_vmaddwev_w_h(scratch2, lhs, rhs);
   as_vssrani_h_w(scratch, scratch, 15);
   as_vssrani_h_w(scratch2, scratch2, 15);
@@ -3298,9 +3328,10 @@ void MacroAssembler::anyTrueSimd128(FloatRegister src, Register dest) {
 
 void MacroAssembler::allTrueInt8x16(FloatRegister src, Register dest) {
   ScratchSimd128Scope scratch(*this);
-  as_vmsknz_b(scratch, src);
+  as_vslei_bu(scratch, src, 0);
+  as_vmsknz_b(scratch, scratch);
   as_vpickve2gr_wu(dest, scratch, 0);
-  cmp32Set(Assembler::Equal, dest, Imm32(0xFFFF), dest);
+  cmp32Set(Assembler::Equal, dest, Imm32(0), dest);
 }
 
 void MacroAssembler::allTrueInt16x8(FloatRegister src, Register dest) {

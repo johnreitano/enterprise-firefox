@@ -15,19 +15,19 @@ import mozilla.components.compose.menu.store.MenuStore
 import mozilla.components.lib.state.Middleware
 import mozilla.components.lib.state.Store
 import mozilla.components.support.base.log.logger.Logger
-import org.mozilla.fenix.components.menu.BrowserMenuBuilder
+import org.mozilla.fenix.components.menu.MenuBuilder
 import org.mozilla.fenix.components.menu.MenuItemEventRouter
 
 /**
  * [MenuStore] middleware keeping the menu up to date and letting the providers of its items handle all user
  * interactions with them.
  *
- * @param browserMenuBuilder [BrowserMenuBuilder] providing the menu to show, kept up to date.
+ * @param menuBuilder [MenuBuilder] providing the menu to show, kept up to date.
  * @param eventRouter [MenuItemEventRouter] for handling interactions with the menu items shown.
  * @param scope [CoroutineScope] tied to the lifetime of the menu, on which to keep it up to date.
  */
 class MenuMiddleware(
-    private val browserMenuBuilder: BrowserMenuBuilder,
+    private val menuBuilder: MenuBuilder,
     private val eventRouter: MenuItemEventRouter,
     private val scope: CoroutineScope,
 ) : Middleware<MenuState, MenuAction> {
@@ -48,6 +48,6 @@ class MenuMiddleware(
     }
 
     private fun observeMenuStructureUpdates(store: Store<MenuState, MenuAction>) = scope.launch {
-        browserMenuBuilder.menuStructure.collect { store.dispatch(Update(it)) }
+        menuBuilder.menuStructure.collect { store.dispatch(Update(it)) }
     }
 }

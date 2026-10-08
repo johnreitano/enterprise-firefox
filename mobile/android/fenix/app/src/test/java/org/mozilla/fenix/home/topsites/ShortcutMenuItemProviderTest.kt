@@ -37,6 +37,7 @@ import org.junit.runner.RunWith
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.AppStore
 import org.mozilla.fenix.components.appstate.AppAction.ShortcutAction
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -202,9 +203,11 @@ class ShortcutMenuItemProviderTest {
         browserStore: BrowserStore = browserStoreWithSelectedTab(),
         pinnedSiteStorage: PinnedSiteStorage,
         areShortcutsEnabled: Boolean = true,
+        target: MenuTarget = MenuTarget.BrowserTab,
     ) =
         ShortcutMenuItemProvider(
             browserStore = browserStore,
+            target = target,
             pinnedSiteStorage = pinnedSiteStorage,
             areShortcutsEnabled = areShortcutsEnabled,
             topSitesUseCases = topSitesUseCases,

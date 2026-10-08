@@ -713,6 +713,38 @@ describe("<TopSite>", () => {
       expect(action.type).toBe(at.OPEN_LINK);
       expect(action.data.typedBonus).toBe(true);
     });
+    it("should label an organic tile's OPEN_LINK for dwell time", () => {
+      const dispatch = clickLink({ link, index: 3 });
+
+      const [, [action]] = dispatch.mock.calls;
+      expect(action.data).toHaveProperty("dwell_label", "topsite_organic");
+      expect(action.data).toHaveProperty("is_sponsored", false);
+    });
+    it("should label a sponsored tile's OPEN_LINK for dwell time", () => {
+      const dispatch = clickLink({
+        link: Object.assign({}, link, {
+          sponsored_position: 1,
+          sponsored_tile_id: 12345,
+        }),
+        index: 3,
+      });
+
+      const [, [action]] = dispatch.mock.calls;
+      expect(action.data).toHaveProperty("dwell_label", "topsite_sponsored");
+      expect(action.data).toHaveProperty("is_sponsored", true);
+    });
+    it("should label a SPOC tile's OPEN_LINK for dwell time", () => {
+      const dispatch = clickLink({
+        link: Object.assign({}, link, { type: "SPOC" }),
+        index: 3,
+      });
+
+      const [, [action]] = dispatch.mock.calls;
+      expect(action.data).toHaveProperty("dwell_label", "topsite_sponsored");
+      // A Pocket-sponsored top site sets no sponsored_tile_id, which is why
+      // the label cannot be derived from is_sponsored.
+      expect(action.data).toHaveProperty("is_sponsored", false);
+    });
   });
 });
 

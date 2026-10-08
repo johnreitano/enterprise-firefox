@@ -2896,7 +2896,7 @@ def main():
     result = xpcsh.runTests(options)
 
     if "MOZ_AUTOMATION" in os.environ:
-        symbolicate_profiles()
+        symbolicate_profiles(symbol_dir=options.symbolsPath)
 
     if result == TBPL_RETRY:
         sys.exit(4)

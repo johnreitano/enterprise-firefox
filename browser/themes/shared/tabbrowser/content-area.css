@@ -231,7 +231,7 @@
   min-width: 0;
 
   /* We want to be able to show the frame color behind the clipped radiused corner */
-  background: var(--tabpanel-background-color);
+  background: var(--tabpanel-background-color) padding-box;
 
   display: grid;
   /**

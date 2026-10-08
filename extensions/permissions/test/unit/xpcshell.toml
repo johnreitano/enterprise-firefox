@@ -10,9 +10,6 @@ head = "head.js"
 ["test_permmanager_defaults.js"]
 
 ["test_permmanager_expiration.js"]
-skip-if = [
-  "os == 'win' && os_version == '10.2009' && arch == 'x86_64'", # Bug 1718292
-]
 
 ["test_permmanager_getAllByTypeSince.js"]
 

@@ -243,12 +243,6 @@ export class AIChatContent extends MozLitElement {
 
   updated(changedProperties) {
     super.updated(changedProperties);
-    // When the conversation is replaced (e.g. switching to a tab with an empty
-    // sidebar) no scroll event fires, so recompute the jump-to-bottom button
-    // here to avoid it lingering from the previous conversation.
-    if (changedProperties.has("conversationState")) {
-      this.#updateJumpButtonState();
-    }
     this.#maybeFocusAgentMonitorCard();
   }
 
@@ -469,18 +463,9 @@ export class AIChatContent extends MozLitElement {
   }
 
   #initOverflowObserver() {
-    this.#overflowObserver = new ResizeObserver(() => {
-      // The wrapper resizes on every streamed chunk, and reading
-      // scrollHeight/clientHeight below forces a synchronous reflow. Coalesce
-      // to one read per frame.
-      if (this.#overflowRafId) {
-        return;
-      }
-      this.#overflowRafId = requestAnimationFrame(() => {
-        this.#overflowRafId = null;
-        this.#updateOverflowState();
-      });
-    });
+    this.#overflowObserver = new ResizeObserver(() =>
+      this.#updateOverflowState()
+    );
     this.updateComplete.then(() => {
       this.#overflowObserver.observe(
         this.shadowRoot.querySelector(".chat-inner-wrapper")
@@ -488,9 +473,15 @@ export class AIChatContent extends MozLitElement {
     });
   }
 
+  /**
+   * Toggle the scroll container's `overflowing` attribute (which drives the
+   * scroll fades) to match whether it actually scrolls, and recompute the
+   * jump-to-bottom button, which no scroll event covers when the change came
+   * from content rather than from scrolling.
+   */
   #updateOverflowState() {
-    const wrapper = this.shadowRoot.querySelector(".chat-content-wrapper");
-    const innerWrapper = this.shadowRoot.querySelector(".chat-inner-wrapper");
+    const wrapper = this.#wrapper;
+    const innerWrapper = this.shadowRoot?.querySelector(".chat-inner-wrapper");
 
     if (!wrapper || !innerWrapper) {
       return;
@@ -506,9 +497,6 @@ export class AIChatContent extends MozLitElement {
         wrapper.scrollHeight > wrapper.clientHeight + thresholdPadding
     );
 
-    // Recompute the jump-to-bottom button after content resizes (e.g.
-    // switching to an empty/short conversation) since no scroll event
-    // fires in that case and the button would otherwise stay visible.
     this.#updateJumpButtonState();
   }
 
@@ -2017,8 +2005,7 @@ export class AIChatContent extends MozLitElement {
           ${this.#renderError()}
         </div>
       </div>
-      <div class="fullpage-top-blur"></div>
-      <div class="fullpage-top-scrim"></div>
+      <div class="fullpage-top-box-shadow"></div>
       <kit-mention variant="sidebar"></kit-mention>
       <div
         class="assistant-response-announcer"

@@ -830,7 +830,7 @@
   mirror: always
 
 - name: apz.pinch_lock.buffer_max_age
-  type: int32_t
+  type: uint32_t
   value: 80   # milliseconds
   mirror: once
 
@@ -884,7 +884,7 @@
   mirror: always
 
 - name: apz.touch_scroll.buffer_max_age
-  type: int32_t
+  type: uint32_t
   value: 200  # milliseconds
   mirror: once
 
@@ -3782,6 +3782,13 @@
 
 #ifdef XP_WIN
 - name: dom.ipc.processPriorityManager.backgroundUsesEcoQoS
+  type: bool
+  value: false
+  mirror: always
+
+# Whether the main threads of the parent process and of foreground content
+# processes run at THREAD_PRIORITY_ABOVE_NORMAL.
+- name: dom.ipc.processPriorityManager.foregroundRaisesMainThreadPriority
   type: bool
   value: false
   mirror: always
@@ -11190,6 +11197,12 @@
   mirror: always
   rust: true
 
+# Whether the CSS namespace is exposed in workers and worklets.
+- name: layout.css.namespace.exposed-in-workers-and-worklets
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+
 # Is -moz-osx-font-smoothing enabled? (Only supported in OSX builds)
 - name: layout.css.osx-font-smoothing.enabled
   type: bool
@@ -13228,6 +13241,12 @@
   type: bool
   value: false
   mirror: once
+
+# Prefer system FFmpeg over bundled ffvpx for Vulkan decode (edge distros).
+- name: media.hardware-video-decoding-vulkan.prefer-system-ffmpeg
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
 
 - name: media.hardware-video-encoding.enabled
   type: bool

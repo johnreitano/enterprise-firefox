@@ -108,13 +108,15 @@ private fun MenuPopupContent(
     val scope = rememberCoroutineScope()
     val store = remember { buildMenuStore(scope, onDismissRequest) }
 
-    Surface(
-        modifier = Modifier.width(MENU_WIDTH).heightIn(max = maxHeight),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shadowElevation = MENU_ELEVATION,
-    ) {
-        Menu(store = store)
+    MenuTheme {
+        Surface(
+            modifier = Modifier.width(MENU_WIDTH).heightIn(max = maxHeight),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            shadowElevation = MENU_ELEVATION,
+        ) {
+            Menu(store = store)
+        }
     }
 }
 
