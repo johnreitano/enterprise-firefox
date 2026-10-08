@@ -3790,10 +3790,13 @@ pref("toolkit.legacyUserProfileCustomizations.stylesheets", false);
 
     // Health Report is enabled by default on all channels.
     // Do note that the toggle on Fenix and Focus does NOT reflect to this pref.
-    pref("datareporting.healthreport.uploadEnabled", true);
     #ifdef MOZ_ENTERPRISE
+      // Enterprise security events are sent through Glean, so the upload
+      // pref they depend on cannot be turned off by the user.
+      pref("datareporting.healthreport.uploadEnabled", true, locked);
       pref("datareporting.usage.uploadEnabled", false);
     #else
+      pref("datareporting.healthreport.uploadEnabled", true);
       pref("datareporting.usage.uploadEnabled", true);
     #endif
   #endif

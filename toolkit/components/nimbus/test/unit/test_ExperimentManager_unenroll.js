@@ -177,33 +177,38 @@ add_task(async function testUnenrollAllOptOut() {
   await doOptOutTest({ rolloutsEnabled: false, studiesEnabled: false });
 });
 
-add_task(async function test_unenroll_uploadPref() {
-  const { manager, cleanup } = await setupTest();
-  const recipe = NimbusTestUtils.factories.recipe("foo");
+add_task(
+  { skip_if: () => AppConstants.MOZ_ENTERPRISE },
+  async function test_unenroll_uploadPref() {
+    const { manager, cleanup } = await setupTest();
+    const recipe = NimbusTestUtils.factories.recipe("foo");
 
-  await manager.store.init();
-  await manager.onStartup();
-  await NimbusTestUtils.enroll(recipe, { manager });
+    await manager.store.init();
+    await manager.onStartup();
+    await NimbusTestUtils.enroll(recipe, { manager });
 
-  Assert.equal(
-    manager.store.get(recipe.slug).active,
-    true,
-    "Should set .active to true"
-  );
+    Assert.equal(
+      manager.store.get(recipe.slug).active,
+      true,
+      "Should set .active to true"
+    );
 
-  Services.prefs.setBoolPref(UPLOAD_ENABLED_PREF, false);
+    Services.prefs.setBoolPref(UPLOAD_ENABLED_PREF, false);
 
-  await NimbusTestUtils.assert.enrollmentExists(recipe.slug, { active: false });
+    await NimbusTestUtils.assert.enrollmentExists(recipe.slug, {
+      active: false,
+    });
 
-  Assert.equal(
-    manager.store.get(recipe.slug).active,
-    false,
-    "Should set .active to false"
-  );
+    Assert.equal(
+      manager.store.get(recipe.slug).active,
+      false,
+      "Should set .active to false"
+    );
 
-  await cleanup();
-  Services.prefs.clearUserPref(UPLOAD_ENABLED_PREF);
-});
+    await cleanup();
+    Services.prefs.clearUserPref(UPLOAD_ENABLED_PREF);
+  }
+);
 
 add_task(async function test_setExperimentInactive_called() {
   const { sandbox, manager, cleanup } = await setupTest();
