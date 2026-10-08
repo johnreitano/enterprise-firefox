@@ -223,6 +223,9 @@ linux-tests:
     - xpcshell
 
 linux-tests-enterprise:
+    - enterprise-end2end-current
+    - enterprise-end2end-main
+    - enterprise-end2end-minimal
     - gtest
     - marionette-integration
     - marionette-enterprise
@@ -385,6 +388,9 @@ windows11-25h2-tests:
     - xpcshell
 
 windows11-25h2-tests-enterprise:
+    - enterprise-end2end-current
+    - enterprise-end2end-main
+    - enterprise-end2end-minimal
     - gtest
     - marionette-integration
     - marionette-enterprise
@@ -498,6 +504,9 @@ macosx1500-64-tests:
     - web-platform-tests-webrtc
 
 macosx1500-64-tests-enterprise:
+    - enterprise-end2end-current
+    - enterprise-end2end-main
+    - enterprise-end2end-minimal
     - gtest
     - marionette-integration
     - marionette-enterprise
