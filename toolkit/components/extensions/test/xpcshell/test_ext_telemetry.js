@@ -818,26 +818,24 @@ if (AppConstants.MOZ_BUILD_APP === "browser") {
     Services.prefs.clearUserPref(TelemetryUtils.Preferences.FhrUploadEnabled);
   });
 
-  add_task(async function test_telemetry_can_upload_disabled() {
-    if (AppConstants.MOZ_ENTERPRISE) {
-      info("Skipping: enterprise builds lock the data upload pref on");
-      return;
+  add_task(
+    { skip_if: () => AppConstants.MOZ_ENTERPRISE },
+    async function test_telemetry_can_upload_disabled() {
+      Services.prefs.setBoolPref(
+        TelemetryUtils.Preferences.FhrUploadEnabled,
+        false
+      );
+
+      await run({
+        backgroundScript: async () => {
+          const result = await browser.telemetry.canUpload();
+          browser.test.assertFalse(result);
+          browser.test.notifyPass("can_upload_disabled");
+        },
+        doneSignal: "can_upload_disabled",
+      });
+
+      Services.prefs.clearUserPref(TelemetryUtils.Preferences.FhrUploadEnabled);
     }
-
-    Services.prefs.setBoolPref(
-      TelemetryUtils.Preferences.FhrUploadEnabled,
-      false
-    );
-
-    await run({
-      backgroundScript: async () => {
-        const result = await browser.telemetry.canUpload();
-        browser.test.assertFalse(result);
-        browser.test.notifyPass("can_upload_disabled");
-      },
-      doneSignal: "can_upload_disabled",
-    });
-
-    Services.prefs.clearUserPref(TelemetryUtils.Preferences.FhrUploadEnabled);
-  });
+  );
 }

@@ -245,113 +245,112 @@ add_task(async function test_recover_overwrites_stale_selectable_prefs() {
  * Test that recovering into a selectable profile uses the most restrictive
  * data collection settings between the backup and the profile group.
  */
-add_task(async function test_recover_data_collection_prefs_most_restrictive() {
-  if (AppConstants.MOZ_ENTERPRISE) {
-    info(
-      "Skipping: enterprise builds lock datareporting.healthreport.uploadEnabled on"
+add_task(
+  { skip_if: () => AppConstants.MOZ_ENTERPRISE },
+  async function test_recover_data_collection_prefs_most_restrictive() {
+    let sandbox = sinon.createSandbox();
+    let preferencesBackupResource = new PreferencesBackupResource();
+
+    let recoveryPath = await IOUtils.createUniqueDirectory(
+      PathUtils.tempDir,
+      "PreferencesBackupResource-data-collection-test"
     );
-    return;
-  }
+    let destProfilePath = await IOUtils.createUniqueDirectory(
+      PathUtils.tempDir,
+      "PreferencesBackupResource-dest-data-collection-test"
+    );
 
-  let sandbox = sinon.createSandbox();
-  let preferencesBackupResource = new PreferencesBackupResource();
+    // Set initial values - we'll verify these change (or don't) based on backup vs group
+    Services.prefs.setBoolPref("browser.discovery.enabled", true);
+    Services.prefs.setBoolPref(
+      "datareporting.healthreport.uploadEnabled",
+      false
+    );
+    Services.prefs.setBoolPref("app.shield.optoutstudies.enabled", true);
 
-  let recoveryPath = await IOUtils.createUniqueDirectory(
-    PathUtils.tempDir,
-    "PreferencesBackupResource-data-collection-test"
-  );
-  let destProfilePath = await IOUtils.createUniqueDirectory(
-    PathUtils.tempDir,
-    "PreferencesBackupResource-dest-data-collection-test"
-  );
+    // Get default for a pref we'll omit from backup to test the default fallback
+    const defaults = Services.prefs.getDefaultBranch(null);
+    const usageUploadDefault = defaults.getBoolPref(
+      "datareporting.usage.uploadEnabled",
+      false
+    );
+    Services.prefs.clearUserPref("datareporting.usage.uploadEnabled");
 
-  // Set initial values - we'll verify these change (or don't) based on backup vs group
-  Services.prefs.setBoolPref("browser.discovery.enabled", true);
-  Services.prefs.setBoolPref("datareporting.healthreport.uploadEnabled", false);
-  Services.prefs.setBoolPref("app.shield.optoutstudies.enabled", true);
+    // Create backup prefs.js - note datareporting.usage.uploadEnabled is missing
+    await IOUtils.writeUTF8(
+      PathUtils.join(recoveryPath, "prefs.js"),
+      `user_pref("browser.discovery.enabled", false);\n` +
+        `user_pref("datareporting.healthreport.uploadEnabled", true);\n` +
+        `user_pref("app.shield.optoutstudies.enabled", true);\n`
+    );
 
-  // Get default for a pref we'll omit from backup to test the default fallback
-  const defaults = Services.prefs.getDefaultBranch(null);
-  const usageUploadDefault = defaults.getBoolPref(
-    "datareporting.usage.uploadEnabled",
-    false
-  );
-  Services.prefs.clearUserPref("datareporting.usage.uploadEnabled");
+    sandbox.stub(lazy.SelectableProfileService, "isEnabled").value(true);
+    sandbox
+      .stub(lazy.SelectableProfileService, "currentProfile")
+      .value({ id: 1 });
 
-  // Create backup prefs.js - note datareporting.usage.uploadEnabled is missing
-  await IOUtils.writeUTF8(
-    PathUtils.join(recoveryPath, "prefs.js"),
-    `user_pref("browser.discovery.enabled", false);\n` +
-      `user_pref("datareporting.healthreport.uploadEnabled", true);\n` +
-      `user_pref("app.shield.optoutstudies.enabled", true);\n`
-  );
+    // Group has all data collection prefs ENABLED
+    sandbox.stub(lazy.SelectableProfileService, "getDBPref").resolves(true);
 
-  sandbox.stub(lazy.SelectableProfileService, "isEnabled").value(true);
-  sandbox
-    .stub(lazy.SelectableProfileService, "currentProfile")
-    .value({ id: 1 });
+    sandbox
+      .stub(lazy.SelectableProfileService, "flushSharedPrefToDatabase")
+      .resolves();
 
-  // Group has all data collection prefs ENABLED
-  sandbox.stub(lazy.SelectableProfileService, "getDBPref").resolves(true);
+    sandbox
+      .stub(lazy.SelectableProfileService, "addSelectableProfilePrefs")
+      .resolves();
 
-  sandbox
-    .stub(lazy.SelectableProfileService, "flushSharedPrefToDatabase")
-    .resolves();
-
-  sandbox
-    .stub(lazy.SelectableProfileService, "addSelectableProfilePrefs")
-    .resolves();
-
-  await preferencesBackupResource.recover(
-    { profilePath: "/some/original/path" },
-    recoveryPath,
-    destProfilePath
-  );
-
-  // backup=false, group=true -> set to false (most restrictive)
-  Assert.equal(
-    Services.prefs.getBoolPref("browser.discovery.enabled"),
-    false,
-    "browser.discovery.enabled: backup=false, group=true -> false"
-  );
-
-  // backup=true, group=true -> no change needed (both enabled)
-  Assert.equal(
-    Services.prefs.getBoolPref("datareporting.healthreport.uploadEnabled"),
-    false,
-    "datareporting.healthreport.uploadEnabled: backup=true, group=false -> false"
-  );
-
-  Assert.equal(
-    Services.prefs.getBoolPref("app.shield.optoutstudies.enabled"),
-    true,
-    "app.shield.optoutstudies.enabled: backup=true, group=true -> stays true"
-  );
-
-  // backup=missing, group=true -> uses default value
-  Assert.equal(
-    Services.prefs.getBoolPref("datareporting.usage.uploadEnabled"),
-    usageUploadDefault,
-    "datareporting.usage.uploadEnabled: backup=missing -> uses default"
-  );
-
-  Assert.ok(
-    lazy.SelectableProfileService.addSelectableProfilePrefs.calledOnceWith(
+    await preferencesBackupResource.recover(
+      { profilePath: "/some/original/path" },
+      recoveryPath,
       destProfilePath
-    ),
-    "addSelectableProfilePrefs should be called with destProfilePath"
-  );
+    );
 
-  // Clean up prefs set during test
-  Services.prefs.clearUserPref("browser.discovery.enabled");
-  Services.prefs.clearUserPref("datareporting.healthreport.uploadEnabled");
-  Services.prefs.clearUserPref("app.shield.optoutstudies.enabled");
-  Services.prefs.clearUserPref("datareporting.usage.uploadEnabled");
+    // backup=false, group=true -> set to false (most restrictive)
+    Assert.equal(
+      Services.prefs.getBoolPref("browser.discovery.enabled"),
+      false,
+      "browser.discovery.enabled: backup=false, group=true -> false"
+    );
 
-  await maybeRemovePath(recoveryPath);
-  await maybeRemovePath(destProfilePath);
-  sandbox.restore();
-});
+    // backup=true, group=true -> no change needed (both enabled)
+    Assert.equal(
+      Services.prefs.getBoolPref("datareporting.healthreport.uploadEnabled"),
+      false,
+      "datareporting.healthreport.uploadEnabled: backup=true, group=false -> false"
+    );
+
+    Assert.equal(
+      Services.prefs.getBoolPref("app.shield.optoutstudies.enabled"),
+      true,
+      "app.shield.optoutstudies.enabled: backup=true, group=true -> stays true"
+    );
+
+    // backup=missing, group=true -> uses default value
+    Assert.equal(
+      Services.prefs.getBoolPref("datareporting.usage.uploadEnabled"),
+      usageUploadDefault,
+      "datareporting.usage.uploadEnabled: backup=missing -> uses default"
+    );
+
+    Assert.ok(
+      lazy.SelectableProfileService.addSelectableProfilePrefs.calledOnceWith(
+        destProfilePath
+      ),
+      "addSelectableProfilePrefs should be called with destProfilePath"
+    );
+
+    // Clean up prefs set during test
+    Services.prefs.clearUserPref("browser.discovery.enabled");
+    Services.prefs.clearUserPref("datareporting.healthreport.uploadEnabled");
+    Services.prefs.clearUserPref("app.shield.optoutstudies.enabled");
+    Services.prefs.clearUserPref("datareporting.usage.uploadEnabled");
+
+    await maybeRemovePath(recoveryPath);
+    await maybeRemovePath(destProfilePath);
+    sandbox.restore();
+  }
+);
 
 add_task(
   async function test_recover_non_selectable_overwrites_stale_selectable_prefs() {
