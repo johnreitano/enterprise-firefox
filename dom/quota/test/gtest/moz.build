@@ -61,3 +61,7 @@ FINAL_LIBRARY = "xul-gtest"
 LOCAL_INCLUDES += [
     "/dom/quota",
 ]
+
+SOURCE_HEADERS += [
+    "Common.h",
+]

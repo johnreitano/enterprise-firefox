@@ -354,8 +354,9 @@ export class FormAutofillStorage extends FormAutofillStorageBase {
    * complete. The address version documents the reasoning; it is the same here.
    *
    * One thing differs. The copy reads each card's number in the clear so the
-   * receiving store can encrypt it itself, which means it needs the OS key
-   * store readable. #creditCardNumbersReadable settles that before any copying
+   * receiving store can encrypt it itself, which means it needs the source's
+   * key readable -- the OS key store's in one direction, the Rust store's in
+   * the other. #creditCardNumbersReadable settles that before any copying
    * starts, and a profile whose numbers cannot be read is left where it is.
    */
   async #migrateToEnabledCreditCardStorage() {
@@ -405,26 +406,20 @@ export class FormAutofillStorage extends FormAutofillStorageBase {
    * Whether the source's card numbers can be read, so the copy can hand them
    * over in the clear.
    *
-   * Answered by decrypting one record, not by asking the OS key store, which
-   * cannot answer it: ensureLoggedIn() without a reauth prompt reports success
-   * unconditionally, whether or not the ciphertext the store holds is readable.
+   * The source is asked rather than a particular key store, because each store
+   * holds its own: decrypting one record is what answers it either way. The OS
+   * key store cannot be asked directly in any case -- ensureLoggedIn() without
+   * a reauth prompt reports success unconditionally, and generates a key as a
+   * side effect, which would create an entry for every profile that has never
+   * saved a card.
    *
-   * Decrypting has the same side effect rather than avoiding it --
-   * OSKeyStore.decrypt() goes through that same ensureLoggedIn(), which
-   * generates a key when none exists. What spares a profile that has never
-   * saved a card is the early return below: there is nothing to decrypt, so
-   * the key store is never reached, and an empty profile still moves to the
-   * other store. A profile that does hold a ciphertext has the key already.
-   *
-   * Neither direction prompts today, both stores encrypting through the OS key
-   * store; RustAutofillCreditCardsAdapter documents why it does not yet hold a
-   * key of its own. Once it does, decrypting a card out of it needs that key
-   * generated and unlocked, so this check becomes a primary password prompt in
-   * the copy-back direction and will have to answer without one.
+   * A profile with no cards is not asked at all: there is nothing to decrypt,
+   * so the common case never touches either key, and an empty profile still
+   * moves to the other store.
    *
    * Settled once, before anything is copied, rather than discovered per record.
    * A copy that stops halfway leaves the profile split across two stores, and a
-   * key store that is merely locked would otherwise spend the retry budget --
+   * key that is merely locked would otherwise spend the retry budget --
    * a deferral costs a launch, three failed attempts cost the migration for
    * good. LoginStorageMigrator settles the primary password up front for the
    * same reason.

@@ -14,8 +14,6 @@ mod transport;
 pub use environment::Environment;
 pub use report_reason::ReportReason;
 
-#[cfg(feature = "stateful")]
-use self::ad_response::Ads;
 use self::{
     ad_request::{AdPlacementRequest, AdRequest, AdRequestFlags},
     ad_response::{AdResponse, AdResponseValue},
@@ -25,6 +23,8 @@ use self::{
     preflight::PreflightRequest,
     transport::MARSTransport,
 };
+#[cfg(feature = "stateful")]
+use crate::ads::{Ads, PlacementId};
 use crate::{
     http_cache::{HttpCache, RequestHash},
     telemetry::Telemetry,
@@ -61,9 +61,37 @@ where
         self.transport.clear_cache()
     }
 
-    #[allow(dead_code)]
-    pub fn shutdown_db(&mut self) -> Result<(), rusqlite::Error> {
-        self.transport.shutdown_db()
+    pub fn fetch_ads<A>(
+        &self,
+        context_id: String,
+        flags: AdRequestFlags,
+        placements: Vec<AdPlacementRequest>,
+        cache_policy: CachePolicy,
+        ohttp: bool,
+        blocks: Vec<String>,
+    ) -> Result<(AdResponse<A>, RequestHash), FetchAdsError>
+    where
+        A: AdResponseValue,
+    {
+        let mut ad_request = AdRequest::try_new(
+            blocks,
+            context_id,
+            self.environment.clone(),
+            flags,
+            ohttp,
+            placements,
+        )?;
+        let request_hash = RequestHash::new(&ad_request);
+
+        if ohttp {
+            ad_request
+                .headers
+                .extend(Headers::try_from(self.fetch_preflight()?)?);
+        }
+
+        let response = self.transport.send(ad_request, &cache_policy, ohttp)?;
+        let ads = AdResponse::<A>::parse(response.json()?, &self.telemetry)?;
+        Ok((ads, request_hash))
     }
 
     #[cfg(feature = "stateful")]
@@ -74,7 +102,7 @@ where
         placements: Vec<AdPlacementRequest>,
         ohttp: bool,
         blocks: Vec<String>,
-    ) -> Result<HashMap<String, Ads>, FetchAdsError> {
+    ) -> Result<HashMap<PlacementId, Ads>, FetchAdsError> {
         let mut ad_request = AdRequest::try_new(
             blocks,
             context_id,
@@ -144,43 +172,15 @@ where
                         .collect(),
                 ),
             };
-            result.insert(placement_id, ads);
+            result.insert(placement_id.into(), ads);
         }
 
         Ok(result)
     }
 
-    pub fn fetch_ads<A>(
-        &self,
-        context_id: String,
-        flags: AdRequestFlags,
-        placements: Vec<AdPlacementRequest>,
-        cache_policy: CachePolicy,
-        ohttp: bool,
-        blocks: Vec<String>,
-    ) -> Result<(AdResponse<A>, RequestHash), FetchAdsError>
-    where
-        A: AdResponseValue,
-    {
-        let mut ad_request = AdRequest::try_new(
-            blocks,
-            context_id,
-            self.environment.clone(),
-            flags,
-            ohttp,
-            placements,
-        )?;
-        let request_hash = RequestHash::new(&ad_request);
-
-        if ohttp {
-            ad_request
-                .headers
-                .extend(Headers::try_from(self.fetch_preflight()?)?);
-        }
-
-        let response = self.transport.send(ad_request, &cache_policy, ohttp)?;
-        let ads = AdResponse::<A>::parse(response.json()?, &self.telemetry)?;
-        Ok((ads, request_hash))
+    #[cfg(test)]
+    pub fn get_telemetry(&self) -> T {
+        self.telemetry.clone()
     }
 
     // TODO: Remove this allow(dead_code) when cache invalidation is re-enabled behind Nimbus experiment
@@ -216,6 +216,11 @@ where
         Ok(self.make_callback_request(callback, ohttp)?)
     }
 
+    #[allow(dead_code)]
+    pub fn shutdown_db(&mut self) -> Result<(), rusqlite::Error> {
+        self.transport.shutdown_db()
+    }
+
     fn fetch_preflight(&self) -> Result<preflight::PreflightResponse, CallbackRequestError> {
         let response = self.transport.send(
             PreflightRequest(self.environment.clone().into_url("ads-preflight")),
@@ -238,18 +243,13 @@ where
         }
         self.transport.fire(request, ohttp).map_err(Into::into)
     }
-
-    #[cfg(test)]
-    pub fn get_telemetry(&self) -> T {
-        self.telemetry.clone()
-    }
 }
 
 #[cfg(test)]
 mod tests {
 
-    use super::ad_response::AdImage;
     use super::*;
+    use crate::ads::AdImage;
     use crate::ffi::telemetry::MozAdsTelemetryWrapper;
     use crate::test_utils::{
         get_example_happy_image_response, make_happy_placement_requests, TEST_CONTEXT_ID,
@@ -356,7 +356,7 @@ mod tests {
 
         let cache = HttpCache::builder("test_fetch_ads_cache_hit_skips_network.db")
             .default_ttl(std::time::Duration::from_secs(300))
-            .max_size(crate::common::bytesize::ByteSize::mib(1))
+            .max_size(crate::bytesize::ByteSize::mib(1))
             .build()
             .unwrap();
         let client = make_test_client(Some(cache));
@@ -394,7 +394,7 @@ mod tests {
         viaduct_dev::init_backend_dev();
         let cache = HttpCache::builder("test_record_click.db")
             .default_ttl(std::time::Duration::from_secs(300))
-            .max_size(crate::common::bytesize::ByteSize::mib(1))
+            .max_size(crate::bytesize::ByteSize::mib(1))
             .build()
             .unwrap();
 
@@ -413,7 +413,7 @@ mod tests {
         viaduct_dev::init_backend_dev();
         let cache = HttpCache::builder("test_record_impression.db")
             .default_ttl(std::time::Duration::from_secs(300))
-            .max_size(crate::common::bytesize::ByteSize::mib(1))
+            .max_size(crate::bytesize::ByteSize::mib(1))
             .build()
             .unwrap();
 

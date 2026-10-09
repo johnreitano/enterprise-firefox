@@ -1819,8 +1819,8 @@ export class CreditCardsBase extends AutofillRecords {
 
   /**
    * Hand a card over with its number in the clear, so the receiving store can
-   * encrypt it under whatever scheme that store uses. Today both use the OS key
-   * store; they will not always.
+   * encrypt it under its own key. This store's is the OS key store's; the Rust
+   * store holds one of its own.
    *
    * Unlike _stripComputedFields, a decrypt failure is not swallowed here. There
    * it is deliberate, so a card whose number cannot be read can still have its
@@ -1842,6 +1842,37 @@ export class CreditCardsBase extends AutofillRecords {
     );
     delete exported["cc-number-encrypted"];
     return exported;
+  }
+
+  /**
+   * The cleartext of an encrypted field of a stored record.
+   *
+   * Which fields a store keeps encrypted, where it keeps their ciphertext and
+   * what key reads them back is the store's business, so a consumer names the
+   * field it wants of the collection it read the record from. Here the OS key
+   * store does the re-authentication as part of decrypting.
+   *
+   * @param {object} record A record this store handed out.
+   * @param {string} field The field to read, e.g. "cc-number".
+   * @param {object} [options]
+   * @param {string|false} [options.reauth] The OS re-authentication prompt to
+   *   show first, or false to read it without one.
+   * @param {string} [options.trigger] What is asking, for the OS key store's
+   *   own telemetry.
+   * @returns {Promise<?string>} The cleartext, or null if the record holds
+   *   nothing encrypted under that field -- in which case nothing is asked of
+   *   the user.
+   */
+  decryptField(
+    record,
+    field,
+    { reauth = false, trigger = "formautofill_cc" } = {}
+  ) {
+    const ciphertext = record[lazy.CreditCardRecord.ciphertextField(field)];
+    if (!ciphertext) {
+      return Promise.resolve(null);
+    }
+    return lazy.OSKeyStore.decrypt(ciphertext, trigger, reauth);
   }
 
   async _stripComputedFields(creditCard) {

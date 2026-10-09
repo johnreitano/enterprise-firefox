@@ -3,7 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 :host {
-  --aitab-text-block-gap: 72px;
+  --aitab-text-block-gap: 36px;
+
   --aitab-text-block-references-gap: 6px;
 }
 
@@ -11,11 +12,11 @@
   display: grid;
   /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
   gap: var(--aitab-text-block-gap);
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.75fr);
+  grid-template-columns: 100%;
 
-  @container aitab-page (max-width: 900px) {
-    grid-template-columns: 100%;
-    --aitab-text-block-gap: 36px;
+  @media (width > 900px) {
+    --aitab-text-block-gap: 72px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.75fr);
   }
 }
 

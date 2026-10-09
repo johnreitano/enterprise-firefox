@@ -51,6 +51,7 @@ DirtyTrackingAutoLock::DirtyTrackingAutoLock(
   }
 }
 
+DirtyTrackingAutoLock::~DirtyTrackingAutoLock() { Unlock<true>(); }
 void DirtyTrackingAutoLock::EagerMarkAsDirty() {
   MOZ_ASSERT(IsValid());
 
@@ -73,6 +74,8 @@ void DirtyTrackingAutoLock::EagerMarkAsDirty() {
   }
 }
 
+bool DirtyTrackingAutoLock::IsValid() const { return !!mOriginInfo; }
+
 RefPtr<OriginInfo> DirtyTrackingAutoLock::GetOriginInfo(
     const nsClassHashtable<nsCStringHashKey, GroupInfoPair>& aGroupInfoPairs,
     const OriginMetadata& aOriginMetadata) {
@@ -87,6 +90,12 @@ RefPtr<OriginInfo> DirtyTrackingAutoLock::GetOriginInfo(
 
   return groupInfo ? groupInfo->LockedGetOriginInfo(aOriginMetadata.mOrigin)
                    : nullptr;
+}
+
+RefPtr<OriginInfo> DirtyTrackingAutoLock::GetOriginInfo() const {
+  MOZ_DIAGNOSTIC_ASSERT(IsValid());
+
+  return mOriginInfo;
 }
 
 }  // namespace mozilla::dom::quota

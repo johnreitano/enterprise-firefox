@@ -316,8 +316,9 @@ nsresult JsepSessionImpl::CreateOfferMsection(const JsepOfferOptions& options,
   }
 
   if (msection->GetMediaType() != SdpMediaSection::MediaType::kApplication) {
-    // Ditto for extmap-allow-mixed
-    msection->GetAttributeList().SetAttribute(
+    // Ditto for extmap-allow-mixed Add to session level instead of media
+    // level. Adding more than once is a no-op.
+    local->GetAttributeList().SetAttribute(
         MakeUnique<SdpFlagAttribute>(SdpAttribute::kExtmapAllowMixedAttribute));
   }
 

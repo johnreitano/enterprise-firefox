@@ -5,7 +5,11 @@
 #ifndef jit_IonGenericCallStub_h
 #define jit_IonGenericCallStub_h
 
-#include "jit/Registers.h"
+#include "jit/Assembler.h"
+
+#if !defined(JS_USE_LINK_REGISTER) || defined(JS_CODEGEN_ARM)
+#  include "jit/Registers.h"
+#endif
 
 namespace js::jit {
 

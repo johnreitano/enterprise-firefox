@@ -164,7 +164,6 @@ reason = "Windows test specific to the x86-64 architecture"
 skip-if = [
   "os == 'android'",
   "os == 'mac' && os_version == '10.15' && arch == 'x86_64'",
-  "os == 'mac' && os_version == '14.70' && arch == 'x86_64'",
   "os == 'mac' && os_version == '15.30' && arch == 'aarch64'",
 ]
 

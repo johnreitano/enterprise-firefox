@@ -52,9 +52,6 @@ prefs = [
 ]
 
 ["browser_aboutnewtab_process_selection.js"]
-skip-if = [
-  "os == 'mac' && os_version == '10.15' && arch == 'x86_64'", # bug 1618098
-]
 
 ["browser_blocking_image.js"]
 
@@ -66,9 +63,6 @@ tags = "mcb"
 ["browser_bug1058164.js"]
 
 ["browser_bug1303838.js"]
-skip-if = [
-  "os == 'mac' && os_version == '10.15' && arch == 'x86_64' && opt", # Bug 1703712
-]
 
 ["browser_bug1554070.js"]
 support-files = [

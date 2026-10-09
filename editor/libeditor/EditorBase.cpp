@@ -1913,6 +1913,10 @@ nsresult EditorBase::CutAsAction(nsIPrincipal* aPrincipal) {
     }
   }
 
+  editActionData.SetSelectionCreatedByDoubleclick(
+      SelectionRef().GetFrameSelection() &&
+      SelectionRef().GetFrameSelection()->IsDoubleClickSelection());
+
   // Dispatch "beforeinput" event after dispatching "cut" event.
   nsresult rv = editActionData.MaybeDispatchBeforeInputEvent();
   if (NS_FAILED(rv)) {
@@ -3017,6 +3021,13 @@ NS_IMETHODIMP EditorBase::NotifySelectionChanged(Document* aDocument,
                                                  int32_t aAmount) {
   if (NS_WARN_IF(!aDocument) || NS_WARN_IF(!aSelection)) {
     return NS_ERROR_INVALID_ARG;
+  }
+
+  if (IsDispatchingInputEvent()) {
+    mEditActionData
+        ->SetSelectionCreatedByDoubleclickOfEditActionDispatchingInputEvent(
+            aSelection->GetFrameSelection() &&
+            aSelection->GetFrameSelection()->IsDoubleClickSelection());
   }
 
   if (mTextInputListener) {

@@ -75,12 +75,12 @@ export class SearchbarInput extends UrlbarInputBase {
     this.addContextMenuItems({
       after: "edit-contextmenu-select-all",
       createItems: () => {
-        let fragment = this.document.createDocumentFragment();
-        let separator = this.document.createXULElement("menuseparator");
+        let fragment = document.createDocumentFragment();
+        let separator = document.createXULElement("menuseparator");
 
-        let clearHistory = this.document.createXULElement("menuitem");
+        let clearHistory = document.createXULElement("menuitem");
         clearHistory.setAttribute("anonid", "clear-search-history");
-        this.document.l10n.setAttributes(clearHistory, "clear-search-history");
+        document.l10n.setAttributes(clearHistory, "clear-search-history");
         clearHistory.addEventListener("command", () => {
           lazy.UrlbarUtils.clearFormHistory();
           this.handleRevert();

@@ -858,15 +858,15 @@ nsresult TransportLayerDtls::GetChannelInfo(SSLChannelInfo* info) const {
 nsTArray<nsTArray<uint8_t>> TransportLayerDtls::GetPeerCertChainDer() const {
   CheckThread();
   nsTArray<nsTArray<uint8_t>> result;
-  UniqueCERTCertList chain(SSL_PeerCertificateChain(ssl_fd_.get()));
-  if (!chain) {
+  UniqueSECItemArray chain;
+  if (SSL_PeerCertificateChainDER(ssl_fd_.get(), TempPtrToSetter(&chain)) !=
+      SECSuccess) {
     MOZ_MTLOG(ML_NOTICE,
-              LAYER_INFO << "SSL_PeerCertificateChain returned no certs");
+              LAYER_INFO << "SSL_PeerCertificateChainDER returned no certs");
     return result;
   }
-  for (CERTCertListNode* node = CERT_LIST_HEAD(chain);
-       !CERT_LIST_END(node, chain); node = CERT_LIST_NEXT(node)) {
-    const SECItem& der = node->cert->derCert;
+  for (unsigned int i = 0; i < chain->len; ++i) {
+    const SECItem& der = chain->items[i];
     nsTArray<uint8_t> bytes;
     bytes.AppendElements(der.data, der.len);
     result.AppendElement(std::move(bytes));
@@ -1546,13 +1546,14 @@ SECStatus TransportLayerDtls::AuthCertificateHook(void* arg, PRFileDesc* fd,
   return stream->AuthCertificateHook(fd, checksig, isServer);
 }
 
-SECStatus TransportLayerDtls::CheckDigest(
-    const DtlsDigest& digest, UniqueCERTCertificate& peer_cert) const {
+SECStatus TransportLayerDtls::CheckDigest(const DtlsDigest& digest,
+                                          const SECItem& peer_cert_der) const {
   DtlsDigest computed_digest(digest.algorithm_);
 
   MOZ_MTLOG(ML_DEBUG,
             LAYER_INFO << "Checking digest, algorithm=" << digest.algorithm_);
-  nsresult res = DtlsIdentity::ComputeFingerprint(peer_cert, &computed_digest);
+  nsresult res = DtlsIdentity::ComputeFingerprint(
+      peer_cert_der.data, peer_cert_der.len, &computed_digest);
   if (NS_FAILED(res)) {
     MOZ_MTLOG(ML_ERROR, "Could not compute peer fingerprint for digest "
                             << digest.algorithm_);
@@ -1574,7 +1575,6 @@ SECStatus TransportLayerDtls::AuthCertificateHook(PRFileDesc* fd,
                                                   PRBool checksig,
                                                   PRBool isServer) {
   CheckThread();
-  UniqueCERTCertificate peer_cert(SSL_PeerCertificate(fd));
 
   // We are not set up to take this being called multiple
   // times. Change this if we ever add renegotiation.
@@ -1599,12 +1599,20 @@ SECStatus TransportLayerDtls::AuthCertificateHook(PRFileDesc* fd,
 
     case VERIFY_DIGEST: {
       MOZ_ASSERT(!digests_.empty());
+      UniqueSECItemArray peer_cert_chain;
+      SECStatus rv =
+          SSL_PeerCertificateChainDER(fd, TempPtrToSetter(&peer_cert_chain));
+      if (rv != SECSuccess || peer_cert_chain->len == 0) {
+        PR_SetError(SSL_ERROR_BAD_CERTIFICATE, 0);
+        break;
+      }
+
       // Check all the provided digests
 
       // Checking functions call PR_SetError()
-      SECStatus rv = SECFailure;
+      rv = SECFailure;
       for (const auto& digest : digests_) {
-        rv = CheckDigest(digest, peer_cert);
+        rv = CheckDigest(digest, peer_cert_chain->items[0]);
 
         // Matches a digest, we are good to go
         if (rv == SECSuccess) {

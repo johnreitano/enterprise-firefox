@@ -342,25 +342,6 @@ sidebar-main,
     inset: 0;
     inset-inline-end: unset;
 
-    /* Make sure the colors match the toolbox and they are opaque.
-     * TODO(bug 2070647): Consider moving this to the
-     * launcher-expanded/ongoing-animations block. */
-    color: var(--toolbox-text-color);
-    background-image: var(--toolbox-background-gradient), image(var(--toolbox-background-color));
-    background-size:
-      100vw 100vh,
-      auto;
-    /* With Windows Mica, the toolbox background is not guaranteed to be opaque.
-     * Make sure there's some opaque backdrop that matches our color scheme.
-     * These colors match the "transparency effects disabled" mica backdrop on
-     * Windows 11, which is as good as we can make it. */
-    background-color: light-dark(#e8e8e8, #202020);
-
-    &[sidebar-positionend]:-moz-locale-dir(ltr),
-    &:not([sidebar-positionend]):-moz-locale-dir(rtl) {
-      background-position-x: 100%;
-    }
-
     &[sidebar-positionend] {
       inset-inline-start: unset;
       inset-inline-end: 0;
@@ -372,6 +353,25 @@ sidebar-main,
     &[sidebar-ongoing-animations] {
       z-index: var(--browser-area-z-index-sidebar-expand-on-hover);
       position: absolute;
+
+      /* Make sure the colors match the toolbox and they are opaque.
+       * TODO(bug 2070647): Consider moving this to the
+       * launcher-expanded/ongoing-animations block. */
+      color: var(--toolbox-text-color);
+      background-image: var(--toolbox-background-gradient), image(var(--toolbox-background-color));
+      background-size:
+        100vw 100vh,
+        auto;
+      /* With Windows Mica, the toolbox background is not guaranteed to be opaque.
+       * Make sure there's some opaque backdrop that matches our color scheme.
+       * These colors match the "transparency effects disabled" mica backdrop on
+       * Windows 11, which is as good as we can make it. */
+      background-color: light-dark(#e8e8e8, #202020);
+
+      &[sidebar-positionend]:-moz-locale-dir(ltr),
+      &:not([sidebar-positionend]):-moz-locale-dir(rtl) {
+        background-position-x: 100%;
+      }
 
       &:not([sidebar-positionend]) {
         border-inline-end: 0.01px solid var(--sidebar-border-color);

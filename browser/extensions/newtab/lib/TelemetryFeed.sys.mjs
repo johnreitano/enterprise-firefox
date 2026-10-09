@@ -39,6 +39,7 @@ const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
   AboutNewTab: "resource:///modules/AboutNewTab.sys.mjs",
+  AboutNewTabParent: "resource:///actors/AboutNewTabParent.sys.mjs",
   AdsClient: "resource://newtab/lib/AdsClient.sys.mjs",
   ClientEnvironmentBase:
     "resource://gre/modules/components-utils/ClientEnvironment.sys.mjs",
@@ -74,6 +75,17 @@ export function isAdEligiblePositionSupported(
   version = AppConstants.MOZ_APP_VERSION
 ) {
   return Services.vc.compare(version, "157.0a1") >= 0;
+}
+
+// @backward-compat { version 160 } background, and event_source on
+// topsites.click, were added as extra_keys in 160. glean-core drops the whole
+// event when it sees an unknown extra key, so below 160 background is omitted,
+// and the new top site clicks are not recorded at all: without event_source
+// they could not be told apart from plain clicks.
+export function isBrowserContextMenuClickSupported(
+  version = AppConstants.MOZ_APP_VERSION
+) {
+  return Services.vc.compare(version, "160.0a1") >= 0;
 }
 
 export const PREF_IMPRESSION_ID = "impressionId";
@@ -122,6 +134,13 @@ const DWELL_LABELS = new Set([
 // Upper bound on the pages we track at once, so a session that opens many
 // links without going idle can't grow the map forever.
 const MAX_TRACKED_OPENED_PAGES = 100;
+
+// Fired by URILoadingHelper when Firefox opens a link from page content in a
+// new tab or window, e.g. from its context menu or on middle-click. Newtab
+// cannot otherwise see these opens.
+const CREATED_NAVIGATION_TARGET_TOPIC = "webNavigation-createdNavigationTarget";
+const BROWSER_CONTEXT_MENU_OR_MIDDLE_CLICK_SOURCE =
+  "BROWSER_CONTEXT_MENU_OR_MIDDLE_CLICK";
 
 /**
  * Glean session types for OHTTP ping optimization.
@@ -232,6 +251,8 @@ export class TelemetryFeed {
    * Events are stored here and cleared at session end based on session type.
    */
   #eventBuffer = [];
+  // portID -> { url, userEvent } for the story Firefox may open next.
+  #pendingLinkOpens = new Map();
 
   /** Whether the user is currently interacting. Drives the dwell stopwatches. */
   #userActive = false;
@@ -531,6 +552,10 @@ export class TelemetryFeed {
     return unifiedAdsSpocsEnabled && this.SHOW_SPONSORED_STORIES_ENABLED;
   }
 
+  get canRecordBrowserTopSiteClicks() {
+    return isBrowserContextMenuClickSupported();
+  }
+
   get canSendUnifiedAdsTilesCallbacks() {
     const unifiedAdsTilesEnabled = this._prefs.get(
       PREF_UNIFIED_ADS_TILES_ENABLED
@@ -571,6 +596,7 @@ export class TelemetryFeed {
       );
       Services.obs.addObserver(this, USER_INTERACTION_ACTIVE);
       Services.obs.addObserver(this, USER_INTERACTION_INACTIVE);
+      Services.obs.addObserver(this, CREATED_NAVIGATION_TARGET_TOPIC);
     }
 
     // Set two scalars for the "deletion-request" ping (See bug 1602064 and 1729474)
@@ -822,6 +848,7 @@ export class TelemetryFeed {
       // describes it. Anything it managed to queue goes with it.
       this.#discardEventBuffer(session.session_id);
       this.sessions.delete(portID);
+      this.#pendingLinkOpens.delete(portID);
       return;
     }
 
@@ -875,6 +902,7 @@ export class TelemetryFeed {
     );
 
     this.sessions.delete(portID);
+    this.#pendingLinkOpens.delete(portID);
   }
 
   /**
@@ -1254,6 +1282,9 @@ export class TelemetryFeed {
             is_sponsored: true,
             position,
             visible_topsites,
+            ...(data.event_source
+              ? { event_source: data.event_source, background: data.background }
+              : {}),
           };
           Glean.topsites.click.record(gleanData);
         }
@@ -1309,6 +1340,12 @@ export class TelemetryFeed {
           visible_topsites,
           smart_scores: JSON.stringify(action.data.smart_scores),
           smart_weights: JSON.stringify(action.data.smart_weights),
+          ...(action.data.event_source
+            ? {
+                event_source: action.data.event_source,
+                background: action.data.background,
+              }
+            : {}),
         });
         break;
 
@@ -1392,6 +1429,38 @@ export class TelemetryFeed {
       case "EXPLORE_MORE_THEMES_CLICK": {
         Glean.newtab.appearanceExploreMoreThemesClick.record({
           newtab_visit_id: session.session_id,
+        });
+        break;
+      }
+      case "OPEN_NEW_WINDOW":
+      case "OPEN_PRIVATE_WINDOW": {
+        const { action_position, source, value } = action.data;
+        if (
+          source !== "TOP_SITES" ||
+          value?.card_type === "search" ||
+          !this.canRecordBrowserTopSiteClicks
+        ) {
+          break;
+        }
+        const row = this.store?.getState()?.TopSites?.rows?.[action_position];
+        if (value?.card_type === "spoc") {
+          this.recordSponsoredTopSiteClick(row, {
+            position: action_position,
+            event_source: "CONTEXT_MENU",
+            meta: action.meta,
+          });
+          break;
+        }
+        this.handleTopSitesOrganicImpressionStats({
+          data: {
+            type: "click",
+            position: action_position,
+            isPinned: row?.isPinned,
+            smart_scores: row?.scores,
+            smart_weights: row?.weights,
+            event_source: "CONTEXT_MENU",
+          },
+          meta: action.meta,
         });
         break;
       }
@@ -1524,11 +1593,11 @@ export class TelemetryFeed {
     const session = this.sessions.get(au.getPortIdOfSender(action));
 
     switch (action.data?.event) {
-      // TODO: Determine if private window should be tracked?
-      // case "OPEN_PRIVATE_WINDOW":
+      case "OPEN_PRIVATE_WINDOW":
       case "OPEN_NEW_WINDOW":
       case "CLICK": {
         const {
+          background,
           card_column,
           card_type,
           corpus_item_id,
@@ -1608,6 +1677,10 @@ export class TelemetryFeed {
               Glean.pocket.click.record({
                 ...this.redactNewTabPing(gleanData, is_sponsored),
                 newtab_visit_id: session.session_id,
+                ...(background !== undefined &&
+                isBrowserContextMenuClickSupported()
+                  ? { background }
+                  : {}),
               });
             }
           );
@@ -1992,6 +2065,9 @@ export class TelemetryFeed {
         break;
       case at.DISCOVERY_STREAM_USER_EVENT:
         this.handleDiscoveryStreamUserEvent(action);
+        break;
+      case at.BROWSER_LINK_OPEN_INTENT:
+        this.handleBrowserLinkOpenIntent(action);
         break;
       case at.TELEMETRY_USER_EVENT:
         this.handleUserEvent(action);
@@ -3042,6 +3118,135 @@ export class TelemetryFeed {
     }
   }
 
+  /**
+   * Records a click for a tile that Firefox opened itself in a new tab or
+   * window, e.g. from its context menu. The tile is resolved from state by its
+   * url and routed through the ordinary click handlers.
+   *
+   * @param {object} subject Subject of the navigation target notification.
+   * @param {MozBrowser} subject.sourceTabBrowser Browser the link was opened from.
+   * @param {MozBrowser} subject.createdTabBrowser Browser the link opened in.
+   * @param {string} subject.url Url of the opened link.
+   */
+  handleCreatedNavigationTarget({ sourceTabBrowser, createdTabBrowser, url }) {
+    const { loadedTabs } = lazy.AboutNewTabParent;
+    const gBrowser = createdTabBrowser?.documentGlobal?.gBrowser;
+    // For a tab opened in the foreground, sourceTabBrowser is read after the
+    // new tab is selected, so it is the new tab rather than newtab.
+    const source = loadedTabs.has(sourceTabBrowser)
+      ? sourceTabBrowser
+      : gBrowser?.getTabForBrowser(createdTabBrowser)?.openerTab?.linkedBrowser;
+    const portID = source && loadedTabs.get(source)?.portID;
+    if (!portID || !this.sessions.has(portID)) {
+      return;
+    }
+    const meta = { fromTarget: portID };
+    const background = gBrowser?.selectedBrowser !== createdTabBrowser;
+
+    const state = this.store.getState();
+    const rows = state?.TopSites?.rows ?? [];
+    const position = rows.findIndex(row => row?.url === url);
+    if (position !== -1) {
+      if (!this.canRecordBrowserTopSiteClicks) {
+        return;
+      }
+      const row = rows[position];
+      if (
+        row.sponsored_position ||
+        row.sponsored_tile_id ||
+        row.type === "SPOC"
+      ) {
+        this.recordSponsoredTopSiteClick(row, {
+          position,
+          event_source: BROWSER_CONTEXT_MENU_OR_MIDDLE_CLICK_SOURCE,
+          background,
+          meta,
+        });
+        return;
+      }
+      this.handleTopSitesOrganicImpressionStats({
+        data: {
+          type: "click",
+          position,
+          isPinned: row.isPinned,
+          smart_scores: row.scores,
+          smart_weights: row.weights,
+          event_source: BROWSER_CONTEXT_MENU_OR_MIDDLE_CLICK_SOURCE,
+          background,
+        },
+        meta,
+      });
+      return;
+    }
+
+    const intent = this.#pendingLinkOpens.get(portID);
+    if (intent?.url !== url) {
+      return;
+    }
+    this.#pendingLinkOpens.delete(portID);
+
+    // The shim is dropped so that no ad callback is sent for sponsored stories.
+    // eslint-disable-next-line no-unused-vars
+    const { shim, ...value } = intent.userEvent.value ?? {};
+    this.handleDiscoveryStreamUserEvent({
+      data: {
+        ...intent.userEvent,
+        value: {
+          ...value,
+          event_source: BROWSER_CONTEXT_MENU_OR_MIDDLE_CLICK_SOURCE,
+          background,
+        },
+      },
+      meta,
+    });
+  }
+
+  /**
+   * Holds the click payload a story sends when it is right-clicked or
+   * middle-clicked, so that it can be recorded if Firefox then opens the link.
+   *
+   * @param {object} action BROWSER_LINK_OPEN_INTENT action from newtab.
+   */
+  handleBrowserLinkOpenIntent(action) {
+    const portID = au.getPortIdOfSender(action);
+    const { url, userEvent } = action.data ?? {};
+    if (!portID || !url || !userEvent) {
+      return;
+    }
+    this.#pendingLinkOpens.set(portID, { url, userEvent });
+  }
+
+  /**
+   * Records a click on a sponsored top site on newtab whose link was opened by
+   * Firefox's right-click menu or a middle-click, or newtab's private window
+   * option.
+   * No reporting url is passed, so no ad callback is sent.
+   *
+   * @param {object} row Top site row from state.
+   * @param {object} options Position, event_source, background and action meta.
+   */
+  recordSponsoredTopSiteClick(
+    row,
+    { position, event_source, background, meta }
+  ) {
+    this.handleTopSitesSponsoredImpressionStats({
+      data: {
+        type: "click",
+        position,
+        source: "newtab",
+        advertiser_name: (
+          row?.label ||
+          row?.hostname ||
+          ""
+        ).toLocaleLowerCase(),
+        frecency_boosted: row?.type === "frecency-boost",
+        event_source,
+        background,
+      },
+      meta,
+    });
+  }
+
   _beginObservingNewtabPingPrefs() {
     Services.prefs.addObserver(ACTIVITY_STREAM_PREF_BRANCH, this);
 
@@ -3072,6 +3277,9 @@ export class TelemetryFeed {
         return;
       case USER_INTERACTION_INACTIVE:
         this.#onUserInteractionInactive();
+        return;
+      case CREATED_NAVIGATION_TARGET_TOPIC:
+        this.handleCreatedNavigationTarget(subject.wrappedJSObject ?? {});
         return;
     }
 
@@ -3157,6 +3365,7 @@ export class TelemetryFeed {
       );
       Services.obs.removeObserver(this, USER_INTERACTION_ACTIVE);
       Services.obs.removeObserver(this, USER_INTERACTION_INACTIVE);
+      Services.obs.removeObserver(this, CREATED_NAVIGATION_TARGET_TOPIC);
       this.#userActive = false;
       this.#lastActiveAt = null;
       this._initialized = false;

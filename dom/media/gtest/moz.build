@@ -228,3 +228,14 @@ if CONFIG["CC_TYPE"] in ("clang", "clang-cl"):
     CXXFLAGS += [
         "-Wno-inconsistent-missing-override",
     ]
+
+SOURCE_HEADERS += [
+    "GMPTestMonitor.h",
+    "MediaSinkTestUtils.h",
+    "MockDecoderModule.h",
+    "MockGraphInterface.h",
+    "MockMediaDataDemuxer.h",
+    "MockMediaDecoderOwner.h",
+    "MockMediaResource.h",
+    "YUVBufferGenerator.h",
+]

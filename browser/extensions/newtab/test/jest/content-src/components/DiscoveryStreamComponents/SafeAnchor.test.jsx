@@ -47,6 +47,23 @@ describe("Discovery Stream <SafeAnchor>", () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
+  it("should report an open intent on right-click and middle-click only", () => {
+    const onLinkOpenIntent = jest.fn();
+    const { container } = render(
+      <SafeAnchor
+        url="https://example.com"
+        onLinkOpenIntent={onLinkOpenIntent}
+      />
+    );
+    const link = container.querySelector("a");
+
+    fireEvent.contextMenu(link);
+    fireEvent(link, new MouseEvent("auxclick", { bubbles: true, button: 1 }));
+    fireEvent(link, new MouseEvent("auxclick", { bubbles: true, button: 2 }));
+
+    expect(onLinkOpenIntent).toHaveBeenCalledTimes(2);
+  });
+
   it("should dispatch an event on click", () => {
     const dispatch = jest.fn();
     const { container } = render(<SafeAnchor dispatch={dispatch} />);

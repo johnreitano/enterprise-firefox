@@ -520,7 +520,8 @@ class _SessionStore {
   // states for all recently closed windows
   #closedWindows = [];
 
-  #savedGroups = /** @type {SavedTabGroupStateData[]} */ ([]);
+  /** @type {SavedTabGroupStateData[]} */
+  #savedGroups = [];
 
   /**
    * States for all saved and closed tab groups.
@@ -573,7 +574,8 @@ class _SessionStore {
    *   The unique ID of the item that closed.
    */
 
-  #lastClosedActions = /** @type {CloseAction[]} */ ([]);
+  /** @type {CloseAction[]} */
+  #lastClosedActions = [];
 
   /**
    * Removes an object from the #lastClosedActions list

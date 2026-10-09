@@ -108,12 +108,22 @@ export class PageExtractorParent extends JSWindowActorParent {
    * @returns {Promise<{hasPendingNavigation: boolean}>}
    */
   async waitForPageReady(traceId, refreshWithinMs) {
-    return this.#trace(lazy.Phase.waitForReady, { traceId }, event =>
-      this.sendQuery("PageExtractorParent:WaitForPageReady", {
-        traceId: event.traceId,
-        refreshWithinMs,
-      })
-    );
+    return this.#trace(lazy.Phase.waitForReady, { traceId }, async event => {
+      try {
+        return await this.sendQuery("PageExtractorParent:WaitForPageReady", {
+          traceId: event.traceId,
+          refreshWithinMs,
+        });
+      } catch (error) {
+        // The document was replaced or its browser torn down before it was
+        // ready. A replacement is read in its place, and a teardown is
+        // already reported by the phase that caused it.
+        if (error?.name === "AbortError") {
+          event.finish({ status: "document-unloaded" });
+        }
+        throw error;
+      }
+    });
   }
 
   /**
@@ -157,7 +167,7 @@ export class PageExtractorParent extends JSWindowActorParent {
         if (this.#isPDF()) {
           const result = await this.#getTextFromPDF(options, event.traceId);
           event.finish({
-            status: "success",
+            status: result.text ? "success" : "empty",
             strategy: "pdf",
             textLength: result.text.length,
             linkCount: result.links.length,
@@ -175,7 +185,7 @@ export class PageExtractorParent extends JSWindowActorParent {
           return null;
         }
         event.finish({
-          status: "success",
+          status: result.text ? "success" : "empty",
           textLength: result.text.length,
           linkCount: result.links.length,
           canvasCount: result.canvasSnapshots.length,
@@ -219,7 +229,10 @@ export class PageExtractorParent extends JSWindowActorParent {
 
         text = lazy.collapseWhitespace(text).trim();
 
-        event.finish({ status: "success", textLength: text.length });
+        event.finish({
+          status: text ? "success" : "empty",
+          textLength: text.length,
+        });
         return { text, links: [], canvasSnapshots: [] };
       }
     );
@@ -455,8 +468,9 @@ export class PageExtractorParent extends JSWindowActorParent {
                     errorName: error.name,
                   });
                   actorResolver.reject(
-                    new Error(
-                      "PageExtractor could not run on that page or the page could not be found."
+                    new DOMException(
+                      "PageExtractor could not run on that page or the page could not be found.",
+                      error.name
                     )
                   );
                   return;

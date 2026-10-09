@@ -508,6 +508,7 @@ class ContentChild final : public PContentChild,
                                           const ImageIntSize& aSize,
                                           const bool& aStretch,
                                           const ColorScheme& aColoScheme,
+                                          NotNull<nsIPrincipal*> aPrincipal,
                                           DecodeImageResolver&& aResolver);
 
 #if defined(XP_WIN)

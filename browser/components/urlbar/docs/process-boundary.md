@@ -115,6 +115,6 @@ result's `id` instead, as `acknowledgeFeedback()` and
 `updateResultMenuCommands()` do.
 
 A provider that needs the chrome window reads `controller.browserWindow`, which
-the parent resolves from the actor. `controller.input.window` doesn't exist on
-the message path. The results that were visible at engagement time come with the
-engagement data rather than from the view, since the parent's view has none.
+the parent resolves from the actor. The results that were visible at engagement
+time come with the engagement data rather than from the view, since the parent's
+view has none.

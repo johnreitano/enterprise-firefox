@@ -125,13 +125,14 @@ function findModule(
   );
 }
 
-function findParams(records, { feature, model }) {
+function findParams(records, { feature, model, majorVersion }) {
+  const major = majorVersion ?? FEATURE_MAJOR_VERSIONS[feature];
   const candidates = records.filter(
     r =>
       r.kind === "params" &&
       r.feature === feature &&
       Array.isArray(r.modules) &&
-      checkMajorVersion(r.version, FEATURE_MAJOR_VERSIONS[feature])
+      checkMajorVersion(r.version, major)
   );
   return (
     (model && candidates.find(r => r.model === model)) ||
@@ -579,6 +580,10 @@ export async function loadPrompt(feature, opts = {}) {
  *
  * @param {string} feature - Feature identifier from MODEL_FEATURES
  * @param {object} [opts]
+ * @param {string} opts.module - Module name from the feature's params manifest
+ * @param {string} [opts.model] - Model to resolve for; defaults to the model pref
+ * @param {number} [opts.majorVersionOverride] - Major to read instead of
+ *   FEATURE_MAJOR_VERSIONS[feature] (tests, next-release dry runs)
  * @returns {Promise<{prompt: string, version: string}>} The prompt text and version
  */
 export async function loadPromptV2(feature, opts = {}) {
@@ -588,14 +593,18 @@ export async function loadPromptV2(feature, opts = {}) {
   // resolve the model
   const model = opts.model ?? Services.prefs.getStringPref(MODEL_PREF, "");
 
-  // find the params record for the feature+model
+  // find the params record for the feature+model at this build's major, or
+  // the override (honored like the v1 path); findParams applies the default
   const paramsRecord = findParams(v2Records, {
     feature,
     model,
+    majorVersion: opts.majorVersionOverride,
   });
   if (!paramsRecord) {
+    const majorVersion =
+      opts.majorVersionOverride ?? FEATURE_MAJOR_VERSIONS[feature];
     const err = new Error(
-      `No matching v2 params record found for feature: ${feature} with model ${model}`
+      `No matching v2 params record found for feature: ${feature} with model ${model} at major version ${majorVersion}`
     );
     err.clientReason = "v2ParamsUnavailable";
     throw err;

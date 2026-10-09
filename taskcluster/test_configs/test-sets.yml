@@ -163,6 +163,13 @@ awsy:
     - awsy-base-dmd
     - awsy-tp6
 
+# Pageload AWSY tests for the macOS tart VMs. The base tests stay on hardware
+# for now, as their results were less stable on the VMs (Bug 2045799).
+awsy-pageload:
+    - awsy
+    - awsy-dmd
+    - awsy-tp6
+
 ccov-code-coverage-tests:
     - test-coverage
     - test-coverage-wpt

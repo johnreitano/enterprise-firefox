@@ -68,3 +68,7 @@ AllowCompilerWarnings()
 NoVisibilityFlags()
 
 FINAL_LIBRARY = 'mozinference'
+
+SOURCE_HEADERS += [
+	"moz-overrides.h",
+]

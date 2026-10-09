@@ -2727,8 +2727,9 @@ nsHttpHandler::EnsureHSTSDataReadyNative(
   auto func = [callback(aCallback)](bool aResult, nsresult aStatus) {
     callback->DoCallback(aResult);
   };
-  rv = NS_ShouldSecureUpgrade(uri, nullptr, nullptr, false, originAttributes,
-                              shouldUpgrade, std::move(func), willCallback);
+  rv = NS_ShouldSecureUpgrade(uri, nullptr, nullptr, nullptr, false,
+                              originAttributes, shouldUpgrade, std::move(func),
+                              willCallback);
   if (NS_FAILED(rv) || !willCallback) {
     aCallback->DoCallback(false);
     return rv;

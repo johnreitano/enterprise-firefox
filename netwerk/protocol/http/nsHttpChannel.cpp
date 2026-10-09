@@ -987,9 +987,10 @@ nsresult nsHttpChannel::OnBeforeConnect() {
       };
 
       bool willCallback = false;
-      rv = NS_ShouldSecureUpgrade(
-          mURI, mLoadInfo, resultPrincipal, LoadAllowSTS(), originAttributes,
-          shouldUpgrade, std::move(resultCallback), willCallback);
+      rv = NS_ShouldSecureUpgrade(mURI, mLoadInfo, this, resultPrincipal,
+                                  LoadAllowSTS(), originAttributes,
+                                  shouldUpgrade, std::move(resultCallback),
+                                  willCallback);
       // If the request gets upgraded because of the HTTPS-Only mode, but no
       // event listener has been registered so far, we want to do that here.
       uint32_t httpOnlyStatus = mLoadInfo->GetHttpsOnlyStatus();
@@ -1188,6 +1189,7 @@ nsresult nsHttpChannel::ContinueOnBeforeConnect(bool aShouldUpgrade,
     // already present in the loadinfo.
     if (aUpgradeWithHTTPSRR) {
       mLoadInfo->SetHttpsUpgradeTelemetry(nsILoadInfo::HTTPS_RR);
+      NS_LogSecureUpgradeToConsole(mURI, mLoadInfo, this, "HTTPS RR"_ns);
     }
     return AsyncCall(&nsHttpChannel::HandleAsyncRedirectChannelToHttps);
   }

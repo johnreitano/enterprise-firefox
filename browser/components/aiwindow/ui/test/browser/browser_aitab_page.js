@@ -194,6 +194,19 @@ add_task(async function test_renders_page_config() {
         ["textblock", "timeline"],
         "Every typed block gets a placeholder that keeps its type, and a block with no type is skipped"
       );
+
+      const footer = shadowRoot.querySelector(".aitab-sheet + aitab-footer");
+      Assert.ok(footer, "The footer is rendered after the page content");
+      await footer.wrappedJSObject.updateComplete;
+      const madeWith = footer.shadowRoot.querySelector(".aitab-made-with");
+      await ContentTaskUtils.waitForCondition(
+        () => madeWith.textContent.trim(),
+        "The footer credit is localized"
+      );
+      Assert.ok(
+        madeWith.querySelector(".aitab-made-with-brand"),
+        "Localizing the credit keeps the brand element that carries the logo"
+      );
     });
   });
 

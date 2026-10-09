@@ -111,9 +111,6 @@ run-if = [
 ["browser_sma_show_firefox_accounts.js"]
 
 ["browser_sma_show_migration_wizard.js"]
-skip-if = [
-  "os == 'mac' && os_version == '10.15' && arch == 'x86_64' && debug", # Bug 1837646
-]
 
 ["browser_sma_submit_onboarding_opt_out_ping.js"]
 

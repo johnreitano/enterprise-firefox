@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { AITabStore } from "moz-src:///browser/components/aiwindow/ui/modules/AITabStore.sys.mjs";
+import { getHeadingFont } from "moz-src:///browser/components/aiwindow/ui/modules/AITabHeadingFont.sys.mjs";
 import { ConversationStore } from "moz-src:///browser/components/aiwindow/ui/modules/ConversationStore.sys.mjs";
 import { getSmartPageName } from "chrome://browser/content/aiwindow/modules/TrustedInternalURLs.mjs";
 import { A2UI } from "../modules/A2UI.mjs";
@@ -58,6 +59,12 @@ export function formatCreatedAt(createdAt, now = Date.now()) {
  * actions the page offers.
  */
 export class AITabParent extends JSWindowActorParent {
+  #headingFontPromise = null;
+
+  actorCreated() {
+    this.#headingFontPromise = this.#loadHeadingFont();
+  }
+
   async receiveMessage({ data, name }) {
     switch (name) {
       case "AITab:GetPage":
@@ -108,6 +115,7 @@ export class AITabParent extends JSWindowActorParent {
 
       return {
         success: true,
+        font: await this.#headingFontPromise,
         page: pageData &&
           page && {
             ...pageData,
@@ -119,6 +127,21 @@ export class AITabParent extends JSWindowActorParent {
     } catch (error) {
       console.error("Failed to retrieve AI Tab page:", error);
       return { success: false, error: "Failed to retrieve page" };
+    }
+  }
+
+  /**
+   * Started when the actor is created and sent with the page, so content can
+   * install the font before it renders.
+   *
+   * @returns {Promise<?ArrayBuffer>} Null when the font is unavailable.
+   */
+  async #loadHeadingFont() {
+    try {
+      return await getHeadingFont();
+    } catch (error) {
+      console.error("Failed to download the AI Tab heading font:", error);
+      return null;
     }
   }
 

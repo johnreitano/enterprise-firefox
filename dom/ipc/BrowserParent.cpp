@@ -73,6 +73,7 @@
 #include "nsFrameLoaderOwner.h"
 #include "nsFrameManager.h"
 #include "nsIAppWindow.h"
+#include "nsIArray.h"
 #include "nsIBaseWindow.h"
 #include "nsIBrowser.h"
 #include "nsIBrowserController.h"

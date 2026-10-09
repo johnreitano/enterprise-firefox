@@ -13,10 +13,13 @@
 #include "SFNTData.h"
 #include "ScaledFontBase.h"
 #include "Tools.h"
+#include "gfxOTSUtils.h"
+#include "mozilla/UniquePtrExtensions.h"
 #include "mozilla/dom/CanvasRenderingContextHelper.h"
 #include "mozilla/ipc/SerializeToBytesUtil.h"
 #include "mozilla/layers/BuildConstants.h"
 #include "mozilla/layers/LayersSurfaces.h"
+#include "nsXULAppAPI.h"
 
 namespace mozilla {
 namespace gfx {
@@ -3297,7 +3300,7 @@ inline bool RecordedDrawSurfaceDescriptor::PlayEvent(
   }
 
   RefPtr<SourceSurface> surface =
-      aTranslator->LookupSourceSurfaceFromSurfaceDescriptor(mDesc);
+      aTranslator->LookupSourceSurfaceFromSurfaceDescriptor(dt, mDesc);
   if (!surface) {
     return false;
   }
@@ -4152,8 +4155,33 @@ inline bool RecordedFontData::PlayEvent(Translator* aTranslator) const {
     return false;
   }
 
+  const uint8_t* data = mData.data();
+  uint32_t length = mData.size();
+
+  UniqueFreePtr<uint8_t> sanitized;
+  if (XRE_IsParentProcess() || XRE_IsGPUProcess()) {
+    size_t lengthHint =
+        gfxOTSContext::GuessSanitizedFontSize(data, length, false);
+    if (!lengthHint) {
+      gfxCriticalNote << "Could not determine type of recorded font of size "
+                      << length;
+      return false;
+    }
+
+    gfxOTSExpandingMemoryStream<gfxOTSMozAlloc> output(lengthHint);
+    gfxOTSContext otsContext;
+    if (!otsContext.Process(&output, data, length)) {
+      gfxCriticalNote << "Failed sanitizing recorded font of size " << length;
+      return false;
+    }
+
+    length = output.Tell();
+    sanitized.reset(static_cast<uint8_t*>(output.forget()));
+    data = sanitized.get();
+  }
+
   RefPtr<NativeFontResource> fontResource = Factory::CreateNativeFontResource(
-      mData.data(), mData.size(), mType, aTranslator->GetFontContext());
+      data, length, mType, aTranslator->GetFontContext());
   if (!fontResource) {
     return false;
   }

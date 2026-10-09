@@ -93,8 +93,17 @@ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "android":
         "gfxFT2Utils.cpp",
         "PrintTargetPDF.cpp",
     ]
+
+    SOURCE_HEADERS += [
+        "gfxFT2FontList.h",
+        "gfxFT2Utils.h",
+    ]
+
     UNIFIED_SOURCES += [
         "AndroidSystemFontIterator.cpp",
+    ]
+    SOURCE_HEADERS += [
+        "AndroidSystemFontIterator.h",
     ]
 elif CONFIG["MOZ_WIDGET_TOOLKIT"] in ("cocoa", "uikit"):
     EXPORTS += [
@@ -111,6 +120,12 @@ elif CONFIG["MOZ_WIDGET_TOOLKIT"] in ("cocoa", "uikit"):
         "gfxPlatformMac.cpp",
         "gfxQuartzNativeDrawing.cpp",
         "gfxQuartzSurface.cpp",
+    ]
+
+    SOURCE_HEADERS += [
+        "CoreTextFontList.h",
+        "gfxCoreTextShaper.h",
+        "gfxMacFont.h",
     ]
     if CONFIG["MOZ_WIDGET_TOOLKIT"] == "cocoa":
         EXPORTS.mozilla.gfx += [
@@ -133,6 +148,12 @@ elif CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
         "gfxFT2Utils.cpp",
         "gfxPlatformGtk.cpp",
         "PrintTargetPDF.cpp",
+    ]
+
+    SOURCE_HEADERS += [
+        "gfxFcPlatformFontList.h",
+        "gfxFT2FontList.h",
+        "gfxFT2Utils.h",
     ]
 
     if CONFIG["MOZ_X11"]:
@@ -171,6 +192,10 @@ elif CONFIG["MOZ_WIDGET_TOOLKIT"] == "windows":
     ]
     UNIFIED_SOURCES += [
         "gfxDWriteFontList.cpp",
+    ]
+    SOURCE_HEADERS += [
+        "d3dkmtQueryStatistics.h",
+        "gfxDWriteFontList.h",
     ]
 
 SOURCES += [
@@ -227,9 +252,17 @@ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "cocoa":
     UNIFIED_SOURCES += [
         "gfxMacPlatformFontList.mm",
     ]
+
+    SOURCE_HEADERS += [
+        "gfxMacPlatformFontList.h",
+    ]
 elif CONFIG["MOZ_WIDGET_TOOLKIT"] == "uikit":
     UNIFIED_SOURCES += [
         "IOSPlatformFontList.mm",
+    ]
+
+    SOURCE_HEADERS += [
+        "IOSPlatformFontList.h",
     ]
 elif CONFIG["MOZ_WIDGET_TOOLKIT"] == "windows":
     UNIFIED_SOURCES += [
@@ -294,4 +327,14 @@ LICENSED_UNDER += ["gfx-font-list"]
 LICENSED_UNDER["gfx-font-list"].paths = [
     "gfxMacPlatformFontList.mm",
     "gfxPlatformFontList.cpp",
+]
+
+SOURCE_HEADERS += [
+    "cairo-xlib-utils.h",
+    "gfxFontMissingGlyphs.h",
+    "gfxGlyphExtents.h",
+    "gfxGraphiteShaper.h",
+    "gfxHarfBuzzShaper.h",
+    "PrintTargetRecording.h",
+    "SharedFontList-impl.h",
 ]

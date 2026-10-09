@@ -31,6 +31,20 @@ linux64-mozcheck:
         toolchain:
             - linux64-rust-static
 
+linux64-aarch64-mozcheck:
+    treeherder:
+        symbol: TLA64(mozcheck)
+        platform: linux64-aarch64/opt
+    run:
+        arguments: ['aarch64-unknown-linux-gnu']
+    attributes:
+        build_platform: linux64-aarch64-mozcheck
+    fetches:
+        toolchain:
+            - linux64-clang-toolchain
+            - linux64-rust-toolchain
+            - sysroot-aarch64-linux-gnu
+
 macosx64-mozcheck:
     treeherder:
         symbol: TM(mozcheck)
@@ -58,6 +72,17 @@ win64-mozcheck:
         symbol: TW64(mozcheck)
     run:
         arguments: ['x86_64-pc-windows-msvc']
+    fetches:
+        toolchain:
+            - linux64-clang-toolchain
+            - linux64-rust-windows-toolchain
+            - vs-toolchain
+
+win64-aarch64-mozcheck:
+    treeherder:
+        symbol: TWA64(mozcheck)
+    run:
+        arguments: ['aarch64-pc-windows-msvc']
     fetches:
         toolchain:
             - linux64-clang-toolchain

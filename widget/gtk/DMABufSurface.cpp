@@ -1577,9 +1577,8 @@ DMABufSurfaceYUV::DMABufSurfaceYUV()
       mWidthAligned(),
       mHeightAligned(),
       mDrmFormats() {
-  for (int i = 0; i < BUFFER_SURFACE_PLANES; i++) {
-    mBufferModifiers[i] = DRM_FORMAT_MOD_INVALID;
-  }
+  std::fill(std::begin(mBufferModifiers), std::end(mBufferModifiers),
+            DRM_FORMAT_MOD_INVALID);
 }
 
 DMABufSurfaceYUV::~DMABufSurfaceYUV() {

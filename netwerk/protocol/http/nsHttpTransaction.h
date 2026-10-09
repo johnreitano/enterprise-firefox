@@ -16,7 +16,6 @@
 #include "nsAHttpConnection.h"
 #include "nsAHttpTransaction.h"
 #include "nsCOMPtr.h"
-#include "nsContentPermissionHelper.h"
 #include "nsHttp.h"
 #include "nsIAsyncOutputStream.h"
 #include "nsIClassOfService.h"

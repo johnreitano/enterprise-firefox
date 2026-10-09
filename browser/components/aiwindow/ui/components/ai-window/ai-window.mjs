@@ -2209,6 +2209,8 @@ export class AIWindow extends MozLitElement {
    *   the conversation's existing system prompt instead of reloading it.
    * @param {object} [options.assistantToolUIData] - Tool UI attached to the
    *   assistant message so it renders alongside the streamed response.
+   * @param {string} [options.aitabSource] - Where an AI Tab page was requested
+   *   from (tab_list or tab_group), for telemetry.
    */
   submitChatMessage({
     text,
@@ -2221,6 +2223,7 @@ export class AIWindow extends MozLitElement {
     skipPromptGeneration = false,
     skipSystemPromptRefresh = false,
     assistantToolUIData,
+    aitabSource = null,
   }) {
     const trimmed = String(text ?? "").trim();
     if (!trimmed) {
@@ -2249,6 +2252,7 @@ export class AIWindow extends MozLitElement {
 
     if (this.#conversation) {
       this.#conversation.lastSubmitType = submitType;
+      this.#conversation.aitabSource = aitabSource;
     }
 
     this.#recordChatInteraction();

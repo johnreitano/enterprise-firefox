@@ -49,51 +49,95 @@ return handleRustResult(
 }
 
 /**
- * Decrypt an arbitrary string - `key` must have come from `create_key()`
- * and `ciphertext` must have come from `encrypt_string()`
- * @param {string} key
- * @param {string} ciphertext
- * @returns {string}
+ * createAutofillStoreWithNssKeymanager
+ * @param {string} path
+ * @param {PrimaryPasswordAuthenticator} primaryPasswordAuthenticator
+ * @returns {Promise<Store>}}
  */
-export function decryptString(
-    key, 
-    ciphertext) {
+export async function createAutofillStoreWithNssKeymanager(
+    path, 
+    primaryPasswordAuthenticator) {
    
-FfiConverterString.checkType(key);
-FfiConverterString.checkType(ciphertext);
-const result = UniFFIScaffolding.callSync(
-    1, // uniffi_autofill_fn_func_decrypt_string
-    FfiConverterString.lower(key),
-    FfiConverterString.lower(ciphertext),
+FfiConverterString.checkType(path);
+FfiConverterTypePrimaryPasswordAuthenticator.checkType(primaryPasswordAuthenticator);
+const result = await UniFFIScaffolding.callAsyncWrapper(
+    1, // uniffi_autofill_fn_func_create_autofill_store_with_nss_keymanager
+    FfiConverterString.lower(path),
+    FfiConverterTypePrimaryPasswordAuthenticator.lower(primaryPasswordAuthenticator),
 )
 return handleRustResult(
     result,
-    FfiConverterString.lift.bind(FfiConverterString),
+    FfiConverterTypeStore.lift.bind(FfiConverterTypeStore),
     FfiConverterTypeAutofillApiError.lift.bind(FfiConverterTypeAutofillApiError),
 )
 }
 
 /**
- * Encrypt an arbitrary string - `key` must have come from `create_key()`
+ * Create a Store with StaticKeyManager by passing in a db path and a
+ * static key
+ * @param {string} path
  * @param {string} key
- * @param {string} cleartext
- * @returns {string}
+ * @returns {Promise<Store>}}
  */
-export function encryptString(
-    key, 
-    cleartext) {
+export async function createAutofillStoreWithStaticKeyManager(
+    path, 
+    key) {
    
+FfiConverterString.checkType(path);
 FfiConverterString.checkType(key);
-FfiConverterString.checkType(cleartext);
-const result = UniFFIScaffolding.callSync(
-    2, // uniffi_autofill_fn_func_encrypt_string
+const result = await UniFFIScaffolding.callAsyncWrapper(
+    2, // uniffi_autofill_fn_func_create_autofill_store_with_static_key_manager
+    FfiConverterString.lower(path),
     FfiConverterString.lower(key),
-    FfiConverterString.lower(cleartext),
 )
 return handleRustResult(
     result,
-    FfiConverterString.lift.bind(FfiConverterString),
+    FfiConverterTypeStore.lift.bind(FfiConverterTypeStore),
     FfiConverterTypeAutofillApiError.lift.bind(FfiConverterTypeAutofillApiError),
+)
+}
+
+/**
+ * Similar to create_static_key_manager above, create a
+ * ManagedEncryptorDecryptor by passing in a KeyManager
+ * @param {KeyManager} keyManager
+ * @returns {EncryptorDecryptor}
+ */
+export function createManagedEncdec(
+    keyManager) {
+   
+FfiConverterTypeKeyManager.checkType(keyManager);
+const result = UniFFIScaffolding.callSync(
+    3, // uniffi_autofill_fn_func_create_managed_encdec
+    FfiConverterTypeKeyManager.lower(keyManager),
+)
+return handleRustResult(
+    result,
+    FfiConverterTypeEncryptorDecryptor.lift.bind(FfiConverterTypeEncryptorDecryptor),
+    null,
+)
+}
+
+/**
+ * Utility function to create a StaticKeyManager to be used for the time
+ * being until support lands for [trait implementation of an UniFFI
+ * interface](https://mozilla.github.io/uniffi-rs/next/proc_macro/index.html#structs-implementing-traits)
+ * in UniFFI.
+ * @param {string} key
+ * @returns {KeyManager}
+ */
+export function createStaticKeyManager(
+    key) {
+   
+FfiConverterString.checkType(key);
+const result = UniFFIScaffolding.callSync(
+    4, // uniffi_autofill_fn_func_create_static_key_manager
+    FfiConverterString.lower(key),
+)
+return handleRustResult(
+    result,
+    FfiConverterTypeKeyManager.lift.bind(FfiConverterTypeKeyManager),
+    null,
 )
 }
 
@@ -857,14 +901,16 @@ export class FfiConverterTypeAddressTombstone extends FfiConverterArrayBuffer {
     }
 }
 /**
- * What you get back as a credit-card.
+ * What you get back as a credit-card. The number comes back decrypted;
+ * it is empty for a scrubbed card or one saved without a number. A number
+ * the key cannot read fails the read.
  */
 export class CreditCard {
     constructor(
         {
             guid, 
             ccName, 
-            ccNumberEnc, 
+            ccNumber, 
             ccNumberLast4, 
             ccExpMonth, 
             ccExpYear, 
@@ -876,7 +922,7 @@ export class CreditCard {
         } = {
             guid: undefined, 
             ccName: undefined, 
-            ccNumberEnc: undefined, 
+            ccNumber: undefined, 
             ccNumberLast4: undefined, 
             ccExpMonth: undefined, 
             ccExpYear: undefined, 
@@ -904,10 +950,10 @@ export class CreditCard {
             throw e;
         }
         try {
-            FfiConverterString.checkType(ccNumberEnc)
+            FfiConverterString.checkType(ccNumber)
         } catch (e) {
             if (e instanceof UniFFITypeError) {
-                e.addItemDescriptionPart("ccNumberEnc");
+                e.addItemDescriptionPart("ccNumber");
             }
             throw e;
         }
@@ -986,7 +1032,7 @@ export class CreditCard {
         /**
          * @type {string}
          */
-        this.ccNumberEnc = ccNumberEnc;
+        this.ccNumber = ccNumber;
         /**
          * @type {string}
          */
@@ -1025,7 +1071,7 @@ export class CreditCard {
         return (
             this.guid == other.guid
             && this.ccName == other.ccName
-            && this.ccNumberEnc == other.ccNumberEnc
+            && this.ccNumber == other.ccNumber
             && this.ccNumberLast4 == other.ccNumberLast4
             && this.ccExpMonth == other.ccExpMonth
             && this.ccExpYear == other.ccExpYear
@@ -1044,7 +1090,7 @@ export class FfiConverterTypeCreditCard extends FfiConverterArrayBuffer {
         return new CreditCard({
             guid: FfiConverterString.read(dataStream),
             ccName: FfiConverterString.read(dataStream),
-            ccNumberEnc: FfiConverterString.read(dataStream),
+            ccNumber: FfiConverterString.read(dataStream),
             ccNumberLast4: FfiConverterString.read(dataStream),
             ccExpMonth: FfiConverterInt64.read(dataStream),
             ccExpYear: FfiConverterInt64.read(dataStream),
@@ -1058,7 +1104,7 @@ export class FfiConverterTypeCreditCard extends FfiConverterArrayBuffer {
     static write(dataStream, value) {
         FfiConverterString.write(dataStream, value.guid);
         FfiConverterString.write(dataStream, value.ccName);
-        FfiConverterString.write(dataStream, value.ccNumberEnc);
+        FfiConverterString.write(dataStream, value.ccNumber);
         FfiConverterString.write(dataStream, value.ccNumberLast4);
         FfiConverterInt64.write(dataStream, value.ccExpMonth);
         FfiConverterInt64.write(dataStream, value.ccExpYear);
@@ -1073,7 +1119,7 @@ export class FfiConverterTypeCreditCard extends FfiConverterArrayBuffer {
         let totalSize = 0;
         totalSize += FfiConverterString.computeSize(value.guid);
         totalSize += FfiConverterString.computeSize(value.ccName);
-        totalSize += FfiConverterString.computeSize(value.ccNumberEnc);
+        totalSize += FfiConverterString.computeSize(value.ccNumber);
         totalSize += FfiConverterString.computeSize(value.ccNumberLast4);
         totalSize += FfiConverterInt64.computeSize(value.ccExpMonth);
         totalSize += FfiConverterInt64.computeSize(value.ccExpYear);
@@ -1107,10 +1153,10 @@ export class FfiConverterTypeCreditCard extends FfiConverterArrayBuffer {
             throw e;
         }
         try {
-            FfiConverterString.checkType(value.ccNumberEnc);
+            FfiConverterString.checkType(value.ccNumber);
         } catch (e) {
             if (e instanceof UniFFITypeError) {
-                e.addItemDescriptionPart(".ccNumberEnc");
+                e.addItemDescriptionPart(".ccNumber");
             }
             throw e;
         }
@@ -2327,21 +2373,20 @@ export class FfiConverterTypeUpdatableAddressFieldsWithMeta extends FfiConverter
     }
 }
 /**
- * What you pass to create or update a credit-card.
+ * What you pass to create or update a credit-card. The number is given in
+ * cleartext; the store encrypts it and derives the last-4 digits itself.
  */
 export class UpdatableCreditCardFields {
     constructor(
         {
             ccName, 
-            ccNumberEnc, 
-            ccNumberLast4, 
+            ccNumber, 
             ccExpMonth, 
             ccExpYear, 
             ccType
         } = {
             ccName: undefined, 
-            ccNumberEnc: undefined, 
-            ccNumberLast4: undefined, 
+            ccNumber: undefined, 
             ccExpMonth: undefined, 
             ccExpYear: undefined, 
             ccType: undefined
@@ -2356,18 +2401,10 @@ export class UpdatableCreditCardFields {
             throw e;
         }
         try {
-            FfiConverterString.checkType(ccNumberEnc)
+            FfiConverterString.checkType(ccNumber)
         } catch (e) {
             if (e instanceof UniFFITypeError) {
-                e.addItemDescriptionPart("ccNumberEnc");
-            }
-            throw e;
-        }
-        try {
-            FfiConverterString.checkType(ccNumberLast4)
-        } catch (e) {
-            if (e instanceof UniFFITypeError) {
-                e.addItemDescriptionPart("ccNumberLast4");
+                e.addItemDescriptionPart("ccNumber");
             }
             throw e;
         }
@@ -2402,11 +2439,7 @@ export class UpdatableCreditCardFields {
         /**
          * @type {string}
          */
-        this.ccNumberEnc = ccNumberEnc;
-        /**
-         * @type {string}
-         */
-        this.ccNumberLast4 = ccNumberLast4;
+        this.ccNumber = ccNumber;
         /**
          * @type {number}
          */
@@ -2424,8 +2457,7 @@ export class UpdatableCreditCardFields {
     equals(other) {
         return (
             this.ccName == other.ccName
-            && this.ccNumberEnc == other.ccNumberEnc
-            && this.ccNumberLast4 == other.ccNumberLast4
+            && this.ccNumber == other.ccNumber
             && this.ccExpMonth == other.ccExpMonth
             && this.ccExpYear == other.ccExpYear
             && this.ccType == other.ccType
@@ -2438,8 +2470,7 @@ export class FfiConverterTypeUpdatableCreditCardFields extends FfiConverterArray
     static read(dataStream) {
         return new UpdatableCreditCardFields({
             ccName: FfiConverterString.read(dataStream),
-            ccNumberEnc: FfiConverterString.read(dataStream),
-            ccNumberLast4: FfiConverterString.read(dataStream),
+            ccNumber: FfiConverterString.read(dataStream),
             ccExpMonth: FfiConverterInt64.read(dataStream),
             ccExpYear: FfiConverterInt64.read(dataStream),
             ccType: FfiConverterString.read(dataStream),
@@ -2447,8 +2478,7 @@ export class FfiConverterTypeUpdatableCreditCardFields extends FfiConverterArray
     }
     static write(dataStream, value) {
         FfiConverterString.write(dataStream, value.ccName);
-        FfiConverterString.write(dataStream, value.ccNumberEnc);
-        FfiConverterString.write(dataStream, value.ccNumberLast4);
+        FfiConverterString.write(dataStream, value.ccNumber);
         FfiConverterInt64.write(dataStream, value.ccExpMonth);
         FfiConverterInt64.write(dataStream, value.ccExpYear);
         FfiConverterString.write(dataStream, value.ccType);
@@ -2457,8 +2487,7 @@ export class FfiConverterTypeUpdatableCreditCardFields extends FfiConverterArray
     static computeSize(value) {
         let totalSize = 0;
         totalSize += FfiConverterString.computeSize(value.ccName);
-        totalSize += FfiConverterString.computeSize(value.ccNumberEnc);
-        totalSize += FfiConverterString.computeSize(value.ccNumberLast4);
+        totalSize += FfiConverterString.computeSize(value.ccNumber);
         totalSize += FfiConverterInt64.computeSize(value.ccExpMonth);
         totalSize += FfiConverterInt64.computeSize(value.ccExpYear);
         totalSize += FfiConverterString.computeSize(value.ccType);
@@ -2479,18 +2508,10 @@ export class FfiConverterTypeUpdatableCreditCardFields extends FfiConverterArray
             throw e;
         }
         try {
-            FfiConverterString.checkType(value.ccNumberEnc);
+            FfiConverterString.checkType(value.ccNumber);
         } catch (e) {
             if (e instanceof UniFFITypeError) {
-                e.addItemDescriptionPart(".ccNumberEnc");
-            }
-            throw e;
-        }
-        try {
-            FfiConverterString.checkType(value.ccNumberLast4);
-        } catch (e) {
-            if (e instanceof UniFFITypeError) {
-                e.addItemDescriptionPart(".ccNumberLast4");
+                e.addItemDescriptionPart(".ccNumber");
             }
             throw e;
         }
@@ -3630,7 +3651,7 @@ export class AddressesBridgedEngine extends AddressesBridgedEngineInterface {
        
         FfiConverterInt64.checkType(serverModifiedMillis);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            52, // uniffi_autofill_fn_method_addressesbridgedengine_apply
+            54, // uniffi_autofill_fn_method_addressesbridgedengine_apply
             FfiConverterTypeAddressesBridgedEngine.lowerReceiver(this),
             FfiConverterInt64.lower(serverModifiedMillis),
         )
@@ -3651,7 +3672,7 @@ export class AddressesBridgedEngine extends AddressesBridgedEngineInterface {
        
         FfiConverterString.checkType(newSyncId);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            53, // uniffi_autofill_fn_method_addressesbridgedengine_ensure_current_sync_id
+            55, // uniffi_autofill_fn_method_addressesbridgedengine_ensure_current_sync_id
             FfiConverterTypeAddressesBridgedEngine.lowerReceiver(this),
             FfiConverterString.lower(newSyncId),
         )
@@ -3669,7 +3690,7 @@ export class AddressesBridgedEngine extends AddressesBridgedEngineInterface {
     async lastSync() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            54, // uniffi_autofill_fn_method_addressesbridgedengine_last_sync
+            56, // uniffi_autofill_fn_method_addressesbridgedengine_last_sync
             FfiConverterTypeAddressesBridgedEngine.lowerReceiver(this),
         )
         return handleRustResult(
@@ -3685,7 +3706,7 @@ export class AddressesBridgedEngine extends AddressesBridgedEngineInterface {
     async reset() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            55, // uniffi_autofill_fn_method_addressesbridgedengine_reset
+            57, // uniffi_autofill_fn_method_addressesbridgedengine_reset
             FfiConverterTypeAddressesBridgedEngine.lowerReceiver(this),
         )
         return handleRustResult(
@@ -3702,7 +3723,7 @@ export class AddressesBridgedEngine extends AddressesBridgedEngineInterface {
     async resetSyncId() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            56, // uniffi_autofill_fn_method_addressesbridgedengine_reset_sync_id
+            58, // uniffi_autofill_fn_method_addressesbridgedengine_reset_sync_id
             FfiConverterTypeAddressesBridgedEngine.lowerReceiver(this),
         )
         return handleRustResult(
@@ -3724,7 +3745,7 @@ export class AddressesBridgedEngine extends AddressesBridgedEngineInterface {
         FfiConverterInt64.checkType(newTimestamp);
         FfiConverterSequenceString.checkType(uploadedIds);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            57, // uniffi_autofill_fn_method_addressesbridgedengine_set_uploaded
+            59, // uniffi_autofill_fn_method_addressesbridgedengine_set_uploaded
             FfiConverterTypeAddressesBridgedEngine.lowerReceiver(this),
             FfiConverterInt64.lower(newTimestamp),
             FfiConverterSequenceString.lower(uploadedIds),
@@ -3745,7 +3766,7 @@ export class AddressesBridgedEngine extends AddressesBridgedEngineInterface {
        
         FfiConverterSequenceString.checkType(incomingEnvelopesAsJson);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            58, // uniffi_autofill_fn_method_addressesbridgedengine_store_incoming
+            60, // uniffi_autofill_fn_method_addressesbridgedengine_store_incoming
             FfiConverterTypeAddressesBridgedEngine.lowerReceiver(this),
             FfiConverterSequenceString.lower(incomingEnvelopesAsJson),
         )
@@ -3762,7 +3783,7 @@ export class AddressesBridgedEngine extends AddressesBridgedEngineInterface {
     async syncFinished() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            59, // uniffi_autofill_fn_method_addressesbridgedengine_sync_finished
+            61, // uniffi_autofill_fn_method_addressesbridgedengine_sync_finished
             FfiConverterTypeAddressesBridgedEngine.lowerReceiver(this),
         )
         return handleRustResult(
@@ -3779,7 +3800,7 @@ export class AddressesBridgedEngine extends AddressesBridgedEngineInterface {
     async syncId() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            60, // uniffi_autofill_fn_method_addressesbridgedengine_sync_id
+            62, // uniffi_autofill_fn_method_addressesbridgedengine_sync_id
             FfiConverterTypeAddressesBridgedEngine.lowerReceiver(this),
         )
         return handleRustResult(
@@ -3795,7 +3816,7 @@ export class AddressesBridgedEngine extends AddressesBridgedEngineInterface {
     async syncStarted() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            61, // uniffi_autofill_fn_method_addressesbridgedengine_sync_started
+            63, // uniffi_autofill_fn_method_addressesbridgedengine_sync_started
             FfiConverterTypeAddressesBridgedEngine.lowerReceiver(this),
         )
         return handleRustResult(
@@ -3811,7 +3832,7 @@ export class AddressesBridgedEngine extends AddressesBridgedEngineInterface {
     async wipe() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            62, // uniffi_autofill_fn_method_addressesbridgedengine_wipe
+            64, // uniffi_autofill_fn_method_addressesbridgedengine_wipe
             FfiConverterTypeAddressesBridgedEngine.lowerReceiver(this),
         )
         return handleRustResult(
@@ -4573,11 +4594,9 @@ export class StoreInterface {
      * 
      * NB: This function was created to unblock iOS credit card users who are unable to sync records and should not be used
      * outside of this use case.
-     * @param {string} localEncryptionKey
      * @returns {Promise<CreditCardsDeletionMetrics>}}
      */
-    async scrubUndecryptableCreditCardDataForRemoteReplacement(
-        localEncryptionKey) {
+    async scrubUndecryptableCreditCardDataForRemoteReplacement() {
       throw Error("scrubUndecryptableCreditCardDataForRemoteReplacement not implemented");
     }
     /**
@@ -4679,15 +4698,19 @@ export class Store extends StoreInterface {
     /**
      * init
      * @param {string} dbpath
+     * @param {EncryptorDecryptor} encdec
      * @returns {Promise<Store>}}
      */
     static async init(
-        dbpath) {
+        dbpath, 
+        encdec) {
        
         FfiConverterString.checkType(dbpath);
+        FfiConverterTypeEncryptorDecryptor.checkType(encdec);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            63, // uniffi_autofill_fn_constructor_store_new
+            65, // uniffi_autofill_fn_constructor_store_new
             FfiConverterString.lower(dbpath),
+            FfiConverterTypeEncryptorDecryptor.lower(encdec),
         )
         return handleRustResult(
             result,
@@ -4706,7 +4729,7 @@ export class Store extends StoreInterface {
        
         FfiConverterTypeUpdatableAddressFields.checkType(a);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            64, // uniffi_autofill_fn_method_store_add_address
+            66, // uniffi_autofill_fn_method_store_add_address
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterTypeUpdatableAddressFields.lower(a),
         )
@@ -4727,7 +4750,7 @@ export class Store extends StoreInterface {
        
         FfiConverterTypeUpdatableAddressFieldsWithMeta.checkType(entryWithMeta);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            65, // uniffi_autofill_fn_method_store_add_address_with_meta
+            67, // uniffi_autofill_fn_method_store_add_address_with_meta
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterTypeUpdatableAddressFieldsWithMeta.lower(entryWithMeta),
         )
@@ -4748,7 +4771,7 @@ export class Store extends StoreInterface {
        
         FfiConverterTypeUpdatableCreditCardFields.checkType(cc);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            66, // uniffi_autofill_fn_method_store_add_credit_card
+            68, // uniffi_autofill_fn_method_store_add_credit_card
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterTypeUpdatableCreditCardFields.lower(cc),
         )
@@ -4769,7 +4792,7 @@ export class Store extends StoreInterface {
        
         FfiConverterTypeUpdatableCreditCardFieldsWithMeta.checkType(entryWithMeta);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            67, // uniffi_autofill_fn_method_store_add_credit_card_with_meta
+            69, // uniffi_autofill_fn_method_store_add_credit_card_with_meta
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterTypeUpdatableCreditCardFieldsWithMeta.lower(entryWithMeta),
         )
@@ -4790,7 +4813,7 @@ export class Store extends StoreInterface {
        
         FfiConverterSequenceTypeAddressTombstone.checkType(tombstones);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            68, // uniffi_autofill_fn_method_store_add_many_address_tombstones
+            70, // uniffi_autofill_fn_method_store_add_many_address_tombstones
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterSequenceTypeAddressTombstone.lower(tombstones),
         )
@@ -4811,7 +4834,7 @@ export class Store extends StoreInterface {
        
         FfiConverterSequenceTypeUpdatableAddressFieldsWithMeta.checkType(entriesWithMeta);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            69, // uniffi_autofill_fn_method_store_add_many_addresses_with_meta
+            71, // uniffi_autofill_fn_method_store_add_many_addresses_with_meta
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterSequenceTypeUpdatableAddressFieldsWithMeta.lower(entriesWithMeta),
         )
@@ -4832,7 +4855,7 @@ export class Store extends StoreInterface {
        
         FfiConverterSequenceTypeCreditCardTombstone.checkType(tombstones);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            70, // uniffi_autofill_fn_method_store_add_many_credit_card_tombstones
+            72, // uniffi_autofill_fn_method_store_add_many_credit_card_tombstones
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterSequenceTypeCreditCardTombstone.lower(tombstones),
         )
@@ -4853,7 +4876,7 @@ export class Store extends StoreInterface {
        
         FfiConverterSequenceTypeUpdatableCreditCardFieldsWithMeta.checkType(entriesWithMeta);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            71, // uniffi_autofill_fn_method_store_add_many_credit_cards_with_meta
+            73, // uniffi_autofill_fn_method_store_add_many_credit_cards_with_meta
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterSequenceTypeUpdatableCreditCardFieldsWithMeta.lower(entriesWithMeta),
         )
@@ -4874,7 +4897,7 @@ export class Store extends StoreInterface {
        
         FfiConverterTypeUpdatablePassportFields.checkType(p);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            72, // uniffi_autofill_fn_method_store_add_passport
+            74, // uniffi_autofill_fn_method_store_add_passport
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterTypeUpdatablePassportFields.lower(p),
         )
@@ -4894,7 +4917,7 @@ export class Store extends StoreInterface {
     async addressesBridgedEngine() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            73, // uniffi_autofill_fn_method_store_addresses_bridged_engine
+            75, // uniffi_autofill_fn_method_store_addresses_bridged_engine
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -4911,7 +4934,7 @@ export class Store extends StoreInterface {
     async countAllAddresses() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            74, // uniffi_autofill_fn_method_store_count_all_addresses
+            76, // uniffi_autofill_fn_method_store_count_all_addresses
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -4928,7 +4951,7 @@ export class Store extends StoreInterface {
     async countAllCreditCards() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            75, // uniffi_autofill_fn_method_store_count_all_credit_cards
+            77, // uniffi_autofill_fn_method_store_count_all_credit_cards
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -4945,7 +4968,7 @@ export class Store extends StoreInterface {
     async countAllPassports() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            76, // uniffi_autofill_fn_method_store_count_all_passports
+            78, // uniffi_autofill_fn_method_store_count_all_passports
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -4965,7 +4988,7 @@ export class Store extends StoreInterface {
        
         FfiConverterString.checkType(guid);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            77, // uniffi_autofill_fn_method_store_delete_address
+            79, // uniffi_autofill_fn_method_store_delete_address
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
         )
@@ -4987,7 +5010,7 @@ export class Store extends StoreInterface {
     async deleteAllAddresses() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            78, // uniffi_autofill_fn_method_store_delete_all_addresses
+            80, // uniffi_autofill_fn_method_store_delete_all_addresses
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -5008,7 +5031,7 @@ export class Store extends StoreInterface {
     async deleteAllCreditCards() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            79, // uniffi_autofill_fn_method_store_delete_all_credit_cards
+            81, // uniffi_autofill_fn_method_store_delete_all_credit_cards
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -5028,7 +5051,7 @@ export class Store extends StoreInterface {
        
         FfiConverterString.checkType(guid);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            80, // uniffi_autofill_fn_method_store_delete_credit_card
+            82, // uniffi_autofill_fn_method_store_delete_credit_card
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
         )
@@ -5049,7 +5072,7 @@ export class Store extends StoreInterface {
        
         FfiConverterString.checkType(guid);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            81, // uniffi_autofill_fn_method_store_delete_passport
+            83, // uniffi_autofill_fn_method_store_delete_passport
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
         )
@@ -5070,7 +5093,7 @@ export class Store extends StoreInterface {
        
         FfiConverterString.checkType(guid);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            82, // uniffi_autofill_fn_method_store_get_address
+            84, // uniffi_autofill_fn_method_store_get_address
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
         )
@@ -5088,7 +5111,7 @@ export class Store extends StoreInterface {
     async getAllAddresses() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            83, // uniffi_autofill_fn_method_store_get_all_addresses
+            85, // uniffi_autofill_fn_method_store_get_all_addresses
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -5105,7 +5128,7 @@ export class Store extends StoreInterface {
     async getAllCreditCards() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            84, // uniffi_autofill_fn_method_store_get_all_credit_cards
+            86, // uniffi_autofill_fn_method_store_get_all_credit_cards
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -5122,7 +5145,7 @@ export class Store extends StoreInterface {
     async getAllPassports() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            85, // uniffi_autofill_fn_method_store_get_all_passports
+            87, // uniffi_autofill_fn_method_store_get_all_passports
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -5142,7 +5165,7 @@ export class Store extends StoreInterface {
        
         FfiConverterString.checkType(guid);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            86, // uniffi_autofill_fn_method_store_get_credit_card
+            88, // uniffi_autofill_fn_method_store_get_credit_card
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
         )
@@ -5163,7 +5186,7 @@ export class Store extends StoreInterface {
        
         FfiConverterString.checkType(guid);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            87, // uniffi_autofill_fn_method_store_get_passport
+            89, // uniffi_autofill_fn_method_store_get_passport
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
         )
@@ -5180,7 +5203,7 @@ export class Store extends StoreInterface {
     async registerWithSyncManager() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            88, // uniffi_autofill_fn_method_store_register_with_sync_manager
+            90, // uniffi_autofill_fn_method_store_register_with_sync_manager
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -5199,7 +5222,7 @@ export class Store extends StoreInterface {
     async runMaintenance() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            89, // uniffi_autofill_fn_method_store_run_maintenance
+            91, // uniffi_autofill_fn_method_store_run_maintenance
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -5215,7 +5238,7 @@ export class Store extends StoreInterface {
     async scrubEncryptedData() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            90, // uniffi_autofill_fn_method_store_scrub_encrypted_data
+            92, // uniffi_autofill_fn_method_store_scrub_encrypted_data
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -5232,17 +5255,13 @@ export class Store extends StoreInterface {
      * 
      * NB: This function was created to unblock iOS credit card users who are unable to sync records and should not be used
      * outside of this use case.
-     * @param {string} localEncryptionKey
      * @returns {Promise<CreditCardsDeletionMetrics>}}
      */
-    async scrubUndecryptableCreditCardDataForRemoteReplacement(
-        localEncryptionKey) {
+    async scrubUndecryptableCreditCardDataForRemoteReplacement() {
        
-        FfiConverterString.checkType(localEncryptionKey);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            91, // uniffi_autofill_fn_method_store_scrub_undecryptable_credit_card_data_for_remote_replacement
+            93, // uniffi_autofill_fn_method_store_scrub_undecryptable_credit_card_data_for_remote_replacement
             FfiConverterTypeStore.lowerReceiver(this),
-            FfiConverterString.lower(localEncryptionKey),
         )
         return handleRustResult(
             result,
@@ -5257,7 +5276,7 @@ export class Store extends StoreInterface {
     async shutdown() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            92, // uniffi_autofill_fn_method_store_shutdown
+            94, // uniffi_autofill_fn_method_store_shutdown
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -5276,7 +5295,7 @@ export class Store extends StoreInterface {
        
         FfiConverterString.checkType(guid);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            93, // uniffi_autofill_fn_method_store_touch_address
+            95, // uniffi_autofill_fn_method_store_touch_address
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
         )
@@ -5296,7 +5315,7 @@ export class Store extends StoreInterface {
        
         FfiConverterString.checkType(guid);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            94, // uniffi_autofill_fn_method_store_touch_credit_card
+            96, // uniffi_autofill_fn_method_store_touch_credit_card
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
         )
@@ -5316,7 +5335,7 @@ export class Store extends StoreInterface {
        
         FfiConverterString.checkType(guid);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            95, // uniffi_autofill_fn_method_store_touch_passport
+            97, // uniffi_autofill_fn_method_store_touch_passport
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
         )
@@ -5339,7 +5358,7 @@ export class Store extends StoreInterface {
         FfiConverterString.checkType(guid);
         FfiConverterTypeUpdatableAddressFields.checkType(a);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            96, // uniffi_autofill_fn_method_store_update_address
+            98, // uniffi_autofill_fn_method_store_update_address
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
             FfiConverterTypeUpdatableAddressFields.lower(a),
@@ -5360,7 +5379,7 @@ export class Store extends StoreInterface {
        
         FfiConverterTypeUpdatableAddressFieldsWithMeta.checkType(entryWithMeta);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            97, // uniffi_autofill_fn_method_store_update_address_with_meta
+            99, // uniffi_autofill_fn_method_store_update_address_with_meta
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterTypeUpdatableAddressFieldsWithMeta.lower(entryWithMeta),
         )
@@ -5383,7 +5402,7 @@ export class Store extends StoreInterface {
         FfiConverterString.checkType(guid);
         FfiConverterTypeUpdatableCreditCardFields.checkType(cc);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            98, // uniffi_autofill_fn_method_store_update_credit_card
+            100, // uniffi_autofill_fn_method_store_update_credit_card
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
             FfiConverterTypeUpdatableCreditCardFields.lower(cc),
@@ -5404,7 +5423,7 @@ export class Store extends StoreInterface {
        
         FfiConverterTypeUpdatableCreditCardFieldsWithMeta.checkType(entryWithMeta);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            99, // uniffi_autofill_fn_method_store_update_credit_card_with_meta
+            101, // uniffi_autofill_fn_method_store_update_credit_card_with_meta
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterTypeUpdatableCreditCardFieldsWithMeta.lower(entryWithMeta),
         )
@@ -5427,7 +5446,7 @@ export class Store extends StoreInterface {
         FfiConverterString.checkType(guid);
         FfiConverterTypeUpdatablePassportFields.checkType(p);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            100, // uniffi_autofill_fn_method_store_update_passport
+            102, // uniffi_autofill_fn_method_store_update_passport
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
             FfiConverterTypeUpdatablePassportFields.lower(p),
@@ -5475,3 +5494,21 @@ export class FfiConverterTypeStore extends FfiConverter {
     }
 }
 
+import {
+  FfiConverterTypePrimaryPasswordAuthenticator,
+} from "./RustDbCrypto.sys.mjs";
+
+// Export the FFIConverter object to make external types work.
+export { FfiConverterTypePrimaryPasswordAuthenticator };
+import {
+  FfiConverterTypeKeyManager,
+} from "./RustDbCrypto.sys.mjs";
+
+// Export the FFIConverter object to make external types work.
+export { FfiConverterTypeKeyManager };
+import {
+  FfiConverterTypeEncryptorDecryptor,
+} from "./RustDbCrypto.sys.mjs";
+
+// Export the FFIConverter object to make external types work.
+export { FfiConverterTypeEncryptorDecryptor };

@@ -549,7 +549,8 @@
       this.#commandButtons.createAITab.addEventListener("command", () => {
         lazy.AIWindow.createAITab(
           window,
-          this.activeGroup.tabs.map(tab => tab.linkedBrowser.currentURI.spec)
+          this.activeGroup.tabs.map(tab => tab.linkedBrowser.currentURI.spec),
+          "tab_group"
         );
         this.close();
       });

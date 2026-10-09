@@ -3,12 +3,12 @@
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
+use crate::ads::{AdCallbacks, AdImage, AdSpoc, AdTile};
 use crate::http_cache::RequestHash;
 use crate::telemetry::Telemetry;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
-use url::Url;
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct AdResponse<A: AdResponseValue> {
@@ -82,85 +82,6 @@ impl<A: AdResponseValue> AdResponse<A> {
     }
 }
 
-// TODO: Remove this allow(dead_code) when cache invalidation is re-enabled behind Nimbus experiment
-#[allow(dead_code)]
-pub fn pop_request_hash_from_url(url: &mut Url) -> Option<RequestHash> {
-    let mut request_hash = None;
-    let mut query = url::form_urlencoded::Serializer::new(String::new());
-
-    for (key, value) in url.query_pairs() {
-        if key == "request_hash" {
-            request_hash = Some(RequestHash::from(value.as_ref()));
-        } else {
-            query.append_pair(&key, &value);
-        }
-    }
-
-    let query_string = query.finish();
-    if query_string.is_empty() {
-        url.set_query(None);
-    } else {
-        url.set_query(Some(&query_string));
-    }
-    request_hash
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct AdImage {
-    pub alt_text: Option<String>,
-    pub block_key: String,
-    pub callbacks: AdCallbacks,
-    pub format: String,
-    pub image_url: Url,
-    pub url: Url,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct AdSpoc {
-    pub block_key: String,
-    pub callbacks: AdCallbacks,
-    pub caps: SpocFrequencyCaps,
-    pub domain: String,
-    pub excerpt: String,
-    pub format: String,
-    pub image_url: Url,
-    pub ranking: SpocRanking,
-    pub sponsor: String,
-    pub sponsored_by_override: Option<String>,
-    pub title: String,
-    pub url: Url,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct AdTile {
-    pub block_key: String,
-    pub callbacks: AdCallbacks,
-    pub format: String,
-    pub image_url: Url,
-    pub name: String,
-    pub url: Url,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct SpocFrequencyCaps {
-    pub cap_key: String,
-    pub day: u32,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct SpocRanking {
-    pub priority: u32,
-    pub personalization_models: Option<HashMap<String, u32>>,
-    pub item_score: f64,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct AdCallbacks {
-    pub click: Url,
-    pub impression: Url,
-    pub report: Option<Url>,
-}
-
 pub trait AdResponseValue: DeserializeOwned {
     fn callbacks_mut(&mut self) -> &mut AdCallbacks;
     fn cap_key(&self) -> Option<String> {
@@ -190,20 +111,14 @@ impl AdResponseValue for AdTile {
     }
 }
 
-#[cfg(feature = "stateful")]
-#[derive(Clone, Debug, PartialEq, Serialize)]
-pub enum Ads {
-    Images(Vec<AdImage>),
-    Spocs(Vec<AdSpoc>),
-    Tiles(Vec<AdTile>),
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::ads::{SpocFrequencyCaps, SpocRanking};
     use crate::ffi::telemetry::MozAdsTelemetryWrapper;
 
     use super::*;
     use serde_json::{from_str, json};
+    use url::Url;
     use url_macro::url;
 
     #[test]
@@ -670,25 +585,5 @@ mod tests {
             .query()
             .unwrap_or("")
             .contains("request_hash=abc123def456"));
-    }
-
-    #[test]
-    fn test_pop_request_hash_from_url() {
-        let mut url_with_hash =
-            Url::parse("https://example.com/callback?request_hash=abc123def456&other=param")
-                .unwrap();
-        let extracted = pop_request_hash_from_url(&mut url_with_hash);
-        assert_eq!(extracted, Some(RequestHash::from("abc123def456")));
-        assert_eq!(url_with_hash.query(), Some("other=param"));
-
-        let mut url_without_hash = Url::parse("https://example.com/callback?other=param").unwrap();
-        let extracted_none = pop_request_hash_from_url(&mut url_without_hash);
-        assert_eq!(extracted_none, None);
-        assert_eq!(url_without_hash.query(), Some("other=param"));
-
-        let mut url_no_query = Url::parse("https://example.com/callback").unwrap();
-        let extracted_empty = pop_request_hash_from_url(&mut url_no_query);
-        assert_eq!(extracted_empty, None);
-        assert_eq!(url_no_query.query(), None);
     }
 }

@@ -497,6 +497,9 @@ aitab-page-delete-dialog-cancel =
 aitab-page-delete-dialog-confirm =
     .label = Delete
 
+# Credit at the bottom of a generated page.
+aitab-page-made-with = Made with <span data-l10n-name="brand">{ -smart-window-brand-name }</span>
+
 ## "Pick up where you left off" cards for resuming browsing or chat journeys.
 ## A "journey" is a past browsing or chat session the user was in the middle
 ## of - for example, a set of tabs open toward some task, or an ongoing

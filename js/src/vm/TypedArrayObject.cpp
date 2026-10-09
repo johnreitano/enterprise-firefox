@@ -385,10 +385,16 @@ static TypedArrayType* NewTypedArrayObject(JSContext* cx, const JSClass* clasp,
   static_assert(!std::is_same_v<TypedArrayType, FixedLengthTypedArrayObject> ||
                 nfixed == FixedLengthTypedArrayObject::FIXED_DATA_START);
 
+  ObjectFlags objectFlags;
+  if constexpr (std::is_same_v<TypedArrayType, ImmutableTypedArrayObject>) {
+    // Immutable elements are non-configurable, non-writable data properties.
+    objectFlags.setFlag(ObjectFlag::NeedsProxyGetSetResultValidation);
+  }
+
   Rooted<SharedShape*> shape(
       cx,
       SharedShape::getInitialShape(cx, clasp, cx->realm(), AsTaggedProto(proto),
-                                   nfixed, ObjectFlags()));
+                                   nfixed, objectFlags));
   if (!shape) {
     return nullptr;
   }

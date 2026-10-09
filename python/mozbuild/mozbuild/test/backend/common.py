@@ -60,6 +60,16 @@ CONFIGS = defaultdict(
                 "COMPILE_ENVIRONMENT": "1",
             },
         },
+        "database-defines": {
+            "defines": {},
+            "substs": {
+                "CC": ["clang"],
+                "CXX": ["clang++"],
+                "COMPILE_ENVIRONMENT": "1",
+                "LIB_PREFIX": "lib",
+                "LIB_SUFFIX": "a",
+            },
+        },
         "database-compiler-wrapper": {
             "defines": {},
             "substs": {

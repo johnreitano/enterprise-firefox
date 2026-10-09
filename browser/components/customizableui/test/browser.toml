@@ -223,7 +223,6 @@ skip-if = [
 ["browser_993322_widget_notoolbar.js"]
 skip-if = [
   "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && swgl && verify-standalone",
-  "os == 'win' && os_version == '11.26100' && arch == 'x86' && opt && verify-standalone",
   "os == 'win' && os_version == '11.26200' && arch == 'x86' && opt && verify-standalone",
 ]
 

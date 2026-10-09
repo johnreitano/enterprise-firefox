@@ -212,6 +212,7 @@
 #include "nsHyphenationManager.h"
 #include "nsIAppShell.h"
 #include "nsIAppWindow.h"
+#include "nsIArray.h"
 #include "nsIAsyncInputStream.h"
 #include "nsIBidiKeyboard.h"
 #include "nsIBrowserDOMWindow.h"

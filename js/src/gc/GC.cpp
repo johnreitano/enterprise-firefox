@@ -5699,6 +5699,10 @@ MOZ_COLD bool GCRuntime::waitForBackgroundTasksOnAllocFailure() {
     waited = true;
   }
 
+  if (unmarkTask.join()) {
+    waited = true;
+  }
+
   if (sweepTask.join()) {
     waited = true;
   }

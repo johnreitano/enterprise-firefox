@@ -110,3 +110,7 @@ include("/ipc/chromium/chromium-config.mozbuild")
 FINAL_LIBRARY = "xul-gtest"
 
 LOCAL_INCLUDES += ["!/xpcom", "/xpcom/components"]
+
+SOURCE_HEADERS += [
+    "TestCommon.h",
+]

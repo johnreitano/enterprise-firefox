@@ -49,6 +49,7 @@ import org.mozilla.fenix.GleanMetrics.TopSites
 import org.mozilla.fenix.R
 import org.mozilla.fenix.autofill.address.RegionAddressFeatureGate
 import org.mozilla.fenix.browser.browsingmode.BrowsingMode
+import org.mozilla.fenix.components.lens.CameraMode
 import org.mozilla.fenix.components.settings.counterPreference
 import org.mozilla.fenix.components.settings.featureFlagBooleanPreference
 import org.mozilla.fenix.components.settings.lazyFeatureFlagBooleanPreference
@@ -2449,6 +2450,16 @@ class Settings(
             default = { FxNimbus.features.continuousOnboarding.value().enabled },
         )
 
+    /**
+     * Whether the Sync sign-in card can be shown during initial onboarding for users whose Firefox install is
+     * attributed to a pairing campaign link.
+     */
+    var isPairingSignInPromptEnabled by
+        booleanPreference(
+            appContext.getPreferenceKey(R.string.pref_key_is_pairing_sign_in_prompt_enabled),
+            default = { FxNimbus.features.pairingSigninPrompt.value().enabled },
+        )
+
     /** The completion timestamp of the second day of continuous onboarding. */
     var secondDayOnboardingCompletedTimestamp by
         longPreference(
@@ -2480,6 +2491,13 @@ class Settings(
     /** Indicates if continuous onboarding has been completed, meaning its final day-7 stage has finished. */
     val continuousOnboardingCompleted: Boolean
         get() = seventhDayOnboardingCompletedTimestamp != -1L
+
+    /** Indicates if the migrate onboarding state feature is enabled. */
+    var migrateOnboardingStateFeatureEnabled by
+        booleanPreference(
+            key = appContext.getPreferenceKey(R.string.pref_key_migrate_onboarding_state_enabled),
+            default = { FxNimbus.features.migrateOnboardingState.value().enabled },
+        )
 
     /** Indicates if the marketing onboarding card should be shown to the user. */
     var shouldShowMarketingOnboarding by
@@ -3353,6 +3371,22 @@ class Settings(
             key = appContext.getPreferenceKey(R.string.pref_key_has_accepted_google_lens_first_run),
             default = false,
         )
+
+    private var lensCameraLastModeName by
+        stringPreference(
+            key = appContext.getPreferenceKey(R.string.pref_key_lens_camera_last_mode),
+            default = CameraMode.LENS.name,
+        )
+
+    /**
+     * The [CameraMode] the user last selected on the Google Lens camera screen. The camera screen opens in this mode
+     * and the address bar shows the matching icon.
+     */
+    var lensCameraLastMode: CameraMode
+        get() = CameraMode.fromNameOrNull(lensCameraLastModeName) ?: CameraMode.LENS
+        set(value) {
+            lensCameraLastModeName = value.name
+        }
 
     /** Whether the voice search entry point is shown in the display-mode browser toolbar. */
     var showVoiceSearchInDisplayToolbar by

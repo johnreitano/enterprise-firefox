@@ -1561,6 +1561,21 @@ async function persistAITabPage(
 }
 
 /**
+ * How a generate_aitab call was requested, for telemetry.
+ *
+ * @param {ChatConversation} conversation
+ * @param {boolean} isEdit - Whether the call modifies an existing page, which
+ *   the tab menus never ask for.
+ * @returns {"tab_list"|"tab_group"|"chat"|"chat_followup"}
+ */
+function getAITabInitiator(conversation, isEdit) {
+  if (!isEdit && conversation.aitabSource) {
+    return conversation.aitabSource;
+  }
+  return conversation.lastSubmitType == "follow-up" ? "chat_followup" : "chat";
+}
+
+/**
  * @param {object} toolParams
  * @param {string[]} [toolParams.url_list]
  * @param {string} [toolParams.focus]
@@ -1598,6 +1613,7 @@ export async function createAITab(
       rawContent: raw_content,
       modifySlug: modify_slug,
       modifyInstructions: modify_instructions,
+      howInitiated: getAITabInitiator(conversation, isModification),
       signal,
     },
     conversation

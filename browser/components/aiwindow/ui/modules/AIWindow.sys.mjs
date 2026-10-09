@@ -1036,8 +1036,10 @@ export const AIWindow = {
    * @param {Window} win
    * @param {string[]} urls - Non-http(s) URLs are dropped since the model
    *   cannot read them.
+   * @param {"tab_list"|"tab_group"} source - Where the page was requested
+   *   from, for telemetry.
    */
-  createAITab(win, urls) {
+  createAITab(win, urls, source) {
     const pageUrls = urls.filter(url =>
       ["http:", "https:"].includes(URL.parse(url)?.protocol)
     );
@@ -1060,6 +1062,7 @@ export const AIWindow = {
             text,
             submitType: "menu",
             contextPageUrl: null,
+            aitabSource: source,
           });
 
         // AIWINDOW_URL is the Smart Window's new tab page, so this may be the

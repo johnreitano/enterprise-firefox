@@ -56,6 +56,16 @@ interface Document {
   ): XULElement;
 }
 
+interface CustomElementRegistry {
+  // Accept XUL custom elements, which the generated CustomElementConstructor
+  // leaves out by requiring an HTMLElement.
+  define(
+    name: string,
+    constructor: new () => XULElement,
+    options?: ElementDefinitionOptions
+  ): void;
+}
+
 type nsIGleanPingNoReason = {
   [K in keyof nsIGleanPing]: K extends "submit"
     ? (_?: never) => void

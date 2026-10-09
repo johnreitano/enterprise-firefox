@@ -84,3 +84,8 @@ FINAL_LIBRARY = "xul"
 LICENSED_UNDER += [
     "chromium",
 ]
+
+SOURCE_HEADERS += [
+    "SpeechModelDownloadPermissionRequest.h",
+    "SpeechModelResolver.h",
+]

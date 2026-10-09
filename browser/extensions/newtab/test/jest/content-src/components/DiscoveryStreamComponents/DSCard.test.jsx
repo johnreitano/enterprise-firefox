@@ -12,7 +12,7 @@ import {
   PlaceholderDSCard,
 } from "content-src/components/DiscoveryStreamComponents/DSCard/DSCard";
 import { SafeAnchor } from "content-src/components/DiscoveryStreamComponents/SafeAnchor/SafeAnchor";
-import { actionCreators as ac } from "common/Actions.mjs";
+import { actionCreators as ac, actionTypes as at } from "common/Actions.mjs";
 import { INITIAL_STATE } from "common/Reducers.sys.mjs";
 import React from "react";
 
@@ -309,6 +309,29 @@ describe("<DSCard>", () => {
           },
         })
       );
+    });
+
+    it("should send the click payload as an open intent", () => {
+      setProps({ id: "fooidx", pos: 9, type: "foo" });
+      jest
+        .spyOn(cardRef.current, "doesLinkTopicMatchSelectedTopic")
+        .mockReturnValue(undefined);
+
+      cardRef.current.onLinkOpenIntent({
+        currentTarget: { href: "https://example.com/" },
+      });
+
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      expect(dispatch).toHaveBeenCalledWith(
+        ac.OnlyToMain({
+          type: at.BROWSER_LINK_OPEN_INTENT,
+          data: {
+            url: "https://example.com/",
+            userEvent: cardRef.current.getClickEventData(),
+          },
+        })
+      );
+      expect(dispatch.mock.calls[0][0].data.userEvent.action_position).toBe(9);
     });
 
     it("should set the right card_type on spocs", () => {

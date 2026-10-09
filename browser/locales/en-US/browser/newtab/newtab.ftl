@@ -1783,9 +1783,11 @@ newtab-recent-searches-empty-trending = Trending searches are not available righ
 # Widget heading; also the widget's accessible name.
 newtab-horoscopes-widget-title = Horoscopes
 
-# Screen reader label for the widget's icon-only menu button.
-newtab-horoscopes-widget-menu-button =
-    .aria-label = Horoscopes options
+# Tooltip and screen reader label for the icon-only button that opens the
+# widget's menu.
+newtab-horoscopes-widget-open-menu-button =
+    .title = Open horoscopes menu
+    .aria-label = Open horoscopes menu
 
 # Context menu item linking to more information about the widget.
 newtab-horoscopes-menu-learn-more = Learn more

@@ -1150,8 +1150,13 @@ void ExternalEngineStateMachine::OnSeeked() {
   }
   MOZ_ASSERT(mState.IsSeekingData());
 
-  const auto currentTime = mEngine->GetCurrentPosition();
   auto* state = mState.AsSeekingData();
+  if (!state->mSeekJob.Exists()) {
+    LOG("Seeking has been rejected, ignore the event");
+    return;
+  }
+
+  const auto currentTime = mEngine->GetCurrentPosition();
   if (IsBeingProfiledOrLogEnabled()) {
     nsPrintfCString msg("target=%" PRId64 ", currentTime=%" PRId64,
                         state->GetTargetTime().ToMicroseconds(),

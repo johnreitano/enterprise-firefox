@@ -19,6 +19,10 @@ class nsIScriptElement;
 class nsITimer;
 class nsIURI;
 
+namespace mozilla {
+class ManagedPostRefreshObserver;
+}
+
 namespace mozilla::dom {
 
 class Document;
@@ -54,6 +58,12 @@ class SpeculationRules final {
   // document is tracking, or nullptr if there is none.
   Element* FindInterestedLink(nsIContent* aContent) const;
 
+  // Document rules only match links that are being rendered, so if frame
+  // construction is pending, rather than forcing a flush this postpones
+  // InnerConsiderLoads until after the next refresh. Returns true if it was
+  // postponed.
+  bool WaitForPendingFrames();
+
   // https://html.spec.whatwg.org/#inner-consider-speculative-loads-steps
   // Step 7, for those candidate groups that the user's behaviour has shown to
   // be eager enough. A group is enacted if it is at least as eager as
@@ -76,6 +86,9 @@ class SpeculationRules final {
 
   // https://html.spec.whatwg.org/#consider-speculative-loads-microtask-queued
   bool mConsiderSpeculativeLoadsMicrotaskQueued{false};
+
+  // Set while InnerConsiderLoads is postponed until after the next refresh.
+  RefPtr<ManagedPostRefreshObserver> mPendingFramesObserver;
 
   // The set of HTML <a> and <area> elements with an href attribute that are
   // connected to this document. This is tracked so FindMatchingLinks doesn't

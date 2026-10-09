@@ -124,7 +124,8 @@ document.addEventListener(
             window,
             TabContextMenu.contextTabs.map(
               tab => tab.linkedBrowser.currentURI.spec
-            )
+            ),
+            "tab_list"
           );
           break;
         case "context_bookmarkTab":

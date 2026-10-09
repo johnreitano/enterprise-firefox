@@ -22,6 +22,9 @@ const REMOTE_SETTINGS_COLLECTION = "newtab-sponsored-topsites-scoring";
 // The prefix for flags to check when attempting to load the remote settings record.
 const FLAG_PREFIX = "sponsored_top_site_scoring";
 
+// Upper bound on config.privacy_parameter to limit the total privacy loss
+const MAX_PRIVACY_PARAMETER = 1;
+
 export class SponsoredTopSitesScoreProvider {
   /**
    * @param {Function} getFlags Returns the current adsBackend flags for selecting
@@ -79,14 +82,20 @@ export class SponsoredTopSitesScoreProvider {
       return;
     }
 
-    // TODO: get counts from _getDomainDayCounts and compute scores with differential privacy.
-    this._scores = {};
+    const domainDayCounts = await this._getDomainDayCounts(config);
+    const scores = this._sponsoredScores(config, domainDayCounts);
+    // TODO: post-process the private scores before they are sent to the server.
+    this._scores = this._differentiallyPrivateScores(scores, config);
   }
 
   /**
    * Load the Remote Settings record with the matching id of the enabled flag.
+   * The privacy_parameter, repeat_visit_weight, and normalization_cap fields
+   * are stored as integer hundredths and are converted to their decimal
+   * values, with privacy_parameter capped at MAX_PRIVACY_PARAMETER.
    *
-   * @returns {Promise<?object>} The matching config record or null when not found.
+   * @returns {Promise<?object>} The matching config or null when not found or
+   *  invalid.
    */
   async _loadConfig() {
     const recordId = this._getRecordId();
@@ -95,7 +104,43 @@ export class SponsoredTopSitesScoreProvider {
     }
 
     const records = await this._rs?.get();
-    return records?.find(r => r.id === recordId) ?? null;
+    const record = records?.find(r => r.id === recordId);
+    if (!record || !this._isValidConfig(record)) {
+      return null;
+    }
+
+    return {
+      ...record,
+      privacy_parameter: Math.min(
+        record.privacy_parameter / 100,
+        MAX_PRIVACY_PARAMETER
+      ),
+      repeat_visit_weight: record.repeat_visit_weight / 100,
+      normalization_cap: record.normalization_cap / 100,
+    };
+  }
+
+  /**
+   * Check that the numeric fields of a Remote Settings record are integers
+   * within a range that produces meaningful scores.
+   *
+   * @param {object} record The raw Remote Settings record.
+   * @returns {boolean} Whether the record can be used for scoring.
+   */
+  _isValidConfig(record) {
+    const isIntegerInRange = (value, min, max = Infinity) =>
+      Number.isInteger(value) && value >= min && value <= max;
+
+    return (
+      isIntegerInRange(record.lookback_days, 1) &&
+      isIntegerInRange(record.recency_halflife_days, 1) &&
+      isIntegerInRange(record.trend_days, 1) &&
+      isIntegerInRange(record.allowed_targets, 0) &&
+      isIntegerInRange(record.decimals, 1, 4) &&
+      isIntegerInRange(record.privacy_parameter, 1) &&
+      isIntegerInRange(record.normalization_cap, 1) &&
+      isIntegerInRange(record.repeat_visit_weight, 0, 99)
+    );
   }
 
   /**
@@ -168,11 +213,122 @@ export class SponsoredTopSitesScoreProvider {
       }
 
       const days = domainDayCounts.get(domain) ?? new Map();
-      days.set(row.day, (days.get(row.day) ?? 0) + row.visits);
+      const dayOffset = row.day - todayDay;
+      days.set(dayOffset, (days.get(dayOffset) ?? 0) + row.visits);
       domainDayCounts.set(domain, days);
     }
 
     return domainDayCounts;
+  }
+
+  /**
+   * Score a domain from its daily visit counts. More recent visits are
+   * weighted more heavily, and more visits in a day give a higher overall score
+   * depending upon the repeat_visit_weight. The score is normalized to [0, 1].
+   *
+   * @param {Map<number, number>} dayCounts Visit count keyed by day offset
+   *  relative to today (0 is today, -1 is yesterday, ...).
+   * @param {object} config The active Remote Settings config.
+   * @returns {number} The domain score.
+   */
+  _domainScore(dayCounts, config) {
+    const decay = Math.LN2 / config.recency_halflife_days;
+
+    let score = 0;
+    for (const [day, visits] of dayCounts) {
+      score +=
+        Math.exp(day * decay) * (1 - config.repeat_visit_weight ** visits);
+    }
+
+    let normalization = 0;
+    for (let j = 0; j < config.lookback_days; j++) {
+      normalization += Math.exp(-j * decay);
+    }
+
+    return score / normalization;
+  }
+
+  /**
+   * Score each sponsored target. Take the sum of scores of each domain and
+   * divide by config.normalization_cap to account for different sized
+   * list of domains between targets.
+   *
+   * @param {object} config The active Remote Settings config.
+   * @param {Map<string, Map<number, number>>} domainDayCounts The visit count
+   *  per configured domain, keyed by day offset, from _getDomainDayCounts.
+   * @returns {object} A score in [0, 1] keyed by target.
+   */
+  _sponsoredScores(config, domainDayCounts) {
+    const scores = {};
+    for (const [target, domains] of Object.entries(config.targets ?? {})) {
+      let sum = 0;
+      for (const domain of domains ?? []) {
+        const dayCounts = domainDayCounts.get(domain.toLowerCase());
+        if (dayCounts) {
+          sum += this._domainScore(dayCounts, config);
+        }
+      }
+      scores[target] =
+        Math.min(sum, config.normalization_cap) / config.normalization_cap;
+    }
+    return scores;
+  }
+
+  /**
+   * Count the maximum number of sponsored targets associated to any single domain.
+   *
+   * @param {object} config The active Remote Settings config.
+   * @returns {number} The largest number of targets sharing one domain
+   */
+  _getOverlap(config) {
+    const targetCounts = new Map();
+    for (const domains of Object.values(config.targets ?? {})) {
+      for (const domain of new Set(domains?.map(d => d.toLowerCase()))) {
+        targetCounts.set(domain, (targetCounts.get(domain) ?? 0) + 1);
+      }
+    }
+    return Math.max(0, ...targetCounts.values());
+  }
+
+  /**
+   * Add Laplace noise to each target score for differential privacy.
+   * The total privacy composition over all scoring will be accounted for
+   * with zCDP and applying some tight accounting tricks.
+   * TODO: add a link to the zCDP accounting once it is published.
+   *
+   * These noised scores will not leave the client, and there will instead
+   * be post-processing, clamping, and rounding to avoid floating point issues
+   * with the privacy-preserving scores that are ultimately sent back to the server.
+   *
+   * @param {object} scores A score keyed by target, from _sponsoredScores.
+   * @param {object} config The active Remote Settings config.
+   * @returns {object} The noised score keyed by target.
+   */
+  _differentiallyPrivateScores(scores, config) {
+    const scale =
+      Math.sqrt(this._getOverlap(config)) /
+      (config.normalization_cap *
+        config.lookback_days *
+        config.privacy_parameter);
+
+    const privateScores = {};
+    for (const [target, score] of Object.entries(scores)) {
+      privateScores[target] = score + this._sampleLaplace(scale);
+    }
+    return privateScores;
+  }
+
+  /**
+   * Draw a sample from a Laplace distribution centered at 0.
+   *
+   * @param {number} scale The scale (b) of the distribution.
+   * @returns {number} The sample.
+   */
+  _sampleLaplace(scale) {
+    const randomValues = new Uint32Array(1);
+    crypto.getRandomValues(randomValues);
+    const u = (randomValues[0] + 0.5) / 2 ** 32;
+    return u < 0.5 ? scale * Math.log(2 * u) : -scale * Math.log(2 * (1 - u));
   }
 
   /**

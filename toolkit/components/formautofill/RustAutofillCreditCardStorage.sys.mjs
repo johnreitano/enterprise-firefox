@@ -7,9 +7,10 @@
  *
  * The credit card half of `RustAutofillAdapterBase`, which holds everything
  * that is not specific to this collection. What is here follows from the Rust
- * credit card schema: the number is stored encrypted with only its last four
- * digits in the clear, so `cc-number` is derived as a mask on read and the
- * ciphertext derived on write.
+ * credit card schema: the store encrypts the number under its own key and
+ * keeps the last four digits in the clear, so `cc-number` is written in the
+ * clear and read back as a mask of those digits. A record this adapter hands
+ * out never carries the number itself; #numberOf is where it is read.
  */
 
 import {
@@ -36,7 +37,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/components/generated/RustAutofill.sys.mjs",
   UpdatableCreditCardFieldsWithMeta:
     "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/components/generated/RustAutofill.sys.mjs",
-  OSKeyStore: "resource://gre/modules/OSKeyStore.sys.mjs",
+  FormAutofill: "resource://autofill/FormAutofill.sys.mjs",
+  FormAutofillUtils: "resource://gre/modules/shared/FormAutofillUtils.sys.mjs",
   UpdatableCreditCardFields:
     "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/components/generated/RustAutofill.sys.mjs",
 });
@@ -61,18 +63,15 @@ const JS_TO_RUST_INTEGER_FIELD = {
   "cc-exp-year": "ccExpYear",
 };
 
-// cc-number is in neither map: it is one JS field over two columns, ccNumberEnc
-// and ccNumberLast4, and only the ciphertext is stored as it was given. Reading
-// it back inverts, so `cc-number-encrypted` is what this store holds and
-// `cc-number` is derived, as cc-exp and the name components are.
+// cc-number is in neither map: it is written in the clear as ccNumber, which
+// the store encrypts, and read back as a mask of ccNumberLast4.
 //
-// Both are still comparable, but not by string equality -- see
+// It is still comparable, but not by string equality -- see
 // creditCardFieldDiffers.
 const storedFields = new Set([
   ...Object.keys(JS_TO_RUST_STRING_FIELD),
   ...Object.keys(JS_TO_RUST_INTEGER_FIELD),
   "cc-number",
-  "cc-number-encrypted",
   ...INTERNAL_FIELDS,
 ]);
 
@@ -95,8 +94,8 @@ const storedFields = new Set([
  *    the detection table moves every stored card.
  * The name components and cc-exp are excluded for that reason.
  *
- * The two number fields are included, but neither compares as a string --
- * see creditCardFieldDiffers.
+ * cc-number is included, but does not compare as a string -- see
+ * creditCardFieldDiffers.
  *
  * @param {string} field
  * @returns {boolean}
@@ -106,7 +105,7 @@ export function isStoredCreditCardField(field) {
 }
 
 /**
- * Whether a field disagrees between a record and its copy, for the two fields
+ * Whether a field disagrees between a record and its copy, for the field
  * where string equality is the wrong question.
  *
  * cc-number is a mask, rebuilt here at a fixed width and written by the JSON
@@ -115,12 +114,6 @@ export function isStoredCreditCardField(field) {
  * they are what the UI shows -- so those are what get compared. That is also
  * the comparison worth having: a card landing under the wrong guid, or a number
  * truncated in transit, shows up here and nowhere else.
- *
- * cc-number-encrypted compares by presence only. A migration decrypts and
- * re-encrypts, and encryption is not deterministic, so the bytes differ on
- * every record by design; what is still answerable is whether both sides hold a
- * number or neither does. An empty ciphertext is a legitimate state, which is
- * why this is a parity check rather than an assertion that one exists.
  *
  * Comparing the two plaintexts is the stronger check and is not made: the copy
  * lets go of the exported records before it verifies, so it would mean
@@ -136,8 +129,6 @@ export function creditCardFieldDiffers(field, a, b) {
   switch (field) {
     case "cc-number":
       return String(a ?? "").slice(-4) !== String(b ?? "").slice(-4);
-    case "cc-number-encrypted":
-      return !a !== !b;
     default:
       return a !== b;
   }
@@ -152,7 +143,7 @@ export function creditCardFieldDiffers(field, a, b) {
  * 15-digit card reads back wider here than it was written.
  *
  * Consumers use `cc-number` for display, and the ones that need the number
- * itself decrypt `cc-number-encrypted`, so this costs presentation rather than
+ * itself read it from the store, so this costs presentation rather than
  * correctness.
  */
 const MASKED_NUMBER_LENGTH = 16;
@@ -161,22 +152,22 @@ const MASKED_NUMBER_LENGTH = 16;
 // one. See isMasked.
 const MASK_CHARACTER = "•";
 
-// A masked value is not a number: it is what a record reads back as once the
-// number behind it is gone. Encrypting one would store it in place of the card,
-// so every path that is about to encrypt refuses it.
+// A masked value is not a number: it is what every record reads back as. The
+// store encrypts whatever number it is given, so writing a mask would store it
+// in place of the card, and the one conversion every write goes through refuses
+// it.
 const isMasked = value => String(value ?? "").includes(MASK_CHARACTER);
 
 /**
  * Convert a JS credit card record to the Rust `UpdatableCreditCardFields`.
  *
- * The number is not encrypted here: the ciphertext is passed in, so that this
- * stays the same pure conversion its address counterpart is and the one place
- * that encrypts is visible at the call site.
- *
  * @param {object} record
- * @param {string} ccNumberEnc The record's number, already encrypted.
+ * @throws if the record's number is a mask.
  */
-function jsRecordToUpdatableCreditCardFields(record, ccNumberEnc) {
+function jsRecordToUpdatableCreditCardFields(record) {
+  if (isMasked(record["cc-number"])) {
+    throw new Error("Got a masked cc-number when writing");
+  }
   const fields = {};
   for (const [jsKey, rustKey] of Object.entries(JS_TO_RUST_STRING_FIELD)) {
     fields[rustKey] = record[jsKey] ?? "";
@@ -184,8 +175,7 @@ function jsRecordToUpdatableCreditCardFields(record, ccNumberEnc) {
   for (const [jsKey, rustKey] of Object.entries(JS_TO_RUST_INTEGER_FIELD)) {
     fields[rustKey] = Number(record[jsKey]) || 0;
   }
-  fields.ccNumberEnc = ccNumberEnc;
-  fields.ccNumberLast4 = record["cc-number"]?.slice(-4) ?? "";
+  fields.ccNumber = record["cc-number"] ?? "";
   return new lazy.UpdatableCreditCardFields(fields);
 }
 
@@ -214,9 +204,6 @@ function creditCardToJsRecord(creditCard) {
     }
   }
 
-  if (creditCard.ccNumberEnc) {
-    record["cc-number-encrypted"] = creditCard.ccNumberEnc;
-  }
   if (creditCard.ccNumberLast4) {
     record["cc-number"] =
       MASK_CHARACTER.repeat(
@@ -307,22 +294,14 @@ export class RustAutofillCreditCardsAdapter extends RustAutofillAdapterBase {
     return store.touchCreditCard(guid);
   }
 
-  async _add(store, record) {
-    return store.addCreditCard(
-      jsRecordToUpdatableCreditCardFields(
-        record,
-        await this.#encryptNumber(record)
-      )
-    );
+  _add(store, record) {
+    return store.addCreditCard(jsRecordToUpdatableCreditCardFields(record));
   }
 
-  async _update(store, guid, record) {
+  _update(store, guid, record) {
     return store.updateCreditCard(
       guid,
-      jsRecordToUpdatableCreditCardFields(
-        record,
-        await this.#encryptNumber(record)
-      )
+      jsRecordToUpdatableCreditCardFields(record)
     );
   }
 
@@ -361,6 +340,52 @@ export class RustAutofillCreditCardsAdapter extends RustAutofillAdapterBase {
   // ---- Credit card specifics --------------------------------------------
 
   /**
+   * The stored cards holding the number this record carries.
+   *
+   * The counterpart of CreditCardsBase.getDuplicateRecords, comparing what it
+   * compares: the number itself. The mask keeps only the last four digits, so
+   * nothing a record carries answers the question, and the cards are read from
+   * the store as it hands them over rather than through getAll().
+   *
+   * A card the store hands over without a number is passed over: it never had
+   * one, scrubEncryptedData() blanked it, or the store's key could not read it.
+   * This runs on every credit card submission, and one unreadable card must not
+   * cost the user the save prompt for a different one.
+   *
+   * @param {object} record A normalised credit card record.
+   * @yields {object} Each stored record holding the same number.
+   */
+  async *getDuplicateRecords(record) {
+    if (!record["cc-number"]) {
+      return;
+    }
+    for (const card of await this._getAll(await this._store())) {
+      if (card.ccNumber && card.ccNumber == record["cc-number"]) {
+        yield this._recordFromRust(card);
+      }
+    }
+  }
+
+  /**
+   * The stored cards that are this record rather than merely sharing its
+   * number: every field the record states has to agree. The counterpart of
+   * CreditCardsBase.getMatchRecords.
+   *
+   * @param {object} record A normalised credit card record.
+   * @yields {object} Each stored record the given one is a subset of.
+   */
+  async *getMatchRecords(record) {
+    const fields = this._validFields.filter(field => field != "cc-number");
+    for await (const stored of this.getDuplicateRecords(record)) {
+      if (
+        fields.every(field => !record[field] || record[field] == stored[field])
+      ) {
+        yield stored;
+      }
+    }
+  }
+
+  /**
    * Reject a complete record that cannot be stored. Mirrors
    * CreditCardsBase._validateFields, and is called where that is: on the whole
    * record, after a merge rather than before one, because the field it requires
@@ -368,13 +393,6 @@ export class RustAutofillCreditCardsAdapter extends RustAutofillAdapterBase {
    *
    * normalizeFields drops a number that does not validate, so an invalid number
    * and a missing one reach this the same way.
-   *
-   * A masked number is refused too. `cc-number` is held masked, and
-   * _prepareStoredForMerge is what replaces it with the decrypted number before
-   * a merge can take it -- so a mask arriving here means that did not happen,
-   * and #encryptNumber would store the mask in place of the card. Checking it
-   * where the invariant is asserted keeps it from depending on the hook having
-   * run.
    *
    * @param {object} record
    */
@@ -385,36 +403,95 @@ export class RustAutofillCreditCardsAdapter extends RustAutofillAdapterBase {
   }
 
   /**
-   * Restore the number, so a stored record can be merged with. Mirrors
-   * CreditCardsBase._stripComputedFields: `cc-number` is held masked and the
-   * number itself only in `cc-number-encrypted`, so a merge that kept the mask
-   * would encrypt it as though it were the number.
+   * The number of a stored card, in the clear.
    *
-   * The mask goes first and is put back only by a decryption that succeeded.
-   * There is nothing to restore it from otherwise -- scrubEncryptedData() blanks
-   * `cc_number_enc` and leaves `cc_number_last_4`, so a record can hold a mask
-   * and no ciphertext -- and leaving it would store the mask as the number.
-   * _validateRecord refuses the update instead.
+   * The only place this adapter reads a number. The store decrypts every card
+   * it hands over, and every record built from one carries a mask instead, so
+   * the number goes no further than the caller that asked for it.
+   *
+   * @param {string} guid
+   * @returns {Promise<?string>} The number, or null if the store handed the
+   *   card over without one: it never had one, scrubEncryptedData() blanked it,
+   *   or the store's key could not read it.
+   */
+  async #numberOf(guid) {
+    const card = await this._get(await this._store(), guid);
+    return card.ccNumber || null;
+  }
+
+  /**
+   * The cleartext of an encrypted field of a stored record. The counterpart of
+   * CreditCardsBase.decryptField.
+   *
+   * The record carries a mask rather than a ciphertext, so the number is read
+   * from the store by the record's guid. The key is the store's rather than the
+   * OS key store's, so OS re-authentication is a step of its own instead of
+   * something decrypting does on the way past.
+   *
+   * @param {object} record A record this store handed out.
+   * @param {string} field The field to read, e.g. "cc-number".
+   * @param {object} [options]
+   * @param {string|false} [options.reauth] The OS re-authentication prompt to
+   *   show first, or false to read it without one. A `trigger` is accepted and
+   *   ignored: it labels the OS key store's telemetry, and this store does not
+   *   reach the OS key store.
+   * @returns {Promise<?string>} The cleartext, or null if the store holds none
+   *   for the record. Only a record this store handed out with a number carries
+   *   a mask, so one without holds none here, and nothing is asked of the user
+   *   for it.
+   * @throws NS_ERROR_ABORT if the user declined either prompt.
+   */
+  async decryptField(record, field, { reauth = false } = {}) {
+    // Refuses a field no store keeps encrypted.
+    lazy.CreditCardRecord.ciphertextField(field);
+    if (!isMasked(record[field])) {
+      return null;
+    }
+    // TODO: Bug 2073416 - authenticating the user does not belong here. This
+    // store's key is NSS's, so the OS prompt guards nothing it reads; the
+    // option exists because CreditCardsBase cannot separate the prompt from
+    // OSKeyStore.decrypt, and the fill path passes it to both stores alike.
+    if (reauth) {
+      const authenticated = await lazy.FormAutofillUtils.verifyUserOSAuth(
+        lazy.FormAutofill.AUTOFILL_CREDITCARDS_OS_AUTH_LOCKED_PREF,
+        reauth,
+        "",
+        null,
+        // A key provisioned here would sit in the user's keychain unread.
+        false
+      );
+      if (!authenticated) {
+        throw Components.Exception(
+          "User canceled OS unlock entry",
+          Cr.NS_ERROR_ABORT
+        );
+      }
+    }
+    return this.#numberOf(record.guid);
+  }
+
+  /**
+   * Restore the number, so a stored record can be merged with. Mirrors
+   * CreditCardsBase._stripComputedFields: `cc-number` is held masked, so a
+   * merge that kept the mask would write it as though it were the number.
+   *
+   * The mask goes first and is put back only as a number the store read. A card
+   * can hold a mask with no number behind it -- scrubEncryptedData() blanks the
+   * ciphertext and keeps the last four digits -- and leaving the mask would
+   * store it as the number. _validateRecord refuses the update instead, unless
+   * the caller supplies a new number.
    *
    * @param {object} record The record, modified in place.
    */
   async _prepareStoredForMerge(record) {
-    const encrypted = record["cc-number-encrypted"];
+    const masked = record["cc-number"];
     delete record["cc-number"];
-    if (!encrypted) {
+    if (!masked) {
       return;
     }
-    try {
-      record["cc-number"] = await lazy.OSKeyStore.decrypt(
-        encrypted,
-        "formautofill_cc"
-      );
-    } catch (e) {
-      if (e.result == Cr.NS_ERROR_ABORT) {
-        throw e;
-      }
-      // Quietly recover, so an entry whose number cannot be decrypted can still
-      // be updated -- by a caller that supplies a new number.
+    const number = await this.#numberOf(record.guid);
+    if (number) {
+      record["cc-number"] = number;
     }
   }
 
@@ -430,49 +507,19 @@ export class RustAutofillCreditCardsAdapter extends RustAutofillAdapterBase {
   }
 
   /**
-   * The record's number, encrypted for storage.
-   *
-   * Interim, and the only place this adapter encrypts. OSKeyStore is the same
-   * mechanism and key as the JSON store's `cc-number-encrypted`, so a number
-   * written here stays readable by every existing consumer and no new key is
-   * introduced; the store treats `cc_number_enc` as opaque on every path used
-   * here. The Application Services key API is deliberately unused until who
-   * owns that key is settled -- when it is, this, _prepareStoredForMerge and
-   * _recordForMigrationExport are what change, all three being the places this
-   * file reaches for a key.
-   *
-   * @param {object} record A record _validateRecord has accepted.
-   * @returns {Promise<string>}
-   */
-  #encryptNumber(record) {
-    // The only place that encrypts, and so where a mask is refused: storing
-    // one would put it in place of the card number.
-    if (isMasked(record["cc-number"])) {
-      throw new Error("Got a masked cc-number when encrypting");
-    }
-    return lazy.OSKeyStore.encrypt(record["cc-number"]);
-  }
-
-  /**
    * For the migration only. The metadata is taken from the record as given
    * rather than advanced, so unlike a user's edit this neither refreshes
    * timeLastModified nor increments the sync change counter.
    *
    * The record arrives with its number in the clear, from the source store's
-   * _recordForMigrationExport, and is encrypted here -- this store encrypts on
-   * its own terms rather than inheriting the other's ciphertext. Today that is
-   * the same OS key store either way; when this store owns its own key, only
-   * #encryptNumber changes.
+   * _recordForMigrationExport, and the store encrypts it under its own key
+   * rather than inheriting the other's ciphertext.
    *
    * @param {object} record
    */
-  async _fieldsWithMeta(record) {
-    const fields = jsRecordToUpdatableCreditCardFields(
-      record,
-      record["cc-number"] ? await this.#encryptNumber(record) : ""
-    );
+  _fieldsWithMeta(record) {
     return new lazy.UpdatableCreditCardFieldsWithMeta({
-      fields,
+      fields: jsRecordToUpdatableCreditCardFields(record),
       meta: new lazy.CreditCardMeta({
         guid: record.guid,
         timeCreated: record.timeCreated ?? 0,
@@ -488,33 +535,28 @@ export class RustAutofillCreditCardsAdapter extends RustAutofillAdapterBase {
 
   /**
    * Hand a card over with its number in the clear, so the receiving store can
-   * encrypt it under its own scheme. The counterpart of
+   * encrypt it under its own key. The counterpart of
    * CreditCardsBase._recordForMigrationExport, and refuses the same way: a
-   * record whose number will not decrypt throws rather than being copied
-   * without it.
+   * record whose number cannot be read throws rather than being copied without
+   * it.
    *
    * @param {object} record
    * @returns {Promise<object>}
    */
   async _recordForMigrationExport(record) {
     const exported = { ...record };
-    if (!exported["cc-number-encrypted"]) {
-      // Nothing to read the number out of. scrubEncryptedData() blanks
-      // cc_number_enc and keeps cc_number_last_4, so a scrubbed record reads
-      // back as a mask with no ciphertext -- the number is already gone, and
-      // handing the mask over has the receiving store encrypt it in place of
-      // the card. Refuse it, as a decrypt failure below does. A record that
-      // never had a number has no mask either, and crosses unchanged.
-      if (isMasked(exported["cc-number"])) {
-        throw new Error("Got a masked cc-number when exporting");
-      }
+    // A record that never had a number has no mask either, and crosses
+    // unchanged.
+    if (!exported["cc-number"]) {
       return exported;
     }
-    exported["cc-number"] = await lazy.OSKeyStore.decrypt(
-      exported["cc-number-encrypted"],
-      "formautofill_cc"
-    );
-    delete exported["cc-number-encrypted"];
+    const number = await this.#numberOf(record.guid);
+    if (!number) {
+      // The mask has no number behind it, so handing it over would have the
+      // receiving store encrypt the mask in place of the card.
+      throw new Error("Got a masked cc-number when exporting");
+    }
+    exported["cc-number"] = number;
     return exported;
   }
 }

@@ -1371,6 +1371,8 @@ XMLHttpRequestWorker::~XMLHttpRequestWorker() {
   mozilla::DropJSObjects(this);
 }
 
+XMLHttpRequestWorker::ResponseData::ResponseData() : mResponseResult(NS_OK) {}
+
 NS_IMPL_ADDREF_INHERITED(XMLHttpRequestWorker, XMLHttpRequestEventTarget)
 NS_IMPL_RELEASE_INHERITED(XMLHttpRequestWorker, XMLHttpRequestEventTarget)
 
