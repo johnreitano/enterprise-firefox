@@ -8,6 +8,8 @@ run-if = ["enterprise"]
 ["test_live_policy_SecurityLogging.js"]
 
 ["test_live_policy_Sync.js"]
+# Sync is disabled on Thunderbird Enterprise
+run-if = ["buildapp == 'browser' && enterprise"]
 
 ["test_live_remote_fetch_error_message.js"]
 
