@@ -469,7 +469,7 @@ export class PageExtractorChild extends JSWindowActorChild {
               async readerEvent => {
                 const result = await lazy.ReaderMode.parseDocument(document);
                 readerEvent.finish({
-                  status: result ? "success" : "unavailable",
+                  status: result ? "success" : "not-readerable",
                 });
                 return result;
               }
@@ -566,7 +566,7 @@ export class PageExtractorChild extends JSWindowActorChild {
         lazy.console.debug({ text: finalText, links, canvasSnapshots });
 
         event.finish({
-          status: "success",
+          status: finalText ? "success" : "empty",
           textLength: finalText.length,
           linkCount: links.length,
           canvasCount: canvasSnapshots.length,

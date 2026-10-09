@@ -37,7 +37,7 @@ from .parameters import (
     get_version,
 )
 from .util.backstop import ANDROID_PERFTEST_BACKSTOP_INDEX, BACKSTOP_INDEX, is_backstop
-from .util.bugbug import push_schedules
+from .util.bugbug import push_schedules, start_push_schedules
 from .util.hg import get_hg_revision_metadata
 from .util.partials import populate_release_history
 from .util.partners import (
@@ -252,6 +252,15 @@ def taskgraph_decision(options, parameters):
 
     decision_task_id = os.environ["TASK_ID"]
 
+    # Start querying bugbug early, so its results are ready sooner for the
+    # optimizers, and so they are stored even on pushes that don't use them
+    # (e.g. backstop pushes).
+    bugbug_future = None
+    if not create.testing and parameters["project"] == "autoland":
+        bugbug_future = start_push_schedules(
+            parameters["project"], parameters["head_rev"]
+        )
+
     with source_bundle(parameters["head_rev"], parameters["repository_type"]):
         # create a TaskGraphGenerator instance
         tgg = TaskGraphGenerator(
@@ -307,13 +316,6 @@ def taskgraph_decision(options, parameters):
         write_artifact("task-graph.json", tgg.morphed_task_graph.to_json())
         write_artifact("label-to-taskid.json", tgg.label_to_taskid)
 
-        # write bugbug scheduling information if it was invoked
-        if push_schedules.cache_info().currsize > 0:
-            write_artifact(
-                "bugbug-push-schedules.json",
-                push_schedules(tgg.parameters["project"], tgg.parameters["head_rev"]),
-            )
-
         # upload run-task, fetch-content, robustcheckout.py and more as artifacts
         scripts_dir = Path(GECKO, "taskcluster", "scripts")
         taskgraph_dir = Path(taskgraph.__file__).parent
@@ -336,6 +338,19 @@ def taskgraph_decision(options, parameters):
             tgg.parameters,
             decision_task_id=decision_task_id,
         )
+
+        # write bugbug scheduling information if it was invoked or is ready
+        if push_schedules.cache_info().currsize > 0:
+            write_artifact(
+                "bugbug-push-schedules.json",
+                push_schedules(tgg.parameters["project"], tgg.parameters["head_rev"]),
+            )
+        elif bugbug_future and bugbug_future.done() and not bugbug_future.exception():
+            write_artifact("bugbug-push-schedules.json", bugbug_future.result())
+        else:
+            logger.info(
+                "Bugbug results not available, not writing bugbug-push-schedules.json"
+            )
 
 
 def get_decision_parameters(graph_config, options):

@@ -101,3 +101,9 @@ AllowCompilerWarnings()
 
 if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
     CFLAGS += ['-std=gnu89']
+
+SOURCE_HEADERS += [
+	"pngdebug.h",
+	"pnginfo.h",
+	"pngstruct.h",
+]

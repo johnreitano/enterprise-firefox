@@ -817,13 +817,17 @@ export class UrlbarParentController {
    *   The target browser's id. Only used if `where == current` and the call
    *   isn't coming from a content process. If it's not specified and
    *   `where == current`, the currently selected tab is used.
+   * @param {boolean} [tracksBounce]
+   *   Whether the caller tracks a bounce for this load. Any other load ends a
+   *   bounce tracked in the tab it navigates.
    */
   openSERP(
     engineId,
     searchTerms,
     where,
     inBackground = false,
-    browserId = null
+    browserId = null,
+    tracksBounce = false
   ) {
     let searchEngine = lazy.SearchService.getEngineById(engineId);
 
@@ -832,11 +836,15 @@ export class UrlbarParentController {
       searchTerms
     );
 
+    let browser =
+      this.resolveTargetBrowser(browserId) ??
+      this.browserWindow.gBrowser.selectedBrowser;
     this.browserWindow.openTrustedLinkIn(url, where, {
       inBackground,
+      initiatedByURLBar: tracksBounce,
       postData,
-      targetBrowser:
-        where == "current" ? this.resolveTargetBrowser(browserId) : null,
+      resolveOnContentBrowserCreated: claimBounceForLoad(browser),
+      targetBrowser: where == "current" ? browser : null,
       globalHistoryOptions: {
         triggeringSource: this.sapName,
         triggeringSearchEngine: searchEngine.name,
@@ -1038,6 +1046,7 @@ export class UrlbarParentController {
       }
       browser = this.browserWindow.gBrowser.selectedBrowser;
     }
+    params.resolveOnContentBrowserCreated = claimBounceForLoad(browser);
 
     let { url, postData } = lazy.UrlbarUtils.loadRequestToUrl(loadRequest);
     if (!url) {
@@ -1500,15 +1509,32 @@ export class UrlbarParentController {
  */
 
 /**
- * Bounces still being tracked, keyed by the browser of the tab they happened
- * in. In module scope because a bounce outlives the collector that started it:
- * the New Tab search bar's page -- and with it its actor and parent controller
- * -- is gone by the time the tab navigates back or closes, so the trigger
- * arrives from a chrome window input. `record` closes over the collector that
- * resolves the SAP and makes the Glean call, and the map is weak so a tab that
- * never sees a trigger doesn't keep that collector's window alive.
+ * A bounce still being tracked.
  *
- * @type {WeakMap<MozBrowser, {startTime: number, record: (viewTime: number) => void}>}
+ * @typedef {object} TrackedBounce
+ * @property {number} startTime
+ *   When the engagement happened.
+ * @property {(viewTime: number) => void} record
+ *   Records the bounce, given the view time in milliseconds.
+ * @property {boolean} awaitingLoad
+ *   Whether the engagement's load has yet to claim the bounce.
+ */
+
+/**
+ * Bounces still being tracked, keyed by the browser of the page they were
+ * tracked for. In module scope because a bounce outlives the collector that
+ * started it: the New Tab search bar's page -- and with it its actor and parent
+ * controller -- is gone by the time the tab navigates back or closes, so the
+ * trigger arrives from a chrome window input. `record` closes over the
+ * collector that resolves the SAP and makes the Glean call, and the map is weak
+ * so a tab that never sees a trigger doesn't keep that collector's window
+ * alive.
+ *
+ * A bounce is tracked before the engagement's page loads, under the tab the
+ * engagement happened in, and moves to the browser the page loads in once the
+ * load claims it (see `claimBounceForLoad()`).
+ *
+ * @type {WeakMap<MozBrowser, TrackedBounce>}
  */
 const gTrackedBounces = new WeakMap();
 
@@ -1526,15 +1552,51 @@ export async function handleBounceEventTrigger(browser) {
   if (!tracking) {
     return;
   }
+  gTrackedBounces.delete(browser);
+  await recordBounceIfShortVisit(browser, tracking);
+}
 
+/**
+ * Claims the bounce an engagement in a tab is tracking for the page it is
+ * about to load, so the bounce follows that page to the browser it loads in:
+ * a new tab or window, or the tab itself.
+ *
+ * @param {MozBrowser} sourceBrowser
+ *   The browser of the tab the engagement happened in.
+ * @returns {(browser: MozBrowser) => void}
+ *   Moves the bounce to the browser the page loaded in. A no-op when no bounce
+ *   is awaiting a load from the tab.
+ */
+function claimBounceForLoad(sourceBrowser) {
+  let tracking = gTrackedBounces.get(sourceBrowser);
+  if (!tracking?.awaitingLoad) {
+    return () => {};
+  }
+  tracking.awaitingLoad = false;
+  return browser => {
+    if (
+      browser == sourceBrowser ||
+      gTrackedBounces.get(sourceBrowser) != tracking
+    ) {
+      return;
+    }
+    gTrackedBounces.delete(sourceBrowser);
+    gTrackedBounces.set(browser, tracking);
+  };
+}
+
+/**
+ * Records a bounce no longer tracked if the page it was tracked for was viewed
+ * for less than the bounce threshold.
+ *
+ * @param {MozBrowser} browser
+ *   The browser the page loaded in.
+ * @param {TrackedBounce} tracking
+ *   The bounce.
+ */
+async function recordBounceIfShortVisit(browser, tracking) {
   const interactions =
     (await lazy.Interactions.getRecentInteractionsForBrowser(browser)) ?? [];
-
-  // handleBounceEventTrigger() can run concurrently, so we bail out
-  // if a prior async invocation has already cleared the tracking.
-  if (!gTrackedBounces.has(browser)) {
-    return;
-  }
 
   let totalViewTime = 0;
   for (let interaction of interactions) {
@@ -1555,8 +1617,6 @@ export async function handleBounceEventTrigger(browser) {
   ) {
     tracking.record(totalViewTime);
   }
-
-  gTrackedBounces.delete(browser);
 }
 
 /**
@@ -2103,7 +2163,6 @@ export class TelemetryEvent {
         "Telemetry extra_key `location` is required for smartbar"
       );
     }
-    searchMode = searchMode ?? engagementData.searchMode;
 
     // Distinguish user typed search strings from persisted search terms. The
     // "refined" check compares against the previous session's search words, so
@@ -2529,7 +2588,20 @@ export class TelemetryEvent {
       this._startEventInfo,
       this.#engagementData.visibleResults
     );
-    let sap = snapshot && this.#searchSourceToSap(snapshot.searchSource);
+    // There is no snapshot when the engagement has no event to classify, or
+    // when its interaction has already been recorded, as when a navigation
+    // picks the heuristic result the parent resolved for it after recording
+    // the engagement.
+    if (!snapshot) {
+      return;
+    }
+    let sap = this.#searchSourceToSap(snapshot.searchSource);
+    // There is no sap when the window is closing.
+    if (!sap) {
+      return;
+    }
+    // The input has left the search mode by the time the bounce triggers.
+    snapshot.searchMode ??= this.#engagementData.searchMode;
     await this.#startTrackingBounce(browserId, viewTime =>
       this.#recordBounce(snapshot, viewTime, sap)
     );
@@ -2559,9 +2631,10 @@ export class TelemetryEvent {
   }
 
   /**
-   * Tracks a bounce for the tab the engagement happened in, first triggering
-   * any bounce already tracked for that tab: another engagement there could
-   * itself be a bounce.
+   * Tracks a bounce for the tab the engagement happened in, triggering any
+   * bounce already tracked for that tab: another engagement there could itself
+   * be a bounce. The new bounce is stored before the earlier one resolves, so
+   * the engagement's load, which follows right away, finds it to claim.
    *
    * @param {?number} browserId
    *   The stable browser id of the tab the engagement happened in, or null when
@@ -2575,29 +2648,30 @@ export class TelemetryEvent {
     if (!browser) {
       return;
     }
-    if (gTrackedBounces.has(browser)) {
-      await handleBounceEventTrigger(browser);
+    let earlier = gTrackedBounces.get(browser);
+    gTrackedBounces.set(browser, {
+      startTime: Date.now(),
+      record,
+      awaitingLoad: true,
+    });
+    if (earlier) {
+      await recordBounceIfShortVisit(browser, earlier);
     }
-    gTrackedBounces.set(browser, { startTime: Date.now(), record });
   }
 
   /**
    * Records a bounce telemetry event from a bounce snapshot, the direct path's
    * recording half.
    *
-   * @param {?object} snapshot
+   * @param {object} snapshot
    *   The bounce snapshot from `UrlbarTelemetryUtils.collectBounceSnapshot()`.
    * @param {number} viewTime
    *   The time spent on the tab before navigating away, in milliseconds.
-   * @param {?string} sap
-   *   The sap resolved when the engagement happened, or null when it couldn't
-   *   be. A bounce never resolves its own, so it goes unrecorded then.
+   * @param {string} sap
+   *   The sap resolved when the engagement happened. A bounce never resolves
+   *   its own.
    */
   #recordBounce(snapshot, viewTime, sap) {
-    if (!snapshot || !sap) {
-      return;
-    }
-
     this.#recordSearchEngagementTelemetry("bounce", snapshot.startEventInfo, {
       engagementSap: sap,
       action: snapshot.action,

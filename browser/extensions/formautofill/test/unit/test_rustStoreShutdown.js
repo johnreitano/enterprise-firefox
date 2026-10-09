@@ -1,15 +1,19 @@
 /*
- * Unit tests for RustAutofillStore's shutdown handling: finalize() and the
- * profile-teardown blocker registered by _registerShutdownBlocker().
+ * Unit tests for RustAutofillStore: opening the profile's store, and the
+ * shutdown handling around it -- finalize() and the profile-teardown blocker
+ * registered by _registerShutdownBlocker().
  *
- * These exercise the logic in isolation with a fake store and a fake
- * AsyncShutdown phase, so no real SQLite store is opened.
+ * The shutdown tests exercise the logic in isolation with a fake store and a
+ * fake AsyncShutdown phase. Only the first test opens a real store.
  */
 
 "use strict";
 
 const { RustAutofillStore } = ChromeUtils.importESModule(
   "resource://autofill/RustAutofillStore.sys.mjs"
+);
+const { UpdatableCreditCardFields } = ChromeUtils.importESModule(
+  "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/components/generated/RustAutofill.sys.mjs"
 );
 
 /**
@@ -114,4 +118,30 @@ add_task(async function store_closes_immediately_when_phase_closed() {
 
   await handler._registerShutdownBlocker(phase);
   Assert.equal(store.shutdownCount, 1, "store closed immediately");
+});
+
+add_task(async function ensure_open_yields_a_store_that_holds_a_key() {
+  // The profile's store gets its key from NSS rather than being handed one,
+  // which takes NSS knowing the profile. Nothing else here opens a real store,
+  // so this is what says the key arrives at all.
+  const handler = makeHandler();
+  const store = await handler.ensureOpen();
+
+  const { guid } = await store.addCreditCard(
+    new UpdatableCreditCardFields({
+      ccName: "",
+      ccNumber: "4111111111111111",
+      ccExpMonth: 0,
+      ccExpYear: 0,
+      ccType: "",
+    })
+  );
+  Assert.equal(
+    (await store.getCreditCard(guid)).ccNumber,
+    "4111111111111111",
+    "the store encrypts with a key of its own and reads back what it wrote"
+  );
+
+  await store.deleteCreditCard(guid);
+  await handler.finalize();
 });

@@ -1451,14 +1451,13 @@ mozilla::ipc::IPCResult ContentChild::RecvRequestMemoryReport(
 
 mozilla::ipc::IPCResult ContentChild::RecvDecodeImage(
     NotNull<nsIURI*> aURI, const ImageIntSize& aSize, const bool& aStretch,
-    const ColorScheme& aColorScheme, DecodeImageResolver&& aResolver) {
+    const ColorScheme& aColorScheme, NotNull<nsIPrincipal*> aPrincipal,
+    DecodeImageResolver&& aResolver) {
   // We're about to decode a potentially untrusted image.
   MaybeBecomeUntrusted();
 
   auto size = aSize.ToUnknownSize();
-  // TODO(Bug 1999930): Investigate using  a content-principal for
-  // moz-remote-image: requests
-  image::FetchDecodedImage(aURI, size, nsContentUtils::GetSystemPrincipal())
+  image::FetchDecodedImage(aURI, size, aPrincipal)
       ->Then(
           GetCurrentSerialEventTarget(), __func__,
           [size, aStretch, aColorScheme,
@@ -4700,6 +4699,8 @@ mozilla::ipc::IPCResult ContentChild::RecvReactivateDocuments(
   }
   RefPtr browsingContext = aContext.get();
   MOZ_DIAGNOSTIC_ASSERT(browsingContext->IsTopContent());
+  MOZ_DIAGNOSTIC_ASSERT(browsingContext->IsInProcess() ||
+                        !aPreviousEntryForActivation);
 
   browsingContext->ReactivateDocuments(aReactivatedEntry, aNewSHEs,
                                        aPreviousEntryForActivation);

@@ -2673,6 +2673,13 @@ def build_task(config, tasks):
         tags = task.get("tags", {})
         attributes = task.get("attributes", {})
 
+        # Expose the yml file the task was defined in (relative to the
+        # topsrcdir), so consumers of the resolved task graph (e.g. lints
+        # auditing taskcluster/kinds/*) can point back to a specific file
+        # without needing to re-parse the kind's yml files themselves.
+        if task.get("task-from"):
+            attributes["task-from"] = os.path.join(config.path, task["task-from"])
+
         tags.update({
             "createdForUser": config.params["owner"],
             "kind": config.kind,

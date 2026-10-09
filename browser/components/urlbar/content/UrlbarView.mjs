@@ -134,15 +134,6 @@ export class UrlbarView {
   }
 
   /**
-   * The top chrome window. The module's `window` owns the view's panel and is
-   * a content window for smartbar, so use the window exposed by the input to
-   * get the chrome window for gBrowser and other APIs.
-   */
-  get chromeWindow() {
-    return this.input.window;
-  }
-
-  /**
    * @returns {?string}
    *   The URL of the currently selected tab, as recorded in the `currentPage`
    *   property of query contexts. Not set outside of browser windows, and
@@ -150,7 +141,7 @@ export class UrlbarView {
    *   (Bug 2025776).
    */
   get #currentPage() {
-    return this.chromeWindow.gBrowser?.currentURI?.spec;
+    return this.input.browserWindow?.gBrowser?.currentURI?.spec;
   }
 
   /**
@@ -916,7 +907,7 @@ export class UrlbarView {
     // search, which resets persistence and re-enables autofill.
     if (this.input.sapName == "urlbar") {
       let state = this.input.getBrowserState(
-        this.chromeWindow.gBrowser.selectedBrowser
+        this.input.browserWindow.gBrowser.selectedBrowser
       );
       if (state.persist?.shouldPersist) {
         queryOptions.allowAutofill = false;
@@ -1286,7 +1277,8 @@ export class UrlbarView {
   #overflowObserver;
   /** @type {string} */
   #previousTabToSearchEngine = null;
-  #queryContext = /** @type {UrlbarQueryContext} */ (null);
+  /** @type {UrlbarQueryContext} */
+  #queryContext = null;
   #queryUpdatedResults = false;
   #queryWasCancelled = false;
   /** @type {?number} */
@@ -3804,7 +3796,7 @@ export class UrlbarView {
   #setSwitchTabActionChiclet(item, result, actionNode) {
     actionNode.classList.add("urlbarView-switchToTab");
 
-    let splitview = this.chromeWindow.gBrowser.selectedTab.splitview;
+    let splitview = this.input.browserWindow.gBrowser.selectedTab.splitview;
     let shouldMoveTabToSplitView =
       splitview &&
       !splitview.tabs.some(
@@ -3917,7 +3909,7 @@ export class UrlbarView {
 
   // Proton only
   #addGroupToSwitchTabChiclet(result, actionNode) {
-    const group = this.chromeWindow.gBrowser.getTabGroupById(
+    const group = this.input.browserWindow.gBrowser.getTabGroupById(
       result.payload.tabGroup
     );
     if (!group) {
@@ -4022,7 +4014,7 @@ export class UrlbarView {
       result.type == UrlbarShared.RESULT_TYPE.TAB_SWITCH &&
       result.payload.tabGroup
     ) {
-      group = this.chromeWindow.gBrowser.getTabGroupById(
+      group = this.input.browserWindow.gBrowser.getTabGroupById(
         result.payload.tabGroup
       );
     }

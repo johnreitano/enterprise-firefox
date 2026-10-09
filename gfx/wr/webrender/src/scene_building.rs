@@ -3164,6 +3164,7 @@ impl<'a> SceneBuilder<'a> {
                     );
                 }
                 None => {
+                    self.tile_cache_builder.backdrop_placement_node = Some(spatial_node_index);
                     self.tile_cache_builder.add_prim(
                         filtered_instance,
                         info.rect,
@@ -3176,6 +3177,7 @@ impl<'a> SceneBuilder<'a> {
                         &mut self.prim_instances,
                         &self.clip_tree_builder,
                     );
+                    self.tile_cache_builder.backdrop_placement_node = None;
                 }
             }
 
@@ -3465,11 +3467,11 @@ impl<'a> SceneBuilder<'a> {
                                 newnode.inputs = remapped_inputs;
                                 (newnode.clone(), op.clone())
                             },
-                            FilterGraphOp::SVGFEDisplacementMap { scale, .. } => {
+                            FilterGraphOp::SVGFEDisplacementMap { scale_x, scale_y, .. } => {
                                 assert!(remapped_inputs.len() == 2);
                                 let padding = LayoutSize::new(
-                                    scale.ceil(),
-                                    scale.ceil(),
+                                    scale_x.abs().ceil(),
+                                    scale_y.abs().ceil(),
                                 );
                                 // Add padding to both inputs for source and target
                                 // rects, we might be able to skip some of these,

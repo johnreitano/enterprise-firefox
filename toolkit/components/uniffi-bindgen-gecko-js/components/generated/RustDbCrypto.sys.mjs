@@ -48,7 +48,7 @@ FfiConverterString.checkType(canary);
 FfiConverterString.checkType(text);
 FfiConverterString.checkType(encryptionKey);
 const result = await UniFFIScaffolding.callAsyncWrapper(
-    3, // uniffi_db_crypto_fn_func_check_canary
+    5, // uniffi_db_crypto_fn_func_check_canary
     FfiConverterString.lower(canary),
     FfiConverterString.lower(text),
     FfiConverterString.lower(encryptionKey),
@@ -73,7 +73,7 @@ export async function createCanary(
 FfiConverterString.checkType(text);
 FfiConverterString.checkType(encryptionKey);
 const result = await UniFFIScaffolding.callAsyncWrapper(
-    4, // uniffi_db_crypto_fn_func_create_canary
+    6, // uniffi_db_crypto_fn_func_create_canary
     FfiConverterString.lower(text),
     FfiConverterString.lower(encryptionKey),
 )
@@ -92,7 +92,7 @@ return handleRustResult(
 export async function createKey() {
    
 const result = await UniFFIScaffolding.callAsyncWrapper(
-    5, // uniffi_db_crypto_fn_func_create_key
+    7, // uniffi_db_crypto_fn_func_create_key
 )
 return handleRustResult(
     result,
@@ -476,7 +476,7 @@ export class EncryptorDecryptorImpl extends EncryptorDecryptor {
        
         FfiConverterBytes.checkType(ciphertext);
         const result = UniFFIScaffolding.callSync(
-            111, // uniffi_db_crypto_fn_method_encryptordecryptor_decrypt
+            113, // uniffi_db_crypto_fn_method_encryptordecryptor_decrypt
             FfiConverterTypeEncryptorDecryptor.lowerReceiver(this),
             FfiConverterBytes.lower(ciphertext),
         )
@@ -497,7 +497,7 @@ export class EncryptorDecryptorImpl extends EncryptorDecryptor {
        
         FfiConverterBytes.checkType(cleartext);
         const result = UniFFIScaffolding.callSync(
-            112, // uniffi_db_crypto_fn_method_encryptordecryptor_encrypt
+            114, // uniffi_db_crypto_fn_method_encryptordecryptor_encrypt
             FfiConverterTypeEncryptorDecryptor.lowerReceiver(this),
             FfiConverterBytes.lower(cleartext),
         )
@@ -644,7 +644,7 @@ export class KeyManagerImpl extends KeyManager {
     getKey() {
        
         const result = UniFFIScaffolding.callSync(
-            113, // uniffi_db_crypto_fn_method_keymanager_get_key
+            115, // uniffi_db_crypto_fn_method_keymanager_get_key
             FfiConverterTypeKeyManager.lowerReceiver(this),
         )
         return handleRustResult(
@@ -771,7 +771,7 @@ export class ManagedEncryptorDecryptor extends ManagedEncryptorDecryptorInterfac
        
         FfiConverterTypeKeyManager.checkType(keyManager);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            114, // uniffi_db_crypto_fn_constructor_managedencryptordecryptor_new
+            116, // uniffi_db_crypto_fn_constructor_managedencryptordecryptor_new
             FfiConverterTypeKeyManager.lower(keyManager),
         )
         return handleRustResult(
@@ -948,7 +948,7 @@ export class NssKeyManager extends NssKeyManagerInterface {
         FfiConverterString.checkType(keyName);
         FfiConverterTypePrimaryPasswordAuthenticator.checkType(primaryPasswordAuthenticator);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            115, // uniffi_db_crypto_fn_constructor_nsskeymanager_new
+            117, // uniffi_db_crypto_fn_constructor_nsskeymanager_new
             FfiConverterString.lower(keyName),
             FfiConverterTypePrimaryPasswordAuthenticator.lower(primaryPasswordAuthenticator),
         )
@@ -966,7 +966,7 @@ export class NssKeyManager extends NssKeyManagerInterface {
     async intoDynKeyManager() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            116, // uniffi_db_crypto_fn_method_nsskeymanager_into_dyn_key_manager
+            118, // uniffi_db_crypto_fn_method_nsskeymanager_into_dyn_key_manager
             FfiConverterTypeNSSKeyManager.lowerReceiver(this),
         )
         return handleRustResult(
@@ -1068,7 +1068,7 @@ export class PrimaryPasswordAuthenticatorImpl extends PrimaryPasswordAuthenticat
     async getPrimaryPassword() {
        
         const result = await UniFFIScaffolding.callAsync(
-            117, // uniffi_db_crypto_fn_method_primarypasswordauthenticator_get_primary_password
+            119, // uniffi_db_crypto_fn_method_primarypasswordauthenticator_get_primary_password
             FfiConverterTypePrimaryPasswordAuthenticator.lowerReceiver(this),
         )
         return handleRustResult(
@@ -1084,7 +1084,7 @@ export class PrimaryPasswordAuthenticatorImpl extends PrimaryPasswordAuthenticat
     async onAuthenticationSuccess() {
        
         const result = await UniFFIScaffolding.callAsync(
-            118, // uniffi_db_crypto_fn_method_primarypasswordauthenticator_on_authentication_success
+            120, // uniffi_db_crypto_fn_method_primarypasswordauthenticator_on_authentication_success
             FfiConverterTypePrimaryPasswordAuthenticator.lowerReceiver(this),
         )
         return handleRustResult(
@@ -1100,7 +1100,7 @@ export class PrimaryPasswordAuthenticatorImpl extends PrimaryPasswordAuthenticat
     async onAuthenticationFailure() {
        
         const result = await UniFFIScaffolding.callAsync(
-            119, // uniffi_db_crypto_fn_method_primarypasswordauthenticator_on_authentication_failure
+            121, // uniffi_db_crypto_fn_method_primarypasswordauthenticator_on_authentication_failure
             FfiConverterTypePrimaryPasswordAuthenticator.lowerReceiver(this),
         )
         return handleRustResult(
@@ -1251,7 +1251,7 @@ export class StaticKeyManager extends StaticKeyManagerInterface {
        
         FfiConverterString.checkType(key);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            120, // uniffi_db_crypto_fn_constructor_statickeymanager_new
+            122, // uniffi_db_crypto_fn_constructor_statickeymanager_new
             FfiConverterString.lower(key),
         )
         return handleRustResult(

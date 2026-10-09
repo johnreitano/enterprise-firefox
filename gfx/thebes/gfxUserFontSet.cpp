@@ -418,7 +418,26 @@ void gfxUserFontEntry::FontLoadComplete() {
   }
 }
 
-void gfxUserFontEntry::ContinueLoad() {
+void gfxUserFontEntry::ScheduleContinueLoad() {
+  MOZ_ASSERT(NS_IsMainThread());
+  RefPtr<nsIRunnable> runnable =
+      NewRunnableMethod("gfxUserFontEntry::DoContinueLoad", this,
+                        &gfxUserFontEntry::DoContinueLoad);
+  // We don't want to trigger the channel open at random points in time, because
+  // it can run privileged JS.
+  if (!nsContentUtils::IsSafeToRunScript()) {
+    // There's a script-blocker on the stack. We know the sooner point where we
+    // can trigger the load.
+    nsContentUtils::AddScriptRunner(runnable.forget());
+  } else {
+    // We dispatch with a rather high priority, since somebody actually cares
+    // about this font.
+    NS_DispatchToCurrentThreadQueue(runnable.forget(),
+                                    EventQueuePriority::MediumHigh);
+  }
+}
+
+void gfxUserFontEntry::DoContinueLoad() {
   if (mUserFontLoadState == STATUS_NOT_LOADED) {
     // We must have been cancelled (possibly due to a font-list refresh) while
     // the runnable was pending, so just bail out.
@@ -562,8 +581,8 @@ void gfxUserFontEntry::DoLoadNextSrc(bool aIsContinue) {
           // buffers or other sync sources?
           SetLoadState(STATUS_LOAD_PENDING);
           NS_DispatchToMainThread(
-              NewRunnableMethod("gfxUserFontEntry::ContinueLoad", this,
-                                &gfxUserFontEntry::ContinueLoad));
+              NewRunnableMethod("gfxUserFontEntry::DoContinueLoad", this,
+                                &gfxUserFontEntry::DoContinueLoad));
           return;
         }
 
@@ -594,22 +613,8 @@ void gfxUserFontEntry::DoLoadNextSrc(bool aIsContinue) {
           fontSet->LogMessage(this, mCurrentSrcIndex, "font load failed",
                               nsIScriptError::errorFlag, rv);
         } else if (!aIsContinue) {
-          RefPtr<nsIRunnable> runnable =
-              NewRunnableMethod("gfxUserFontEntry::ContinueLoad", this,
-                                &gfxUserFontEntry::ContinueLoad);
           SetLoadState(STATUS_LOAD_PENDING);
-          // We don't want to trigger the channel open at random points in
-          // time, because it can run privileged JS.
-          if (!nsContentUtils::IsSafeToRunScript()) {
-            // There's a script-blocker on the stack. We know the sooner point
-            // where we can trigger the load.
-            nsContentUtils::AddScriptRunner(runnable.forget());
-          } else {
-            // We dispatch with a rather high priority, since somebody actually
-            // cares about this font.
-            NS_DispatchToCurrentThreadQueue(runnable.forget(),
-                                            EventQueuePriority::MediumHigh);
-          }
+          ScheduleContinueLoad();
           return;
         } else {
           // Actually start the async load.

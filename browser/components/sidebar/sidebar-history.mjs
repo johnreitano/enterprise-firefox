@@ -124,6 +124,9 @@ export class SidebarHistory extends SidebarPage {
       if (isPrivateWindowMenuItem && !lazy.PrivateBrowsingUtils.enabled) {
         shouldHide = true;
       }
+      if (lazy.PlacesUIUtils.shouldHideOpenMenuItem(child)) {
+        shouldHide = true;
+      }
       child.hidden = shouldHide;
     }
   }

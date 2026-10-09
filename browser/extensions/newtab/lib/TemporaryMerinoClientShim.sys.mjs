@@ -134,8 +134,10 @@ export class TemporaryMerinoClientShim {
     this.#sessionTimeoutMs = value;
   }
 
-  // Note: Cannot be JSDoc due to https://github.com/pyodide/sphinx-js/issues/242
-  // The current session ID. Null when there is no active session.
+  /**
+   * @returns {?string}
+   *   The current session ID. Null when there is no active session.
+   */
   get sessionID() {
     return this.#sessionID;
   }
@@ -149,9 +151,11 @@ export class TemporaryMerinoClientShim {
     return this.#sequenceNumber;
   }
 
-  // Note: Cannot be JSDoc due to https://github.com/pyodide/sphinx-js/issues/242
-  // A string that indicates the status of the last fetch. Possible values:
-  // success, timeout, network_error, http_error
+  /**
+   * @returns {string}
+   *   A string that indicates the status of the last fetch. Possible values:
+   *   success, timeout, network_error, http_error
+   */
   get lastFetchStatus() {
     return this.#lastFetchStatus;
   }
@@ -831,7 +835,7 @@ export class TemporaryMerinoClientShim {
   }
 
   // State related to the current session.
-  /** @type {string} */
+  /** @type {?string} */
   #sessionID = null;
   #sequenceNumber = 0;
   /** @type {SkippableTimer} */
@@ -843,7 +847,7 @@ export class TemporaryMerinoClientShim {
   #timeoutTimer = null;
   /** @type {AbortController} */
   #fetchController = null;
-  /** @type {string} */
+  /** @type {?string} */
   #lastFetchStatus = null;
   /** @type {PromiseWithResolvers<?Response|?OHTTPResponse>} */
   #nextResponseDeferred = null;

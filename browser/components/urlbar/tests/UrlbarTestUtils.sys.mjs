@@ -1633,7 +1633,7 @@ export class UrlbarInputBaseTestUtils {
           getSearchSource() {
             return "dummy-search-source";
           },
-          window: {
+          browserWindow: {
             location: {
               href: AppConstants.BROWSER_CHROME_URL,
             },
@@ -1657,7 +1657,7 @@ export class UrlbarInputBaseTestUtils {
     // Stub the actor so the child controller builds a direct-path parent
     // controller (the child owns construction; the actor only resolves the
     // chrome window). It is exposed as `controller.parentController`.
-    parentOptions.input.window.windowGlobalChild = {
+    parentOptions.input.browserWindow.windowGlobalChild = {
       getActor: () => ({
         browsingContext: { topChromeWindow: browserWindow },
       }),

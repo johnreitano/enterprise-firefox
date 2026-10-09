@@ -31,6 +31,12 @@ import java.nio.charset.CodingErrorAction
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import mozilla.appservices.db_crypto.EncryptorDecryptor
+import mozilla.appservices.db_crypto.FfiConverterTypeEncryptorDecryptor
+import mozilla.appservices.db_crypto.FfiConverterTypeKeyManager
+import mozilla.appservices.db_crypto.KeyManager
+import mozilla.appservices.db_crypto.RustBuffer as RustBufferEncryptorDecryptor
+import mozilla.appservices.db_crypto.RustBuffer as RustBufferKeyManager
 
 // This is a helper for safely working with byte buffers returned from the Rust code.
 // A rust-owned buffer is represented by its capacity, its current length, and a
@@ -676,9 +682,11 @@ internal object IntegrityCheckingUniffiLib {
     internal fun ensureInitialized() = Unit
     external fun uniffi_autofill_checksum_func_create_autofill_key(
     ): Int
-    external fun uniffi_autofill_checksum_func_decrypt_string(
+    external fun uniffi_autofill_checksum_func_create_autofill_store_with_static_key_manager(
     ): Int
-    external fun uniffi_autofill_checksum_func_encrypt_string(
+    external fun uniffi_autofill_checksum_func_create_managed_encdec(
+    ): Int
+    external fun uniffi_autofill_checksum_func_create_static_key_manager(
     ): Int
     external fun uniffi_autofill_checksum_method_addressesbridgedengine_apply(
     ): Int
@@ -794,6 +802,7 @@ internal object UniffiLib {
 
     init {
         Native.register(UniffiLib::class.java, findLibraryName(componentName = "autofill"))
+        mozilla.appservices.db_crypto.uniffiEnsureInitialized()
         
     }
 
@@ -828,7 +837,7 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_autofill_fn_free_store(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    external fun uniffi_autofill_fn_constructor_store_new(`dbpath`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    external fun uniffi_autofill_fn_constructor_store_new(`dbpath`: RustBuffer.ByValue,`encdec`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
     external fun uniffi_autofill_fn_method_store_add_address(`ptr`: Long,`a`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -884,7 +893,7 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_autofill_fn_method_store_scrub_encrypted_data(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    external fun uniffi_autofill_fn_method_store_scrub_undecryptable_credit_card_data_for_remote_replacement(`ptr`: Long,`localEncryptionKey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    external fun uniffi_autofill_fn_method_store_scrub_undecryptable_credit_card_data_for_remote_replacement(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_autofill_fn_method_store_shutdown(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -906,10 +915,12 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_autofill_fn_func_create_autofill_key(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
-    external fun uniffi_autofill_fn_func_decrypt_string(`key`: RustBuffer.ByValue,`ciphertext`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_autofill_fn_func_encrypt_string(`key`: RustBuffer.ByValue,`cleartext`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
+    external fun uniffi_autofill_fn_func_create_autofill_store_with_static_key_manager(`path`: RustBuffer.ByValue,`key`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_autofill_fn_func_create_managed_encdec(`keyManager`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_autofill_fn_func_create_static_key_manager(`key`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
     external fun ffi_autofill_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun ffi_autofill_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1921,7 +1932,7 @@ public interface StoreInterface {
      * NB: This function was created to unblock iOS credit card users who are unable to sync records and should not be used
      * outside of this use case.
      */
-    fun `scrubUndecryptableCreditCardDataForRemoteReplacement`(`localEncryptionKey`: kotlin.String): CreditCardsDeletionMetrics
+    fun `scrubUndecryptableCreditCardDataForRemoteReplacement`(): CreditCardsDeletionMetrics
     
     fun `shutdown`()
     
@@ -1968,13 +1979,14 @@ open class Store: Disposable, AutoCloseable, StoreInterface
         this.handle = 0
         this.cleanable = null
     }
-    constructor(`dbpath`: kotlin.String) :
+    constructor(`dbpath`: kotlin.String, `encdec`: EncryptorDecryptor) :
         this(UniffiWithHandle, 
     uniffiRustCallWithError(AutofillApiException) { _status ->
     UniffiLib.uniffi_autofill_fn_constructor_store_new(
     
         
-        FfiConverterString.lower(`dbpath`),_status)
+        FfiConverterString.lower(`dbpath`),
+        FfiConverterTypeEncryptorDecryptor.lower(`encdec`),_status)
 }
     )
 
@@ -2476,14 +2488,13 @@ open class Store: Disposable, AutoCloseable, StoreInterface
      * NB: This function was created to unblock iOS credit card users who are unable to sync records and should not be used
      * outside of this use case.
      */
-    @Throws(AutofillApiException::class)override fun `scrubUndecryptableCreditCardDataForRemoteReplacement`(`localEncryptionKey`: kotlin.String): CreditCardsDeletionMetrics {
+    @Throws(AutofillApiException::class)override fun `scrubUndecryptableCreditCardDataForRemoteReplacement`(): CreditCardsDeletionMetrics {
             return FfiConverterTypeCreditCardsDeletionMetrics.lift(
     callWithHandle {
     uniffiRustCallWithError(AutofillApiException) { _status ->
     UniffiLib.uniffi_autofill_fn_method_store_scrub_undecryptable_credit_card_data_for_remote_replacement(
         it,
-        
-        FfiConverterString.lower(`localEncryptionKey`),_status)
+        _status)
 }
     }
     )
@@ -2871,14 +2882,16 @@ public object FfiConverterTypeAddressTombstone: FfiConverterRustBuffer<AddressTo
 
 
 /**
- * What you get back as a credit-card.
+ * What you get back as a credit-card. The number comes back decrypted;
+ * it is empty for a scrubbed card or one saved without a number. A number
+ * the key cannot read fails the read.
  */
 data class CreditCard (
     var `guid`: kotlin.String
     , 
     var `ccName`: kotlin.String
     , 
-    var `ccNumberEnc`: kotlin.String
+    var `ccNumber`: kotlin.String
     , 
     var `ccNumberLast4`: kotlin.String
     , 
@@ -2928,7 +2941,7 @@ public object FfiConverterTypeCreditCard: FfiConverterRustBuffer<CreditCard> {
     override fun allocationSize(value: CreditCard) = (
             FfiConverterString.allocationSize(value.`guid`) +
             FfiConverterString.allocationSize(value.`ccName`) +
-            FfiConverterString.allocationSize(value.`ccNumberEnc`) +
+            FfiConverterString.allocationSize(value.`ccNumber`) +
             FfiConverterString.allocationSize(value.`ccNumberLast4`) +
             FfiConverterLong.allocationSize(value.`ccExpMonth`) +
             FfiConverterLong.allocationSize(value.`ccExpYear`) +
@@ -2942,7 +2955,7 @@ public object FfiConverterTypeCreditCard: FfiConverterRustBuffer<CreditCard> {
     override fun write(value: CreditCard, buf: ByteBuffer) {
             FfiConverterString.write(value.`guid`, buf)
             FfiConverterString.write(value.`ccName`, buf)
-            FfiConverterString.write(value.`ccNumberEnc`, buf)
+            FfiConverterString.write(value.`ccNumber`, buf)
             FfiConverterString.write(value.`ccNumberLast4`, buf)
             FfiConverterLong.write(value.`ccExpMonth`, buf)
             FfiConverterLong.write(value.`ccExpYear`, buf)
@@ -3324,14 +3337,13 @@ public object FfiConverterTypeUpdatableAddressFieldsWithMeta: FfiConverterRustBu
 
 
 /**
- * What you pass to create or update a credit-card.
+ * What you pass to create or update a credit-card. The number is given in
+ * cleartext; the store encrypts it and derives the last-4 digits itself.
  */
 data class UpdatableCreditCardFields (
     var `ccName`: kotlin.String
     , 
-    var `ccNumberEnc`: kotlin.String
-    , 
-    var `ccNumberLast4`: kotlin.String
+    var `ccNumber`: kotlin.String
     , 
     var `ccExpMonth`: kotlin.Long
     , 
@@ -3356,7 +3368,6 @@ public object FfiConverterTypeUpdatableCreditCardFields: FfiConverterRustBuffer<
         return UpdatableCreditCardFields(
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
             FfiConverterLong.read(buf),
             FfiConverterLong.read(buf),
             FfiConverterString.read(buf),
@@ -3365,8 +3376,7 @@ public object FfiConverterTypeUpdatableCreditCardFields: FfiConverterRustBuffer<
 
     override fun allocationSize(value: UpdatableCreditCardFields) = (
             FfiConverterString.allocationSize(value.`ccName`) +
-            FfiConverterString.allocationSize(value.`ccNumberEnc`) +
-            FfiConverterString.allocationSize(value.`ccNumberLast4`) +
+            FfiConverterString.allocationSize(value.`ccNumber`) +
             FfiConverterLong.allocationSize(value.`ccExpMonth`) +
             FfiConverterLong.allocationSize(value.`ccExpYear`) +
             FfiConverterString.allocationSize(value.`ccType`)
@@ -3374,8 +3384,7 @@ public object FfiConverterTypeUpdatableCreditCardFields: FfiConverterRustBuffer<
 
     override fun write(value: UpdatableCreditCardFields, buf: ByteBuffer) {
             FfiConverterString.write(value.`ccName`, buf)
-            FfiConverterString.write(value.`ccNumberEnc`, buf)
-            FfiConverterString.write(value.`ccNumberLast4`, buf)
+            FfiConverterString.write(value.`ccNumber`, buf)
             FfiConverterLong.write(value.`ccExpMonth`, buf)
             FfiConverterLong.write(value.`ccExpYear`, buf)
             FfiConverterString.write(value.`ccType`, buf)
@@ -4383,6 +4392,10 @@ public object FfiConverterSequenceTypeCreditCardBulkTombstoneResultEntry: FfiCon
         }
     }
 }
+
+
+
+
         /**
          * Create a new, random, encryption key.
          */
@@ -4398,33 +4411,49 @@ public object FfiConverterSequenceTypeCreditCardBulkTombstoneResultEntry: FfiCon
     
 
         /**
-         * Decrypt an arbitrary string - `key` must have come from `create_key()`
-         * and `ciphertext` must have come from `encrypt_string()`
+         * Create a Store with StaticKeyManager by passing in a db path and a
+         * static key
          */
-    @Throws(AutofillApiException::class) fun `decryptString`(`key`: kotlin.String, `ciphertext`: kotlin.String): kotlin.String {
-            return FfiConverterString.lift(
+    @Throws(AutofillApiException::class) fun `createAutofillStoreWithStaticKeyManager`(`path`: kotlin.String, `key`: kotlin.String): Store {
+            return FfiConverterTypeStore.lift(
     uniffiRustCallWithError(AutofillApiException) { _status ->
-    UniffiLib.uniffi_autofill_fn_func_decrypt_string(
+    UniffiLib.uniffi_autofill_fn_func_create_autofill_store_with_static_key_manager(
     
         
-        FfiConverterString.lower(`key`),
-        FfiConverterString.lower(`ciphertext`),_status)
+        FfiConverterString.lower(`path`),
+        FfiConverterString.lower(`key`),_status)
 }
     )
     }
     
 
         /**
-         * Encrypt an arbitrary string - `key` must have come from `create_key()`
-         */
-    @Throws(AutofillApiException::class) fun `encryptString`(`key`: kotlin.String, `cleartext`: kotlin.String): kotlin.String {
-            return FfiConverterString.lift(
-    uniffiRustCallWithError(AutofillApiException) { _status ->
-    UniffiLib.uniffi_autofill_fn_func_encrypt_string(
+         * Similar to create_static_key_manager above, create a
+         * ManagedEncryptorDecryptor by passing in a KeyManager
+         */ fun `createManagedEncdec`(`keyManager`: KeyManager): EncryptorDecryptor {
+            return FfiConverterTypeEncryptorDecryptor.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_autofill_fn_func_create_managed_encdec(
     
         
-        FfiConverterString.lower(`key`),
-        FfiConverterString.lower(`cleartext`),_status)
+        FfiConverterTypeKeyManager.lower(`keyManager`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Utility function to create a StaticKeyManager to be used for the time
+         * being until support lands for [trait implementation of an UniFFI
+         * interface](https://mozilla.github.io/uniffi-rs/next/proc_macro/index.html#structs-implementing-traits)
+         * in UniFFI.
+         */ fun `createStaticKeyManager`(`key`: kotlin.String): KeyManager {
+            return FfiConverterTypeKeyManager.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_autofill_fn_func_create_static_key_manager(
+    
+        
+        FfiConverterString.lower(`key`),_status)
 }
     )
     }

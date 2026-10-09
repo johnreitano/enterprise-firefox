@@ -5317,6 +5317,14 @@ nsresult HttpBaseChannel::SetupReplacementChannel(nsIURI* newURI,
 
   newChannel->SetLoadGroup(mLoadGroup);
   newChannel->SetNotificationCallbacks(mCallbacks);
+
+  // Console reports that could not be flushed yet, because the document being
+  // loaded does not exist, must follow the load to the redirected channel.
+  nsCOMPtr<nsIConsoleReportCollector> reporter = do_QueryInterface(newChannel);
+  if (reporter) {
+    FlushConsoleReports(reporter);
+  }
+
   // TODO: create tests for cross-origin redirect in bug 1662896.
   if (sameOriginWithOriginalUri) {
     newChannel->SetContentDisposition(mContentDispositionHint);

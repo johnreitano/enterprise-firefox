@@ -6,14 +6,40 @@ const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
   AsyncShutdown: "resource://gre/modules/AsyncShutdown.sys.mjs",
-  Store:
+  createAutofillStoreWithNssKeymanager:
     "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/components/generated/RustAutofill.sys.mjs",
+  initialize:
+    "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/components/generated/RustInitRustComponents.sys.mjs",
 });
+
+// The authenticator below extends a class from this module, so it cannot be a
+// lazy getter.
+import {
+  AuthenticationCanceled,
+  PrimaryPasswordAuthenticator,
+} from "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/components/generated/RustDbCrypto.sys.mjs";
 
 // File name of the Application Services `autofill` SQLite store within the
 // profile directory. It is the sibling of the JSON profile that backs
 // addresses/credit cards (autofill-profiles.json).
 const AUTOFILL_STORE_FILE_NAME = "autofill.db";
+
+/**
+ * Declines to supply the primary password.
+ *
+ * NSS asks only when the profile has one set, and this store is not enabled
+ * for those profiles. Declining leaves the store reporting its key as
+ * unavailable.
+ */
+class RustAutofillStorageAuthenticator extends PrimaryPasswordAuthenticator {
+  async getPrimaryPassword() {
+    throw new AuthenticationCanceled("No primary password support yet");
+  }
+
+  async onAuthenticationSuccess() {}
+
+  async onAuthenticationFailure() {}
+}
 
 /**
  * Owns the lifecycle of the Application Services `autofill` SQLite store.
@@ -29,6 +55,8 @@ export class RustAutofillStore {
   static _instance = null;
 
   _storePromise = null;
+
+  #authenticator = null;
 
   // A second handler would open a second connection to the same file and
   // register a second shutdown blocker, so constructing always hands back the
@@ -49,9 +77,15 @@ export class RustAutofillStore {
     if (!this._storePromise) {
       // Hold the promise rather than the opened store, so that callers racing
       // to open share one connection instead of each starting their own.
-      this._storePromise = lazy.Store.init(
-        PathUtils.join(PathUtils.profileDir, AUTOFILL_STORE_FILE_NAME)
-      );
+      this.#authenticator = new RustAutofillStorageAuthenticator();
+      this._storePromise = (async () => {
+        // The store's key lives in NSS, which has to know the profile first.
+        await lazy.initialize(PathUtils.profileDir);
+        return lazy.createAutofillStoreWithNssKeymanager(
+          PathUtils.join(PathUtils.profileDir, AUTOFILL_STORE_FILE_NAME),
+          this.#authenticator
+        );
+      })();
       await this._registerShutdownBlocker();
     }
     return this._storePromise;

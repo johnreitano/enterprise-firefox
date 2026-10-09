@@ -1982,14 +1982,16 @@ topsites:
   click:
     type: event
     description: >
-      Recorded when a topsite tile is clicked.
-      Only happens on click. Not on middle-click. Not on "Open in new Tab"-like
-      options in the context menu.
+      Recorded when a topsite tile is clicked. Also recorded when a tile is
+      opened in a new tab or window from Firefox's right-click menu or by
+      middle-click, and when a tile is opened in a new window or private
+      window from the tile's own "..." menu.
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1766887
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1786670
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1817105
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1820707
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2060322
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1766887
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1786670#c3
@@ -2016,6 +2018,13 @@ topsites:
       visible_topsites: *visible_topsites
       smart_scores: *smart_scores
       smart_weights: *smart_weights
+      event_source: *event_source
+      background: &background
+        description: >
+          Whether the link opened in a tab the user was not switched to. Only
+          set when the link was opened from Firefox's right-click menu or by
+          middle-click.
+        type: boolean
     send_in_pings:
       - newtab
 
@@ -2469,15 +2478,16 @@ pocket:
   click:
     type: event
     description: >
-      Recorded when a pocket tile is clicked.
-      Only happens on click. Not on middle-click. Not on "Open in new Tab"-like
-      options in the context menu.
+      Recorded when a pocket tile is clicked. Also recorded when a story is
+      opened in a new tab or window from Firefox's right-click menu or by
+      middle-click.
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1786612
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1817105
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1854245
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1862670
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1937200
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2060322
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1786612
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1817105#c11
@@ -2515,6 +2525,7 @@ pocket:
       layout_name: *layout_name
       event_source: *event_source
       card_column: *card_column
+      background: *background
       content_redacted:
         description: >
           Are content details sent separately in the newtab_content ping

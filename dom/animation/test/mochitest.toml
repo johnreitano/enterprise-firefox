@@ -47,7 +47,6 @@ support-files = [
 
 ["mozilla/test_event_listener_leaks.html"]
 skip-if = [
-  "os == 'win' && os_version == '11.26100' && arch == 'x86_64' && debug && xorigin && verify-standalone",
   "os == 'win' && os_version == '11.26200' && arch == 'x86_64' && debug && xorigin && verify-standalone",
 ]
 

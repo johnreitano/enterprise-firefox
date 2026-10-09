@@ -163,13 +163,6 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
     CustomizableUI.addListener(this);
     this._updateNewTabVisibility();
 
-    XPCOMUtils.defineLazyPreferenceGetter(
-      this,
-      "_closeTabByDblclick",
-      "browser.tabs.closeTabByDblclick",
-      false
-    );
-
     // The base class set these up before we had the arrowscrollbox.
     this.updateWheelListeners();
 
@@ -335,7 +328,7 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
   }
 
   cancelTabGroupPreview() {
-    this.previewPanel?.panelOpener.clear();
+    this.previewPanel?.panelOpener.clear(this.previewPanel.tabGroupPanel);
   }
 
   showTabGroupPreview(group) {
@@ -1370,8 +1363,6 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
   _handleTabSelect(aInstant) {
     let selectedTab = this.selectedItem;
     this.#ensureTabIsVisible(selectedTab, aInstant);
-
-    selectedTab._notselectedsinceload = false;
   }
 
   /**

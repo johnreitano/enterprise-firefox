@@ -362,19 +362,24 @@ ${
   _wwwIsTrimmed = false;
   _enableAutofillPlaceholder = true;
 
+  /**
+   * The browser window or null in a child process.
+   *
+   * For the addressbar and searchbar, this is the same as the global `window`.
+   * For the smartbar, this is the browser window containing its content window.
+   * For the newtab search bar, this is null.
+   *
+   * @type {?ChromeWindow}
+   */
+  // @ts-expect-error bug 1957626
+  browserWindow = window.browsingContext?.topChromeWindow ?? null;
+
   constructor() {
     super();
 
-    // If the current window context does not have gBrowser,
-    // get the main browser window.
-    this.window = this.documentGlobal;
-    if (!this.window.gBrowser) {
-      logger().debug(`gBrowser not available, get the browser window.`);
-      this.window = window.browsingContext.topChromeWindow;
-    }
-
-    this.document = this.window.document;
-    this.isPrivate = lazy.PrivateBrowsingUtils.isWindowPrivate(this.window);
+    this.isPrivate = lazy.PrivateBrowsingUtils.isWindowPrivate(
+      this.browserWindow
+    );
 
     UrlbarPrefs.addObserver(this);
     window.addEventListener("unload", () => {
@@ -528,7 +533,7 @@ ${
     }
 
     // Defer until after layout so listeners can safely interact with the element.
-    this.documentGlobal.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
       this.dispatchEvent(
         new CustomEvent("smartbar-initialized", { bubbles: true })
       );
@@ -571,8 +576,8 @@ ${
     // Don't attach event listeners if the toolbar is not visible
     // in this window or the urlbar is readonly.
     if (
-      !this.window.toolbar.visible ||
-      this.window.document.documentElement.hasAttribute("taskbartab") ||
+      !this.browserWindow.toolbar.visible ||
+      this.browserWindow.document.documentElement.hasAttribute("taskbartab") ||
       this.readOnly
     ) {
       this.#releasePopoverAnchor();
@@ -586,12 +591,12 @@ ${
     }
 
     // These are on the window to detect focusing shortcuts like F6.
-    this.window.addEventListener("keydown", this);
-    this.window.addEventListener("keyup", this);
+    this.browserWindow.addEventListener("keydown", this);
+    this.browserWindow.addEventListener("keyup", this);
 
-    this.window.addEventListener("mousedown", this);
+    this.browserWindow.addEventListener("mousedown", this);
     if (UrlbarContentUtils.getPlatform() == "win") {
-      this.window.addEventListener("draggableregionleftmousedown", this);
+      this.browserWindow.addEventListener("draggableregionleftmousedown", this);
     }
     this.addEventListener("mousedown", this);
 
@@ -606,10 +611,10 @@ ${
     // This listener handles the overflow scroll fade animation.
     this.view.panel.addEventListener("scroll", this);
 
-    this.window.addEventListener("customizationstarting", this);
-    this.window.addEventListener("aftercustomization", this);
+    this.browserWindow.addEventListener("customizationstarting", this);
+    this.browserWindow.addEventListener("aftercustomization", this);
 
-    if (this.window.gBrowser) {
+    if (this.browserWindow.gBrowser) {
       // On startup, this will be called again by browser-init.js
       // once gBrowser has been initialized.
       this.addGBrowserListeners();
@@ -662,12 +667,15 @@ ${
     }
 
     // These are on the window to detect focusing shortcuts like F6.
-    this.window.removeEventListener("keydown", this);
-    this.window.removeEventListener("keyup", this);
+    this.browserWindow.removeEventListener("keydown", this);
+    this.browserWindow.removeEventListener("keyup", this);
 
-    this.window.removeEventListener("mousedown", this);
+    this.browserWindow.removeEventListener("mousedown", this);
     if (UrlbarContentUtils.getPlatform() == "win") {
-      this.window.removeEventListener("draggableregionleftmousedown", this);
+      this.browserWindow.removeEventListener(
+        "draggableregionleftmousedown",
+        this
+      );
     }
     this.removeEventListener("mousedown", this);
 
@@ -682,20 +690,26 @@ ${
     // This listener handles the overflow scroll fade animation.
     this.view.panel.removeEventListener("scroll", this);
     if (this.#scrollAnimationId) {
-      this.window.cancelAnimationFrame(this.#scrollAnimationId);
+      window.cancelAnimationFrame(this.#scrollAnimationId);
       this.#scrollAnimationId = null;
     }
 
-    this.window.removeEventListener("customizationstarting", this);
-    this.window.removeEventListener("aftercustomization", this);
+    this.browserWindow.removeEventListener("customizationstarting", this);
+    this.browserWindow.removeEventListener("aftercustomization", this);
     if (this.#gBrowserListenersAdded) {
-      this.window.gBrowser.tabContainer.removeEventListener("TabSelect", this);
-      this.window.gBrowser.tabContainer.removeEventListener("TabClose", this);
-      this.window.gBrowser.tabContainer.removeEventListener(
+      this.browserWindow.gBrowser.tabContainer.removeEventListener(
+        "TabSelect",
+        this
+      );
+      this.browserWindow.gBrowser.tabContainer.removeEventListener(
+        "TabClose",
+        this
+      );
+      this.browserWindow.gBrowser.tabContainer.removeEventListener(
         "TabAttrModified",
         this
       );
-      this.window.gBrowser.removeTabsProgressListener(this);
+      this.browserWindow.gBrowser.removeTabsProgressListener(this);
       this.#gBrowserListenersAdded = false;
     }
 
@@ -720,21 +734,16 @@ ${
 
     // Remove pref observer
     UrlbarPrefs.removeObserver(this);
-
-    // Clear window and document references.
-    this.window = null;
-    this.document = null;
   }
 
   /**
    * The text context menu shared by the inputs of the document this one lives
-   * in. In smartbar mode that document isn't this.document, which belongs to
-   * the top chrome window.
+   * in. In smartbar mode that document's window isn't this.browserWindow.
    *
    * @type {object}
    */
   get #editContextMenu() {
-    return this.documentGlobal.EditContextMenu;
+    return window.EditContextMenu;
   }
 
   /**
@@ -872,8 +881,7 @@ ${
       );
       xferable.init(null);
       xferable.addDataFlavor("text/plain");
-      const windowContext =
-        this.documentGlobal?.browsingContext?.currentWindowContext;
+      const windowContext = window.browsingContext?.currentWindowContext;
       if (windowContext) {
         Services.clipboard.getData(
           xferable,
@@ -898,21 +906,27 @@ ${
   }
 
   addGBrowserListeners() {
-    if (!this.window.gBrowser || this.#gBrowserListenersAdded) {
+    if (!this.browserWindow.gBrowser || this.#gBrowserListenersAdded) {
       return;
     }
 
-    this.window.gBrowser.addTabsProgressListener(this);
+    this.browserWindow.gBrowser.addTabsProgressListener(this);
     this.#gBrowserListenersAdded = true;
 
     // TabSelect/TabClose listeners are needed for both address bar and smartbar modes
     if (this.#isAddressbar || this.#isSmartbarMode) {
-      this.window.gBrowser.tabContainer.addEventListener("TabSelect", this);
-      this.window.gBrowser.tabContainer.addEventListener("TabClose", this);
+      this.browserWindow.gBrowser.tabContainer.addEventListener(
+        "TabSelect",
+        this
+      );
+      this.browserWindow.gBrowser.tabContainer.addEventListener(
+        "TabClose",
+        this
+      );
     }
 
     if (this.#isSmartbarMode) {
-      this.window.gBrowser.tabContainer.addEventListener(
+      this.browserWindow.gBrowser.tabContainer.addEventListener(
         "TabAttrModified",
         this
       );
@@ -1344,7 +1358,9 @@ ${
       this._updateSearchModeUI(this.searchMode);
     }
 
-    let state = this.getBrowserState(this.window.gBrowser.selectedBrowser);
+    let state = this.getBrowserState(
+      this.browserWindow.gBrowser.selectedBrowser
+    );
     this.#handlePersistedSearchTerms({
       state,
       uri,
@@ -1367,10 +1383,10 @@ ${
     // This url will be set/unset by PromptParent. See bug 791594 for reference.
     if (value === null || (!value && dueToTabSwitch)) {
       uri =
-        this.window.gBrowser.selectedBrowser.currentAuthPromptURI ||
+        this.browserWindow.gBrowser.selectedBrowser.currentAuthPromptURI ||
         uri ||
         this.#isOpenedPageInBlankTargetLoading ||
-        this.window.gBrowser.currentURI;
+        this.browserWindow.gBrowser.currentURI;
       // Strip off usernames and passwords for the location bar
       try {
         uri = Services.io.createExposableURI(uri);
@@ -1381,9 +1397,9 @@ ${
       // Replace initial page URIs with an empty string
       // only if there's no opener (bug 370555).
       if (
-        this.window.isInitialPage(uri) &&
+        this.browserWindow.isInitialPage(uri) &&
         lazy.BrowserUIUtils.checkEmptyPageOrigin(
-          this.window.gBrowser.selectedBrowser,
+          this.browserWindow.gBrowser.selectedBrowser,
           uri
         )
       ) {
@@ -1403,13 +1419,13 @@ ${
       // identity yet. See Bug 1746383.
       valid =
         !dueToSessionRestore &&
-        (!this.window.isBlankPageURL(uri.spec) ||
+        (!this.browserWindow.isBlankPageURL(uri.spec) ||
           lazy.ExtensionUtils.isExtensionUrl(uri) ||
           isInitialPageControlledByWebContent);
     } else if (
-      this.window.isInitialPage(value) &&
+      this.browserWindow.isInitialPage(value) &&
       lazy.BrowserUIUtils.checkEmptyPageOrigin(
-        this.window.gBrowser.selectedBrowser
+        this.browserWindow.gBrowser.selectedBrowser
       )
     ) {
       value = "";
@@ -1470,7 +1486,7 @@ ${
       dueToTabSwitch,
       !isReverting &&
         dueToTabSwitch &&
-        this.getBrowserState(this.window.gBrowser.selectedBrowser)
+        this.getBrowserState(this.browserWindow.gBrowser.selectedBrowser)
           .isUnifiedSearchButtonAvailable
     );
 
@@ -1550,15 +1566,15 @@ ${
     }
 
     if (this.#isSmartbarMode) {
-      if (browser == this.window.gBrowser.selectedBrowser) {
+      if (browser == this.browserWindow.gBrowser.selectedBrowser) {
         this.#updateContextChips();
       }
       return;
     }
 
     if (
-      browser != this.window.gBrowser.selectedBrowser &&
-      !this.window.isBlankPageURL(locationURI.spec)
+      browser != this.browserWindow.gBrowser.selectedBrowser &&
+      !this.browserWindow.isBlankPageURL(locationURI.spec)
     ) {
       // If the page is loaded on background tab, make Unified Search Button
       // unavailable when back to the tab.
@@ -2027,7 +2043,7 @@ ${
    * @type {?number}
    */
   get #selectedBrowserId() {
-    return this.window.gBrowser?.selectedBrowser?.browserId ?? null;
+    return this.browserWindow.gBrowser?.selectedBrowser?.browserId ?? null;
   }
 
   /**
@@ -2384,7 +2400,9 @@ ${
     if (!this.#isAddressbar) {
       return;
     }
-    let state = this.getBrowserState(this.window.gBrowser.selectedBrowser);
+    let state = this.getBrowserState(
+      this.browserWindow.gBrowser.selectedBrowser
+    );
     if (anchorElement?.closest("#urlbar") && state.persist?.shouldPersist) {
       this.handleRevert();
       Glean.urlbarPersistedsearchterms.revertByPopupCount.add(1);
@@ -2573,7 +2591,7 @@ ${
     let loadRequest = resultUrl
       ? { urlLoad: { url: resultUrl, postData: null } }
       : UrlbarShared.getLoadRequestFromResult(result, { element });
-    let isSplitViewActive = this.window.gBrowser.selectedTab.splitview;
+    let isSplitViewActive = this.browserWindow.gBrowser.selectedTab.splitview;
 
     switch (result.type) {
       case UrlbarShared.RESULT_TYPE.URL: {
@@ -2845,10 +2863,10 @@ ${
     // Bounce tracking starts on the selected tab and triggers on chrome tab
     // events (navigation, tab close), so it only runs in a browser window. TBD
     // if and how this should work for a moz-urlbar living in a content process.
-    if (this.window.gBrowser) {
+    if (this.browserWindow.gBrowser) {
       this.controller.engagementEvent
         .startTrackingBounceEvent(
-          this.window.gBrowser.selectedBrowser.browserId,
+          this.browserWindow.gBrowser.selectedBrowser.browserId,
           event,
           {
             result,
@@ -3429,7 +3447,7 @@ ${
       let event = new UIEvent("input", {
         bubbles: true,
         cancelable: false,
-        view: this.window,
+        view: window,
         detail: 0,
       });
       this.inputField.dispatchEvent(event);
@@ -3508,7 +3526,7 @@ ${
             source: UrlbarShared.RESULT_SOURCE.SEARCH,
             isPreview: false,
           },
-          this.window.gBrowser.selectedBrowser
+          this.browserWindow.gBrowser.selectedBrowser
         );
       }
       this.parentController.openSERP(
@@ -3680,7 +3698,7 @@ ${
     }
 
     // Enter search mode if the browser is selected.
-    if (browser == this.window.gBrowser.selectedBrowser) {
+    if (browser == this.browserWindow.gBrowser.selectedBrowser) {
       this._updateSearchModeUI(newSearchMode);
       if (newSearchMode) {
         // Set userTypedValue to the query string so that it's properly restored
@@ -3692,7 +3710,7 @@ ${
         }
       }
     }
-    lazy.UrlbarSearchTermsPersistence.onSearchModeChanged(this.window);
+    lazy.UrlbarSearchTermsPersistence.onSearchModeChanged(this.browserWindow);
     this.dispatchEvent(new Event("searchmodechanged"));
   }
 
@@ -3741,7 +3759,9 @@ ${
     if (this.#isSmartbarMode) {
       return;
     }
-    let state = this.getBrowserState(this.window.gBrowser.selectedBrowser);
+    let state = this.getBrowserState(
+      this.browserWindow.gBrowser.selectedBrowser
+    );
     this.searchMode = state.searchModes?.confirmed;
   }
 
@@ -3961,13 +3981,13 @@ ${
 
   get userTypedValue() {
     return this.#isAddressbar
-      ? this.window.gBrowser.userTypedValue
+      ? this.browserWindow.gBrowser.userTypedValue
       : this._userTypedValue;
   }
 
   set userTypedValue(val) {
     if (this.#isAddressbar) {
-      this.window.gBrowser.userTypedValue = val;
+      this.browserWindow.gBrowser.userTypedValue = val;
     } else {
       this._userTypedValue = val;
     }
@@ -3991,11 +4011,11 @@ ${
     if (this.#isSmartbarMode) {
       return null;
     }
-    if (!this.window.gBrowser) {
+    if (!this.browserWindow.gBrowser) {
       // This only happens before DOMContentLoaded.
       return null;
     }
-    return this.getSearchMode(this.window.gBrowser.selectedBrowser);
+    return this.getSearchMode(this.browserWindow.gBrowser.selectedBrowser);
   }
 
   set searchMode(/** @type {?SearchModeInput} */ searchMode) {
@@ -4005,7 +4025,7 @@ ${
     }
     this.#searchModeApplied = this.setSearchMode(
       searchMode,
-      this.window.gBrowser.selectedBrowser
+      this.browserWindow.gBrowser.selectedBrowser
     );
 
     this.controller.engineStore
@@ -4026,10 +4046,10 @@ ${
     if (!this.#canOpenPopover) {
       return;
     }
-    if (this.document.fullscreenElement) {
+    if (document.fullscreenElement) {
       // Toolbars are hidden in DOM fullscreen mode, so we can't get proper
       // layout information and need to retry after leaving that mode.
-      this.window.addEventListener(
+      this.browserWindow.addEventListener(
         "fullscreen",
         () => {
           this.#updatePopoverAnchor();
@@ -4056,8 +4076,8 @@ ${
     // Enable the animation only after the first extend call to ensure it
     // doesn't run when opening a new window.
     if (!this.hasAttribute("popover-animate")) {
-      this.window.promiseDocumentFlushed(() => {
-        this.window.requestAnimationFrame(() => {
+      window.promiseDocumentFlushed(() => {
+        window.requestAnimationFrame(() => {
           this.setAttribute("popover-animate", "true");
         });
       });
@@ -4127,9 +4147,9 @@ ${
     if (
       updatePopupNotifications &&
       prevState != state &&
-      this.window.UpdatePopupNotificationsVisibility
+      this.browserWindow.UpdatePopupNotificationsVisibility
     ) {
-      this.window.UpdatePopupNotificationsVisibility();
+      this.browserWindow.UpdatePopupNotificationsVisibility();
     }
   }
 
@@ -4258,7 +4278,9 @@ ${
         return "urlbar_searchmode";
       }
 
-      let state = this.getBrowserState(this.window.gBrowser.selectedBrowser);
+      let state = this.getBrowserState(
+        this.browserWindow.gBrowser.selectedBrowser
+      );
       if (state.persist?.searchTerms && !isOneOff) {
         // Normally, we use state.persist.shouldPersist to check if search terms
         // persisted. However when the user modifies the search term, the boolean
@@ -4374,9 +4396,9 @@ ${
     // finishes, we need to disregard the first one.
     let updateKey = {};
     this.#popoverAnchorUpdateKey = updateKey;
-    await this.window.promiseDocumentFlushed(() => {});
+    await window.promiseDocumentFlushed(() => {});
     await new Promise(resolve => {
-      this.window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
         if (this.#popoverAnchorUpdateKey != updateKey || !this.isConnected) {
           return;
         }
@@ -4454,7 +4476,7 @@ ${
     }
 
     // Dispatch ValueChange event for accessibility.
-    let event = this.document.createEvent("Events");
+    let event = document.createEvent("Events");
     event.initEvent("ValueChange", true, true);
     this.inputField.dispatchEvent(event);
 
@@ -4688,7 +4710,7 @@ ${
       this.getAttribute("domaindir") === "rtl" &&
       UrlbarContentUtils.isTextDirectionRTL(this.value, window);
 
-    this.window.promiseDocumentFlushed(() => {
+    window.promiseDocumentFlushed(() => {
       // Check overflow again to ensure it didn't change in the meanwhile.
       let input = this.inputField;
       if (input && this._overflowing) {
@@ -4713,7 +4735,7 @@ ${
           side = "left";
         }
 
-        this.window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
           // And check once again, since we might have stopped overflowing
           // since the promiseDocumentFlushed callback fired.
           if (this._overflowing) {
@@ -4766,9 +4788,9 @@ ${
     let uri;
     if (this.getAttribute("pageproxystate") == "valid") {
       uri = this.#isOpenedPageInBlankTargetLoading
-        ? this.window.gBrowser.selectedBrowser.browsingContext
+        ? this.browserWindow.gBrowser.selectedBrowser.browsingContext
             .nonWebControlledLoadingURI
-        : this.window.gBrowser.currentURI;
+        : this.browserWindow.gBrowser.currentURI;
     } else {
       // The value could be:
       // 1. a trimmed url, set by selecting a result
@@ -5079,7 +5101,7 @@ ${
     });
 
     if (element.dataset.command == "manage") {
-      this.window.openPreferences("search-locationBar");
+      this.browserWindow.openPreferences("search-locationBar");
       return;
     }
 
@@ -5432,7 +5454,7 @@ ${
           return;
         }
         let controller =
-          this.document.commandDispatcher.getControllerForCommand("cmd_copy");
+          document.commandDispatcher.getControllerForCommand("cmd_copy");
         if (
           !controller.isCommandEnabled("cmd_copy") ||
           !this.#isClipboardURIValid()
@@ -5462,7 +5484,7 @@ ${
         Ci.nsIClipboard.kGlobalClipboard
       );
     }
-    return this.document.commandDispatcher
+    return document.commandDispatcher
       .getControllerForCommand("cmd_paste")
       .isCommandEnabled("cmd_paste");
   }
@@ -5472,7 +5494,7 @@ ${
    */
   #pasteForPasteAndGo() {
     if (!this.#isSmartbarMode) {
-      this.window.goDoCommand("cmd_paste");
+      window.goDoCommand("cmd_paste");
       return;
     }
     const clipboardText = this.#readClipboardData()?.getData("text/plain");
@@ -5550,10 +5572,6 @@ ${
     this.#addContextMenuItems({
       after: "edit-contextmenu-select-all",
       createItems: () => {
-        // Use ownerDocument so the elements share a docgroup with the context
-        // menu. In smartbar mode this.document points at the top chrome window,
-        // which is a different docgroup than the AI window that hosts the
-        // input.
         let doc = this.ownerDocument;
         let fragment = doc.createDocumentFragment();
 
@@ -5806,7 +5824,7 @@ ${
       if (engineName) {
         // Set text content for the search mode indicator.
         this._searchModeIndicatorTitle.textContent = engineName;
-        this.document.l10n.setAttributes(
+        document.l10n.setAttributes(
           this.inputField,
           isGeneralPurposeEngine
             ? "urlbar-placeholder-search-mode-web-2"
@@ -5823,14 +5841,8 @@ ${
         };
         let sourceName = UrlbarShared.getResultSourceName(source);
         let l10nID = `urlbar-search-mode-${sourceName}`;
-        this.document.l10n.setAttributes(
-          this._searchModeIndicatorTitle,
-          l10nID
-        );
-        this.document.l10n.setAttributes(
-          this.inputField,
-          messageIDs[sourceName]
-        );
+        document.l10n.setAttributes(this._searchModeIndicatorTitle, l10nID);
+        document.l10n.setAttributes(this.inputField, messageIDs[sourceName]);
       }
     }
 
@@ -5845,7 +5857,7 @@ ${
       this.setPageProxyState("invalid", true);
     }
 
-    lazy.UrlbarSearchTermsPersistence.onSearchModeChanged(this.window);
+    lazy.UrlbarSearchTermsPersistence.onSearchModeChanged(this.browserWindow);
     this.dispatchEvent(new Event("searchmodechanged"));
   }
 
@@ -5893,9 +5905,9 @@ ${
 
     let cachedUriDidChange =
       state.persist?.originalURI &&
-      (!this.window.gBrowser.selectedBrowser.originalURI ||
+      (!this.browserWindow.gBrowser.selectedBrowser.originalURI ||
         !state.persist.originalURI.equals(
-          this.window.gBrowser.selectedBrowser.originalURI
+          this.browserWindow.gBrowser.selectedBrowser.originalURI
         ));
 
     // Capture the shouldPersist property if it exists before
@@ -5905,7 +5917,7 @@ ${
     if (firstView || cachedUriDidChange) {
       lazy.UrlbarSearchTermsPersistence.setPersistenceState(
         state,
-        this.window.gBrowser.selectedBrowser.originalURI
+        this.browserWindow.gBrowser.selectedBrowser.originalURI
       );
     }
     let shouldPersist =
@@ -5913,7 +5925,7 @@ ${
       lazy.UrlbarSearchTermsPersistence.shouldPersist(state, {
         dueToTabSwitch,
         isSameDocument,
-        uri: uri ?? this.window.gBrowser.currentURI,
+        uri: uri ?? this.browserWindow.gBrowser.currentURI,
         userTypedValue: this.userTypedValue,
         firstView,
       });
@@ -5975,7 +5987,7 @@ ${
       await new Promise(r =>
         document.addEventListener("DOMContentLoaded", r, { once: true })
       );
-      await new Promise(r => this.window.requestIdleCallback(r));
+      await new Promise(r => window.requestIdleCallback(r));
     }
 
     await this.controller.engineStore.init();
@@ -6019,7 +6031,7 @@ ${
           this.searchModeSwitcher.updateSearchIcon().catch(console.error);
           this.updatePlaceholder();
           this.inputField.removeEventListener("input", updateListener);
-          this.window.gBrowser.tabContainer.removeEventListener(
+          this.browserWindow.gBrowser.tabContainer.removeEventListener(
             "TabSelect",
             updateListener
           );
@@ -6027,7 +6039,7 @@ ${
       };
 
       this.inputField.addEventListener("input", updateListener);
-      this.window.gBrowser.tabContainer.addEventListener(
+      this.browserWindow.gBrowser.tabContainer.addEventListener(
         "TabSelect",
         updateListener
       );
@@ -6053,7 +6065,7 @@ ${
       switcher.setAttribute("aria-hidden", "true");
     }
     this.getBrowserState(
-      this.window.gBrowser.selectedBrowser
+      this.browserWindow.gBrowser.selectedBrowser
     ).isUnifiedSearchButtonAvailable = available;
   }
 
@@ -6086,12 +6098,12 @@ ${
    */
   _setPlaceholder(engineName) {
     if (this.#isSmartbarMode) {
-      this.document.l10n.setAttributes(this.inputField, "smartbar-placeholder");
+      document.l10n.setAttributes(this.inputField, "smartbar-placeholder");
       return;
     }
 
     if (!this.#isAddressbar) {
-      this.document.l10n.setAttributes(this.inputField, "searchbar-input");
+      document.l10n.setAttributes(this.inputField, "searchbar-input");
       return;
     }
 
@@ -6104,7 +6116,7 @@ ${
       l10nId = "urlbar-placeholder-keyword-disabled";
     }
 
-    this.document.l10n.setAttributes(
+    document.l10n.setAttributes(
       this.inputField,
       l10nId,
       l10nId == "urlbar-placeholder-with-name"
@@ -6218,9 +6230,9 @@ ${
     // We may have hidden popup notifications, show them again if necessary.
     if (
       this.getAttribute("pageproxystate") != "valid" &&
-      this.window.UpdatePopupNotificationsVisibility
+      this.browserWindow.UpdatePopupNotificationsVisibility
     ) {
-      this.window.UpdatePopupNotificationsVisibility();
+      this.browserWindow.UpdatePopupNotificationsVisibility();
     }
 
     // If user move the focus to another component while pressing Enter key,
@@ -6341,9 +6353,9 @@ ${
     // Hide popup notifications, to reduce visual noise.
     if (
       this.getAttribute("pageproxystate") != "valid" &&
-      this.window.UpdatePopupNotificationsVisibility
+      this.browserWindow.UpdatePopupNotificationsVisibility
     ) {
-      this.window.UpdatePopupNotificationsVisibility();
+      this.browserWindow.UpdatePopupNotificationsVisibility();
     }
 
     Services.obs.notifyObservers(null, "urlbar-focus");
@@ -6408,7 +6420,7 @@ ${
         });
         break;
       }
-      case this.window:
+      case this.browserWindow:
         if (this._mousedownOnUrlbarDescendant) {
           this._mousedownOnUrlbarDescendant = false;
           break;
@@ -6499,7 +6511,9 @@ ${
     }
 
     if (this.#isAddressbar) {
-      let state = this.getBrowserState(this.window.gBrowser.selectedBrowser);
+      let state = this.getBrowserState(
+        this.browserWindow.gBrowser.selectedBrowser
+      );
       if (
         state.persist?.shouldPersist &&
         this.value !== state.persist.searchTerms
@@ -6536,7 +6550,7 @@ ${
         // UrlbarView rolls up all popups when it opens, but we should
         // do the same for SmartbarInput when it's already open in case
         // a tab preview was opened
-        this.window.docShell.treeOwner
+        window.docShell.treeOwner
           .QueryInterface(Ci.nsIInterfaceRequestor)
           .getInterface(Ci.nsIAppWindow)
           .rollupAllPopups();
@@ -6628,7 +6642,7 @@ ${
       this._suppressPrimaryAdjustment ||
       // The check on isHandlingUserInput filters out async "select" events
       // from setSelectionRange(), which occur when autofill text is selected.
-      !this.window.windowUtils.isHandlingUserInput ||
+      !window.windowUtils.isHandlingUserInput ||
       !Services.clipboard.isClipboardTypeSupported(
         Services.clipboard.kSelectionClipboard
       )
@@ -6755,12 +6769,15 @@ ${
     };
 
     // Only add gBrowser-dependent properties if we're in a browser window.
-    if (this.window.gBrowser) {
+    if (this.browserWindow.gBrowser) {
       options.userContextId = parseInt(
-        this.window.gBrowser.selectedBrowser?.getAttribute("usercontextid") ?? 0
+        this.browserWindow.gBrowser.selectedBrowser?.getAttribute(
+          "usercontextid"
+        ) ?? 0
       );
-      options.tabGroup = this.window.gBrowser.selectedTab.group?.id ?? null;
-      const currentPageSpec = this.window.gBrowser.currentURI?.spec;
+      options.tabGroup =
+        this.browserWindow.gBrowser.selectedTab.group?.id ?? null;
+      const currentPageSpec = this.browserWindow.gBrowser.currentURI?.spec;
       // currentURI is transiently null during a tab-drag docshell swap
       // (Bug 2025776); omit currentPage rather than passing "" which fails
       // UrlbarQueryContext validation.
@@ -6807,7 +6824,7 @@ ${
     if (this.#scrollAnimationId) {
       return;
     }
-    this.#scrollAnimationId = this.window.requestAnimationFrame(() => {
+    this.#scrollAnimationId = window.requestAnimationFrame(() => {
       this.#scrollAnimationId = null;
 
       const { scrollTop, scrollHeight, clientHeight } = this.view.panel;
@@ -6842,7 +6859,7 @@ ${
   _on_TabAttrModified(event) {
     if (
       this.#isSidebarMode &&
-      event.target == this.window.gBrowser.selectedTab &&
+      event.target == this.browserWindow.gBrowser.selectedTab &&
       (event.detail.changed.includes("image") ||
         event.detail.changed.includes("label"))
     ) {
@@ -6886,7 +6903,7 @@ ${
       return;
     }
 
-    if (event.currentTarget == this.window) {
+    if (event.currentTarget == this.browserWindow) {
       // Tab/Shift+Tab/Escape on the smartbar action buttons goes through
       // a dedicated handler. We detect membership via a manual ancestor
       // walk so we work across shadow root boundaries regardless of mode.
@@ -6974,7 +6991,7 @@ ${
   }
 
   _on_keyup(event) {
-    if (event.currentTarget == this.window) {
+    if (event.currentTarget == this.browserWindow) {
       this._untrimOnFocusAfterKeydown = false;
       return;
     }
@@ -7142,9 +7159,9 @@ ${
       return;
     }
 
-    let uri = this.makeURIReadable(this.window.gBrowser.currentURI);
+    let uri = this.makeURIReadable(this.browserWindow.gBrowser.currentURI);
     let href = uri.displaySpec;
-    let title = this.window.gBrowser.contentTitle || href;
+    let title = this.browserWindow.gBrowser.contentTitle || href;
 
     event.dataTransfer.setData("text/x-moz-url", `${href}\n${title}`);
     event.dataTransfer.setData("text/plain", href);
@@ -7177,7 +7194,10 @@ ${
     let droppedURL = URL.isInstance(droppedItem)
       ? droppedItem.href
       : droppedItem;
-    if (droppedURL && droppedURL !== this.window.gBrowser.currentURI.spec) {
+    if (
+      droppedURL &&
+      droppedURL !== this.browserWindow.gBrowser.currentURI.spec
+    ) {
       let principal = Services.droppedLinkHandler.getTriggeringPrincipal(event);
       this.value = droppedURL;
       this.setPageProxyState("invalid");
@@ -7240,9 +7260,9 @@ ${
 
   get #isOpenedPageInBlankTargetLoading() {
     return (
-      this.window.gBrowser.selectedBrowser.browsingContext.sessionHistory
+      this.browserWindow.gBrowser.selectedBrowser.browsingContext.sessionHistory
         ?.count === 0 &&
-      this.window.gBrowser.selectedBrowser.browsingContext
+      this.browserWindow.gBrowser.selectedBrowser.browsingContext
         .nonWebControlledLoadingURI
     );
   }
@@ -7368,7 +7388,7 @@ ${
     if (!this.#isSidebarMode) {
       return null;
     }
-    const currentTabUrl = lazy.getCurrentTabUrl(this.window);
+    const currentTabUrl = lazy.getCurrentTabUrl(this.browserWindow);
     if (currentTabUrl?.spec == this.#removedImplicitTabUrl) {
       return null;
     }
@@ -7389,7 +7409,7 @@ ${
     // "default" context is consistently visible and doesn't get pushed out by
     // explicit chips, unless the user has explicitly removed it.
     if (this.#isSidebarMode) {
-      const tab = this.window.gBrowser?.selectedTab;
+      const tab = this.browserWindow.gBrowser?.selectedTab;
       const url = tab?.linkedBrowser.currentURI?.spec;
       if (url && url != this.#removedImplicitTabUrl) {
         candidates.unshift({
@@ -7465,7 +7485,7 @@ ${
   restoreContextChips(chips = [], removedImplicitContextChip = false) {
     this.#contextWebsites = [...chips];
     const currentTabUrl =
-      this.window.gBrowser?.selectedTab?.linkedBrowser?.currentURI?.spec;
+      this.browserWindow.gBrowser?.selectedTab?.linkedBrowser?.currentURI?.spec;
     this.#removedImplicitTabUrl = removedImplicitContextChip
       ? currentTabUrl
       : null;
@@ -7577,7 +7597,7 @@ ${
 
     const isCurrentTab =
       this.#isSidebarMode &&
-      this.window.gBrowser.selectedTab.linkedBrowser.currentURI?.spec ==
+      this.browserWindow.gBrowser.selectedTab.linkedBrowser.currentURI?.spec ==
         urlOrGroupId;
     if (isCurrentTab) {
       this.#removedImplicitTabUrl = urlOrGroupId;
@@ -7777,7 +7797,7 @@ class CopyCutController {
       let event = new UIEvent("input", {
         bubbles: true,
         cancelable: false,
-        view: urlbar.window,
+        view: window,
         detail: 0,
       });
       urlbar.inputField.dispatchEvent(event);

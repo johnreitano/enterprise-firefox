@@ -91,7 +91,6 @@ https_first_disabled = true
 ["browser_UsageTelemetry_interaction.js"]
 https_first_disabled = true
 skip-if = [
-  "os == 'win' && os_version == '11.26100' && opt && verify-standalone",
   "os == 'win' && os_version == '11.26200' && opt && verify-standalone",
 ]
 
@@ -115,6 +114,3 @@ run-if = [
 ]
 
 ["browser_urlBar_zoom.js"]
-skip-if = [
-  "os == 'mac' && os_version == '10.15' && arch == 'x86_64' && debug", # Bug 1775794
-]

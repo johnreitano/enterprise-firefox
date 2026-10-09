@@ -7561,6 +7561,8 @@ void ScrollContainerFrame::FireScrolledAreaEvent() {
   nsIContent* content = GetContent();
 
   event.mArea = mScrolledFrame->ScrollableOverflowRectRelativeToParent();
+  event.mFlags.mOnlyChromeDispatch =
+      !StaticPrefs::layout_scrolled_area_changed_content_enabled();
   if (RefPtr<Document> doc = content->GetUncomposedDoc()) {
     EventDispatcher::Dispatch(doc, presContext, &event, nullptr);
   }

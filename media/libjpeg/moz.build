@@ -280,3 +280,8 @@ AllowCompilerWarnings()
 
 FINAL_LIBRARY = 'xul'
 
+
+SOURCE_HEADERS += [
+	"jconfigint.h",
+	"jversion.h",
+]

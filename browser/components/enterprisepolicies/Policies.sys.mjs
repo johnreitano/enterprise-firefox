@@ -1657,7 +1657,7 @@ export var Policies = {
         // This policy is meant to change the default behavior, not to force it.
         // If this policy was already applied and the user chose to re-hide the
         // menu bar, do not show it again.
-        lazy.runOncePerModification("displayMenuBar", value, () => {
+        lazy.runOncePerModification("displayMenuBar", String(value), () => {
           Services.xulStore.setValue(
             BROWSER_DOCUMENT_URL,
             "toolbar-menubar",

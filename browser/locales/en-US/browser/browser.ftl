@@ -1327,9 +1327,9 @@ tabs-toolbar =
 tabs-toolbar-new-tab =
     .label = New Tab
 
-tabs-toolbar-list-all-tabs =
-    .label = List all tabs
-    .tooltiptext = List all tabs
+tabs-toolbar-list-all-tabs-2 =
+    .label = Search and manage tabs
+    .tooltiptext = Search and manage tabs
 
 ## Drop indicator text for pinned tabs when no tabs are pinned.
 

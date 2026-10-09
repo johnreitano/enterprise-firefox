@@ -163,6 +163,85 @@ add_task(async function test_generateAITab_success() {
   }
 });
 
+add_task(async function test_generateAITab_telemetry_success() {
+  Services.fog.testResetFOG();
+  const mockEngine = new lazy.MockEngineManager();
+  const { url: GEN_URL, cleanup: stopServing } = servePage();
+  try {
+    const genPromise = lazy.AITab.generateAITab(
+      {
+        urlList: [GEN_URL, 42],
+        rawContent: "some notes",
+        howInitiated: "tab_group",
+      },
+      lazy.newConversation()
+    );
+    const response = JSON.stringify(GENERATED_SURFACE);
+    await mockEngine.respondTo({
+      purpose: lazy.MODEL_FEATURES.AITAB,
+      response,
+    });
+    const result = await genPromise;
+    Assert.ok(!result.error, `generation should succeed: ${result.error}`);
+
+    const [initiate] = Glean.smartWindow.aitabCreateInitiate.testGetValue();
+    Assert.deepEqual(
+      initiate.extra,
+      {
+        num_tabs: "1",
+        how_initiated: "tab_group",
+        raw_content_len: "10",
+        num_tabs_total_attempted: "2",
+      },
+      "aitab_create_initiate describes the request"
+    );
+
+    const [complete] = Glean.smartWindow.aitabCreateComplete.testGetValue();
+    Assert.equal(complete.extra.is_success, "true", "is_success is true");
+    Assert.ok(!("error" in complete.extra), "no error on success");
+    Assert.deepEqual(
+      JSON.parse(complete.extra.components_used),
+      ["Page", "Header", "TextBlock"],
+      "components are listed in render order"
+    );
+    Assert.greater(
+      Number(complete.extra.num_chars_read),
+      "some notes".length,
+      "num_chars_read counts the page and raw content"
+    );
+    Assert.equal(
+      complete.extra.num_chars_out,
+      String(response.length),
+      "num_chars_out is the model output length"
+    );
+    Assert.ok("seconds_elapsed" in complete.extra, "seconds_elapsed is set");
+    Assert.equal(
+      Glean.smartWindow.aitabEditComplete.testGetValue(),
+      null,
+      "a new page is not reported as an edit"
+    );
+  } finally {
+    await stopServing();
+    mockEngine.cleanupMocks();
+  }
+});
+
+add_task(async function test_generateAITab_telemetry_failure() {
+  Services.fog.testResetFOG();
+  await lazy.AITab.generateAITab({ urlList: [] }, lazy.newConversation());
+
+  const [initiate] = Glean.smartWindow.aitabCreateInitiate.testGetValue();
+  Assert.equal(initiate.extra.how_initiated, "chat", "defaults to chat");
+  const [complete] = Glean.smartWindow.aitabCreateComplete.testGetValue();
+  Assert.equal(complete.extra.is_success, "false", "is_success is false");
+  Assert.equal(complete.extra.error, "no_content", "the error code is set");
+  Assert.equal(
+    complete.extra.components_used,
+    "[]",
+    "no components on failure"
+  );
+});
+
 add_task(async function test_generateAITab_includes_page_image() {
   // A page's cached preview image (og:image in Places) should reach the model
   // prompt as an `Image:` line and be recorded on its urlsUsed entry.
@@ -365,7 +444,7 @@ add_task(async function test_generateAITab_hydrates_link_favicons() {
     );
     Assert.equal(
       header.references.items[0].favicon,
-      FAVICON_URL,
+      `page-icon:${GEN_URL}`,
       "a literal SourceLink item gets its stored favicon URL, replacing the model's"
     );
     Assert.ok(
@@ -374,7 +453,7 @@ add_task(async function test_generateAITab_hydrates_link_favicons() {
     );
     Assert.equal(
       result.surface.dataModel.sources[0].favicon,
-      FAVICON_URL,
+      `page-icon:${GEN_URL}`,
       "an absolutely-bound SourceLink item gets its stored favicon URL"
     );
     Assert.ok(
@@ -455,7 +534,7 @@ add_task(async function test_generateAITab_hydrates_favicon_for_denied_url() {
     );
     Assert.equal(
       links.items[0].favicon,
-      FAVICON_URL,
+      `page-icon:${DENIED_URL}`,
       "the visited page's stored favicon hydrates despite the content refusal"
     );
   } finally {

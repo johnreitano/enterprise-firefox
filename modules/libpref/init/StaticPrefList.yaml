@@ -12145,6 +12145,12 @@
 #endif
   mirror: always
 
+# Whether the MozScrolledAreaChanged event is fired to content listeners.
+- name: layout.scrolled-area-changed.content.enabled
+  type: bool
+  value: false
+  mirror: always
+
 # Enable the spec-compliant behavior to consider the first and last inline
 # fragments when computing the inline containing block's rectangle for
 # absolutely positioned frames per
@@ -12590,6 +12596,14 @@
   type: RelaxedAtomicBool
   value: @IS_NOT_XP_MACOSX@
   mirror: always
+
+#ifdef MOZ_WIDGET_ANDROID
+  # Does the GMPlugin process run as an Android isolated process
+-   name: media.gmp.android.isolated-process
+    type: RelaxedAtomicBool
+    value: false
+    mirror: always
+#endif
 
 #if defined(XP_LINUX) && defined(MOZ_SANDBOX)
   # Whether to allow, on a Linux system that doesn't support the necessary
@@ -19519,6 +19533,14 @@
   value: true
   mirror: always
 
+# Keep the lockstore profile KEK tied to the primary password: migrate it when
+# the primary password changes, and prompt for the primary password at startup
+# to unlock it.
+- name: security.lockstore.unlock.enabled
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+
 # INTERNAL -- DO NOT ENABLE. Master switch for enterprise storage encryption:
 # at startup the browser unlocks the internal NSS token with an enterprise console
 # provisioned secret, and fails closed (force-quit) if that secret is unavailable.
@@ -20192,10 +20214,6 @@
 # dispatched to nearby elements that are sensitive to the event. See
 # PositionedEventTargeting.cpp. The 'mm' prefs define a rectangle around the
 # nominal event target point within which we will search for suitable elements.
-# 'visitedWeight' is a percentage weight; a value > 100 makes a visited link be
-# treated as further away from the event target than it really is, while a
-# value < 100 makes a visited link be treated as closer to the event target
-# than it really is.
 
 - name: ui.touch.radius.enabled
   type: bool
@@ -20245,11 +20263,6 @@
   value: true
   mirror: always
 
-- name: ui.touch.radius.visitedWeight
-  type: uint32_t
-  value: 120
-  mirror: always
-
 - name: ui.mouse.radius.enabled
   type: bool
   value: @IS_ANDROID@
@@ -20289,11 +20302,6 @@
 #else
   value: 8
 #endif
-  mirror: always
-
-- name: ui.mouse.radius.visitedWeight
-  type: uint32_t
-  value: 120
   mirror: always
 
 - name: ui.mouse.radius.reposition

@@ -1579,11 +1579,15 @@ auto nsWindow::Bounds::ComputeX11(const nsWindow* aWindow) -> Bounds {
   LOG_WIN(aWindow, "  mClientArea %s", ToString(result.mClientArea).c_str());
 
   if (result.mClientArea.X() < 0 || result.mClientArea.Y() < 0 ||
-      result.mClientArea.Width() <= 1 || result.mClientArea.Height() <= 1) {
-    // If we don't have gdkwindow bounds, assume we take the whole toplevel
-    // except system decorations.
+      (!aWindow->mHasReceivedSizeAllocate &&
+       (result.mClientArea.Width() <= 1 || result.mClientArea.Height() <= 1))) {
+    // For an invalid client position or a placeholder size before the first
+    // allocation, assume we take the whole toplevel except decorations.
     result.mClientArea =
         DesktopIntRect(systemDecorationOffset, toplevelBounds.Size());
+    if (aWindow->ToplevelUsesCSD()) {
+      result.mClientArea.Deflate(aWindow->mClientMargin);
+    }
   }
 
   result.mClientMargin =
@@ -1627,14 +1631,34 @@ auto nsWindow::Bounds::ComputeWayland(const nsWindow* aWindow) -> Bounds {
           ToString(result.mClientMargin).c_str());
 
   if (result.mClientArea.X() < 0 || result.mClientArea.Y() < 0 ||
-      result.mClientArea.Width() <= 1 || result.mClientArea.Height() <= 1) {
-    // If we don't have gdkwindow bounds yet, assume we take the whole toplevel.
+      (!aWindow->mHasReceivedSizeAllocate &&
+       (result.mClientArea.Width() <= 1 || result.mClientArea.Height() <= 1))) {
+    // For an invalid client position or a placeholder size before the first
+    // allocation, assume we take the whole toplevel except CSD decorations.
+    result.mClientMargin = aWindow->ToplevelUsesCSD() ? aWindow->mClientMargin
+                                                      : DesktopIntMargin();
     result.mClientArea = toplevelBounds;
-    result.mClientMargin = {};
+    result.mClientArea.Deflate(result.mClientMargin);
   }
   return result;
 }
 #endif
+
+DesktopIntMargin nsWindow::Bounds::ComputeCSDMargin(GtkWidget* aShell,
+                                                    GtkWidget* aChild) {
+  GtkAllocation shell{};
+  GtkAllocation child{};
+  gtk_widget_get_allocation(aShell, &shell);
+  gtk_widget_get_allocation(aChild, &child);
+  if (child.x < 0 || child.y < 0) {
+    return {};
+  }
+  auto result =
+      DesktopIntMargin(child.y, shell.width - child.width - child.x,
+                       shell.height - child.height - child.y, child.x);
+  result.EnsureAtLeast(DesktopIntMargin());
+  return result;
+}
 
 auto nsWindow::Bounds::Compute(const nsWindow* aWindow) -> Bounds {
 #ifdef MOZ_X11
@@ -1708,6 +1732,10 @@ void nsWindow::RecomputeBounds(bool aScaleChange) {
     mLastSizeRequest.width += mClientMargin.LeftRight() - oldMargin.LeftRight();
     mLastSizeRequest.height +=
         mClientMargin.TopBottom() - oldMargin.TopBottom();
+    if (ToplevelUsesCSD()) {
+      // Size constraints are in outer pixels when using CSD.
+      ApplySizeConstraints();
+    }
   }
 
   // We need to send WindowMoved even if only the client margins changed
@@ -4442,7 +4470,14 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
     gtk_window_set_focus_on_map(GTK_WINDOW(mShell), FALSE);
   }
 
+  // Show the container before realizing it, so that GTK lays it out inside the
+  // CSD decorations and we can compute the margin properly.
+  gtk_widget_show(container);
   gtk_widget_realize(container);
+  if (ToplevelUsesCSD()) {
+    mClientMargin = Bounds::ComputeCSDMargin(mShell, container);
+  }
+
   // mGdkWindow is set by moz_container_realize() / SetGdkWindow().
   MOZ_DIAGNOSTIC_ASSERT(mGdkWindow, "MozContainer realize failed?");
 
@@ -4465,8 +4500,6 @@ nsresult nsWindow::Create(nsIWidget* aParent, const LayoutDeviceIntRect& aRect,
   ConfigureToplevelWindow();
 
   // make sure this is the focus widget in the container
-  gtk_widget_show(container);
-
   if (shouldFocus) {
     gtk_widget_grab_focus(container);
   }
@@ -6724,29 +6757,40 @@ void nsWindow::SetCustomTitlebar(bool aState) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     gtk_widget_reparent(GTK_WIDGET(mContainer), tmpWindow);
-    gtk_widget_unrealize(GTK_WIDGET(mShell));
+    gtk_widget_unrealize(mShell);
 
     // Add a hidden titlebar widget to trigger CSD, but disable the default
-    // titlebar.  GtkFixed is a somewhat random choice for a simple unused
-    // widget. gtk_window_set_titlebar() takes ownership of the titlebar
-    // widget.
+    // titlebar. GtkFixed is a somewhat random choice for a simple unused
+    // widget. gtk_window_set_titlebar() takes ownership of the titlebar widget.
     gtk_window_set_titlebar(GTK_WINDOW(mShell),
                             aState ? gtk_fixed_new() : nullptr);
 
-    /* A workaround for https://bugzilla.gnome.org/show_bug.cgi?id=791081
-     * gtk_widget_realize() throws:
-     * "In pixman_region32_init_rect: Invalid rectangle passed"
-     * when mShell has default 1x1 size.
-     */
-    GtkAllocation allocation = {0, 0, 0, 0};
-    gtk_widget_get_preferred_width(GTK_WIDGET(mShell), nullptr,
-                                   &allocation.width);
-    gtk_widget_get_preferred_height(GTK_WIDGET(mShell), nullptr,
-                                    &allocation.height);
-    gtk_widget_size_allocate(GTK_WIDGET(mShell), &allocation);
+    // Layout the shell at its preferred size, and use a placeholder child, so
+    // that we can compute the CSD margin of the new decorations.
+    //
+    // We can't use mContainer for this, to prevent the unmapped toplevel
+    // surface from moving.
+    //
+    // This also works around https://bugzilla.gnome.org/show_bug.cgi?id=791081
+    {
+      GtkWidget* placeholder = gtk_fixed_new();
+      gtk_widget_show(placeholder);
+      gtk_container_add(GTK_CONTAINER(mShell), placeholder);
+      GtkAllocation allocation{};
+      gtk_widget_get_preferred_width(mShell, nullptr, &allocation.width);
+      gtk_widget_get_preferred_height(mShell, nullptr, &allocation.height);
+      gtk_widget_size_allocate(mShell, &allocation);
+      // If we're not yet visible, compute the CSD margin here synchronously.
+      // Otherwise wait for the resize to arrive, to make sure we deal with
+      // changes to it properly.
+      if (!visible && ToplevelUsesCSD()) {
+        mClientMargin = Bounds::ComputeCSDMargin(mShell, placeholder);
+      }
+      gtk_widget_destroy(placeholder);
+    }
 
-    gtk_widget_realize(GTK_WIDGET(mShell));
-    gtk_widget_reparent(GTK_WIDGET(mContainer), GTK_WIDGET(mShell));
+    gtk_widget_realize(mShell);
+    gtk_widget_reparent(GTK_WIDGET(mContainer), mShell);
 #pragma GCC diagnostic pop
 
     if (AreBoundsSane()) {

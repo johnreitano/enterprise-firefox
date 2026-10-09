@@ -89,3 +89,9 @@ LOCAL_INCLUDES += [
 ]
 
 FINAL_LIBRARY = "xul-gtest"
+
+SOURCE_HEADERS += [
+    "MockWidget.h",
+    "PolygonTestUtils.h",
+    "TextureHelper.h",
+]

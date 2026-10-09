@@ -42,3 +42,9 @@ interface MozFindbar extends XULElement {
   close(noAnim?: boolean): void;
   onFindCommand(): Promise<void>;
 }
+
+// toolkit/content/widgets/toolbarbutton.js, which tsc cannot see. Declares
+// only the members tabbrowser uses.
+interface MozToolbarbutton extends XULElement {
+  readonly icon: Element | null;
+}

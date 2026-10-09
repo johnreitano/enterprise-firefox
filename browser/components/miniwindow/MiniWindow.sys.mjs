@@ -282,7 +282,7 @@ export class MiniWindow {
 
     let features = {
       alwaysontop: 1,
-      lockaspectratio: 1,
+      lockaspectratio: this.#cropped ? 1 : 0,
       replaceLastTab: true,
       outerWidth: rect.width,
       outerHeight: rect.height,
@@ -380,7 +380,7 @@ export class MiniWindow {
         }
         // Defer so we don't tear down while session history is mid-update.
         Services.tm.dispatchToMainThread(() =>
-          this.returnToOriginWin(true, "navigated_away")
+          this.returnToOriginWin(this.#shouldFocusOnReturn(), "navigated_away")
         );
       },
       OnHistoryReload: () => true,
@@ -389,7 +389,7 @@ export class MiniWindow {
           return;
         }
         Services.tm.dispatchToMainThread(() =>
-          this.returnToOriginWin(true, "navigated_away")
+          this.returnToOriginWin(this.#shouldFocusOnReturn(), "navigated_away")
         );
       },
       OnHistoryPurge() {},
@@ -403,6 +403,16 @@ export class MiniWindow {
     };
     sessionHistory.addSHistoryListener(this.#historyListener);
     this.#historyListenerSH = sessionHistory;
+  }
+
+  /**
+   * Bring the returned tab to the front only if the user was using the mini
+   * window; a page navigating while they're elsewhere shouldn't steal focus.
+   *
+   * @returns {boolean}
+   */
+  #shouldFocusOnReturn() {
+    return Services.focus.activeWindow === this.miniWin;
   }
 
   #detachHistoryListener() {

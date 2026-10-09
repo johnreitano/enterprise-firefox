@@ -10,12 +10,13 @@
  * pre-existing JSON cards into Rust once, preserving guids, timestamps and sync
  * metadata, and `storage.rust.active` latches the success.
  *
- * What is specific to cards is the number. Each store encrypts on its own
- * terms, so the copy reads the number in the clear out of one and hands it to
- * the other -- decrypt then encrypt, the shape LoginStorageMigrator uses. That
- * needs the OS key store readable, which is settled once before any copying
- * starts, and it means a card whose number will not decrypt must be refused
- * rather than copied without it.
+ * What is specific to cards is the number. Each store holds its own key -- the
+ * JSON store the OS key store's, the Rust store one of its own in NSS -- so the
+ * copy reads the number in the clear out of one and hands it to the other:
+ * decrypt then encrypt, the shape LoginStorageMigrator uses. That needs the
+ * source's key readable, which is settled once before any copying starts, and
+ * it means a card whose number will not decrypt must be refused rather than
+ * copied without it.
  */
 
 const { FormAutofillStorage, formAutofillStorage } = ChromeUtils.importESModule(
@@ -23,6 +24,9 @@ const { FormAutofillStorage, formAutofillStorage } = ChromeUtils.importESModule(
 );
 const { RustAutofillCreditCardsAdapter } = ChromeUtils.importESModule(
   "resource://autofill/RustAutofillCreditCardStorage.sys.mjs"
+);
+const { CryptoError } = ChromeUtils.importESModule(
+  "moz-src:///toolkit/components/uniffi-bindgen-gecko-js/components/generated/RustAutofill.sys.mjs"
 );
 const { OSKeyStore } = ChromeUtils.importESModule(
   "resource://gre/modules/OSKeyStore.sys.mjs"
@@ -86,7 +90,15 @@ function card(name) {
   };
 }
 
+// Each store holds its own key: the JSON store's records carry ciphertext the
+// OS key store reads back, while the Rust store's carry a mask and the store
+// hands the number over itself.
 const decryptNumber = cipher => OSKeyStore.decrypt(cipher, "formautofill_cc");
+
+const rustStore = () => new RustAutofillStore().ensureOpen();
+
+const rustNumber = async guid =>
+  (await (await rustStore()).getCreditCard(guid)).ccNumber;
 
 async function setupStorageWithCards(fileName, names) {
   Services.prefs.setBoolPref(ENABLED_PREF, false);
@@ -168,20 +180,21 @@ add_task(async function test_the_number_is_re_encrypted_by_the_target() {
   s = await enableRust(s);
 
   const after = await s.creditCards.get(guids[0]);
-  // The receiving store encrypts for itself, so the ciphertext is its own and
-  // not the one it was handed. Today both use the OS key store, which returns
-  // different bytes for the same number every time; when the Rust store owns
-  // its own key these will not even be the same format.
-  Assert.notEqual(
-    after["cc-number-encrypted"],
+  Assert.ok(
     before["cc-number-encrypted"],
-    "the target wrote its own ciphertext"
+    "the source held the number as its own ciphertext"
+  );
+  // The receiving store encrypts under its own key, so the source's ciphertext
+  // does not come along.
+  Assert.ok(
+    !("cc-number-encrypted" in after),
+    "the target was handed the number rather than the ciphertext"
   );
   // What has to survive is the number, not the bytes.
   Assert.equal(
-    await decryptNumber(after["cc-number-encrypted"]),
+    await rustNumber(guids[0]),
     NUMBERS["Ann One"],
-    "and it decrypts to the number that was saved"
+    "and it holds the number that was saved"
   );
 
   await s._finalize();
@@ -222,26 +235,26 @@ add_task(async function test_a_decrypt_failure_refuses_rather_than_copies() {
   s = await enableRust(s);
   const before = await Promise.all(guids.map(g => s.creditCards.get(g)));
 
-  // The key store answers for the first card -- so the copy is allowed to start
-  // -- and then stops answering, as a keychain locking mid-run would. The
-  // second card's number cannot be recovered, so it must not be copied at all:
-  // writing it with a re-derived number would encrypt the mask in place of the
-  // card, and that damage is permanent where the failure was not.
-  const realDecrypt = OSKeyStore.decrypt;
+  // The source is the Rust store here, so it is its key that stops answering.
+  // It answers for the first card -- so the copy is allowed to start -- and
+  // then fails the read of the second. That number cannot be recovered, so the
+  // card must not be copied at all: writing it with a re-derived number would
+  // encrypt the mask in place of the card, and that damage is permanent where
+  // the failure was not.
+  const store = await rustStore();
+  const realGet = store.getCreditCard.bind(store);
   let calls = 0;
-  OSKeyStore.decrypt = async function (...args) {
+  store.getCreditCard = async function (guid) {
     // One for the readability check, one for the first record's export.
-    if (++calls <= 2) {
-      return realDecrypt.apply(this, args);
+    if (++calls > 2) {
+      throw new CryptoError("decryption failed");
     }
-    const e = new Error("keystore became unavailable");
-    e.result = Cr.NS_ERROR_FAILURE;
-    throw e;
+    return realGet(guid);
   };
   try {
     s = await disableRust(s);
   } finally {
-    OSKeyStore.decrypt = realDecrypt;
+    delete store.getCreditCard;
   }
 
   // An incomplete copy does not move the profile.
@@ -253,13 +266,9 @@ add_task(async function test_a_decrypt_failure_refuses_rather_than_copies() {
   // And both source records are untouched, so a later launch can copy them.
   for (const [i, name] of ["Ann One", "Bob Two"].entries()) {
     const after = await s.creditCards.get(guids[i]);
+    Assert.deepEqual(after, before[i], `${name} was not rewritten`);
     Assert.equal(
-      after["cc-number-encrypted"],
-      before[i]["cc-number-encrypted"],
-      `${name} was not rewritten`
-    );
-    Assert.equal(
-      await decryptNumber(after["cc-number-encrypted"]),
+      await rustNumber(guids[i]),
       NUMBERS[name],
       `${name}'s number is still readable`
     );
@@ -350,7 +359,7 @@ add_task(async function test_flipping_the_pref_switches_a_running_session() {
   Assert.equal((await rust.getAll()).length, 2, "the cards came across");
   Assert.ok(await rust.get(guids[0]), "with their guids preserved");
   Assert.equal(
-    await decryptNumber((await rust.get(guids[0]))["cc-number-encrypted"]),
+    await rustNumber(guids[0]),
     NUMBERS["Ann One"],
     "and their numbers re-encrypted into the target"
   );
@@ -503,7 +512,7 @@ add_task(async function test_a_scrubbed_store_defers_the_copy_back() {
   // so every record reads back as a mask with no number behind it. Handing
   // that over would have the receiving store encrypt the mask in place of the
   // card, so the copy is not attempted at all.
-  const store = await new RustAutofillStore().ensureOpen();
+  const store = await rustStore();
   await store.scrubEncryptedData();
 
   s = await disableRust(s);
@@ -523,11 +532,50 @@ add_task(async function test_a_scrubbed_store_defers_the_copy_back() {
   for (const guid of guids) {
     const after = await s.creditCards.get(guid);
     Assert.ok(after, `${guid} is still in the store that held it`);
-    Assert.ok(
-      !after["cc-number-encrypted"],
+    Assert.equal(
+      await rustNumber(guid),
+      "",
       "still scrubbed, and not rewritten with the mask as its number"
     );
   }
+
+  await s._finalize();
+});
+
+add_task(async function test_the_active_collection_reads_a_number_back() {
+  // What the edit dialog and the sidebar ask of whichever collection is
+  // serving: name the field, get the number. They hold a record they were
+  // handed and never see the key behind it.
+  let { s, guids } = await setupStorageWithCards("cc-mig-readback.json", [
+    "Ann One",
+  ]);
+
+  for (const [store, flip] of [
+    ["JSON", disableRust],
+    ["Rust", enableRust],
+  ]) {
+    s = await flip(s);
+    const collection = s.creditCards;
+    const record = await collection.get(guids[0]);
+    Assert.equal(
+      await collection.decryptField(record, "cc-number"),
+      NUMBERS["Ann One"],
+      `${store} reads the number back through the collection`
+    );
+  }
+
+  // A record holding nothing under that field is not an error, and is what
+  // tells a caller there is no number to show.
+  const store = await rustStore();
+  await store.scrubEncryptedData();
+  Assert.equal(
+    await s.creditCards.decryptField(
+      await s.creditCards.get(guids[0]),
+      "cc-number"
+    ),
+    null,
+    "a scrubbed record reads back as null"
+  );
 
   await s._finalize();
 });

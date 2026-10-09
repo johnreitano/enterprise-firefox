@@ -1620,18 +1620,22 @@ already_AddRefed<a11y::LocalAccessible> nsCocoaWindow::GetWindowAccessible() {
   }
 
   // mAccessible might be dead if accessibility was previously disabled and is
-  // now being enabled again.
+  // now being enabled again. It might also still be alive but shut down, which
+  // leaves it without a document, for example after the window's document was
+  // replaced.
   if (mAccessible && mAccessible->IsAlive()) {
     RefPtr<a11y::LocalAccessible> ret;
     CallQueryReferent(mAccessible.get(), static_cast<a11y::LocalAccessible**>(
                                              getter_AddRefs(ret)));
-    return ret.forget();
+    if (ret && ret->Document()) {
+      return ret.forget();
+    }
   }
 
   // need to fetch the accessible anew, because it has gone away.
   // cache the accessible in our weak ptr
   RefPtr<a11y::LocalAccessible> acc = GetRootAccessible();
-  if (GetWindowType() == WindowType::Popup) {
+  if (acc && GetWindowType() == WindowType::Popup) {
     // If we're a popup panel, we want to return the accessible for the
     // content of the panel, not the accessible for the document.
     if (nsIFrame* popupFrame = GetFrame()) {
@@ -7220,6 +7224,17 @@ void nsCocoaWindow::DispatchSizeModeEvent() {
   }
 }
 
+// MOZ_WINDOW_OCCLUSION set to anything but "1" disables occlusion tracking, as
+// it does on Windows. Test harnesses set it because they run several browser
+// windows on one screen, and an occluded window's documents become hidden.
+static bool IsOcclusionTrackingDisabledByEnv() {
+  static const bool sDisabled = [] {
+    const char* env = getenv("MOZ_WINDOW_OCCLUSION");
+    return env && *env != '1';
+  }();
+  return sDisabled;
+}
+
 void nsCocoaWindow::DispatchOcclusionEvent() {
   if (!mWindow) {
     return;
@@ -7251,7 +7266,7 @@ void nsCocoaWindow::DispatchOcclusionEvent() {
 
   // Our new occlusion state is true if the window is not visible.
   bool newOcclusionState =
-      !keyOrMainNonFullscreen &&
+      !IsOcclusionTrackingDisabledByEnv() && !keyOrMainNonFullscreen &&
       !(mHasStartedNativeFullscreen ||
         ([mWindow occlusionState] & NSWindowOcclusionStateVisible));
 

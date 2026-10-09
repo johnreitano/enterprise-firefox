@@ -247,6 +247,8 @@ class nsWindow : public nsIWidget {
 #ifdef MOZ_WAYLAND
     static Bounds ComputeWayland(const nsWindow*);
 #endif
+    static DesktopIntMargin ComputeCSDMargin(GtkWidget* aShell,
+                                             GtkWidget* aChild);
   };
   void SchedulePendingBounds();
   void MaybeRecomputeBounds();

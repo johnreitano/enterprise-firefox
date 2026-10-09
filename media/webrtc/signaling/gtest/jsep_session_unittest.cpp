@@ -8658,7 +8658,7 @@ TEST_F(JsepSessionTest, TestBundleSupportWithZeroPort) {
   }
 }
 
-TEST_F(JsepSessionTest, ExtmapAllowMixedTrueWhenPrensentAtSessionLevel) {
+TEST_F(JsepSessionTest, ExtmapAllowMixedTrueWhenPresentAtSessionLevel) {
   AddTracks(*mSessionOff, "audio,video,datachannel");
   AddTracks(*mSessionAns, "audio,video,datachannel");
   std::string offer;
@@ -8691,7 +8691,7 @@ TEST_F(JsepSessionTest, ExtmapAllowMixedTrueWhenPrensentAtSessionLevel) {
   });
 }
 
-TEST_F(JsepSessionTest, ExtmapAllowMixedCheckDoNotDefaultToSessionLevel) {
+TEST_F(JsepSessionTest, ExtmapAllowMixedCheckDefaultToSessionLevel) {
   AddTracks(*mSessionOff, "audio,video,datachannel");
   AddTracks(*mSessionAns, "audio,video,datachannel");
 
@@ -8707,8 +8707,8 @@ TEST_F(JsepSessionTest, ExtmapAllowMixedCheckDoNotDefaultToSessionLevel) {
   mSessionOff->SetRemoteDescription(kJsepSdpAnswer, answer);
   mSessionAns->SetLocalDescription(kJsepSdpAnswer, answer);
 
-  ASSERT_FALSE(ExtmapAllowMixed(*mSessionOff));
-  ASSERT_FALSE(ExtmapAllowMixed(*mSessionAns));
+  ASSERT_TRUE(ExtmapAllowMixed(*mSessionOff));
+  ASSERT_TRUE(ExtmapAllowMixed(*mSessionAns));
 }
 
 TEST_F(JsepSessionTest, NoExtmapAllowMixedInDatachannel) {

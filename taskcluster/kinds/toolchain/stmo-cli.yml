@@ -70,3 +70,14 @@ win64-stmo-cli:
             - linux64-clang-toolchain
             - linux64-rust-windows-toolchain
             - vs-toolchain
+
+win64-aarch64-stmo-cli:
+    treeherder:
+        symbol: TWA64(stmo-cli)
+    run:
+        arguments: ['aarch64-pc-windows-msvc']
+    fetches:
+        toolchain:
+            - linux64-clang-toolchain
+            - linux64-rust-windows-toolchain
+            - vs-toolchain

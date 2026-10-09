@@ -817,8 +817,13 @@ def _build_compile_db(command_context, verbose=False):
         command_context.topobjdir, "static-analysis"
     )
     compile_db = mozpath.join(compilation_commands_path, "compile_commands.json")
+    backend_file = mozpath.join(
+        command_context.topobjdir, "backend.StaticAnalysisBackend"
+    )
 
-    if os.path.exists(compile_db):
+    if os.path.exists(compile_db) and not command_context.backend_out_of_date(
+        backend_file
+    ):
         return 0, compile_db, compilation_commands_path
 
     rc, config, ran_configure = _get_config_environment(command_context)
@@ -832,10 +837,13 @@ def _build_compile_db(command_context, verbose=False):
         return _build_compile_db(command_context, verbose=verbose)
 
     if config:
-        print(
-            "Looks like a clang compilation database has not been "
-            "created yet, creating it now..."
-        )
+        if os.path.exists(compile_db):
+            print("The clang compilation database is out of date, regenerating it...")
+        else:
+            print(
+                "Looks like a clang compilation database has not been "
+                "created yet, creating it now..."
+            )
         rc = build_commands.build_backend(
             command_context, ["StaticAnalysis"], verbose=verbose
         )

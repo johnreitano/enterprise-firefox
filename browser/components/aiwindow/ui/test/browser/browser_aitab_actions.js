@@ -29,6 +29,10 @@ const { ConversationStore } = ChromeUtils.importESModule(
 const { Conversation } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/Conversation.sys.mjs"
 );
+const { MockEngineManager } = ChromeUtils.importESModule(
+  "resource://testing-common/AIWindowTestUtils.sys.mjs"
+);
+
 // AIWINDOW_URL and openAIWindow come from head.js.
 
 const AITAB_PREF = "browser.smartwindow.aitab.enabled";
@@ -133,8 +137,12 @@ function openDeleteDialog(browser) {
   });
 }
 
+let gMockEngineManager;
 add_setup(async function () {
+  gMockEngineManager = new MockEngineManager();
   await SpecialPowers.pushPrefEnv({ set: [[AITAB_PREF, true]] });
+
+  registerCleanupFunction(() => {});
 });
 
 add_task(async function test_cancelling_the_dialog_keeps_the_page() {
@@ -349,6 +357,8 @@ add_task(async function test_a_non_web_link_is_refused() {
 });
 
 registerCleanupFunction(async () => {
+  gMockEngineManager.rejectAllRequests();
+
   // A task that throws never reaches its own closeWindow(), and a leftover
   // window fails the whole file with "Found an unexpected browser window",
   // which reads louder than the failure that caused it.
@@ -361,4 +371,6 @@ registerCleanupFunction(async () => {
 
   await AITabStore.deleteBySlug(SLUG);
   await ConversationStore.deleteConversationById(CONV_ID);
+
+  gMockEngineManager.cleanupMocks();
 });

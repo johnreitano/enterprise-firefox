@@ -20,8 +20,8 @@
  */
 
 /**
- * pdfjsVersion = 6.5.10
- * pdfjsBuild = 17bb2442f
+ * pdfjsVersion = 6.5.57
+ * pdfjsBuild = 89b500f5e
  */
 
 ;// ./web/ui_utils.js
@@ -724,6 +724,9 @@ const defaultOptions = new Map([["allowedGlobalEvents", {
 }], ["disableStream", {
   value: false,
   kind: OptionKind.API + OptionKind.PREFERENCE
+}], ["disableWorkerRendering", {
+  value: true,
+  kind: OptionKind.API + OptionKind.PREFERENCE
 }], ["docBaseUrl", {
   value: "",
   kind: OptionKind.API
@@ -764,6 +767,9 @@ const defaultOptions = new Map([["allowedGlobalEvents", {
 }], ["wasmUrl", {
   value: "resource://pdf.js/web/wasm/",
   kind: OptionKind.API
+}], ["rendererSrc", {
+  value: "resource://pdf.js/build/pdf.renderer.mjs",
+  kind: OptionKind.WORKER
 }], ["workerPort", {
   value: globalThis.pdfjsPreloadedWorker || null,
   kind: OptionKind.WORKER
@@ -892,7 +898,7 @@ const {
 } = globalThis.pdfjsLib;
 
 ;// ./web/internal_evt.js
-const INTERNAL_EVT = "69c561af-2641-4e9f-a96c-d349a5f13a03";
+const INTERNAL_EVT = "c186cc9a-35f2-4903-bae3-54472b008de3";
 const internalOpt = Object.freeze({
   internal: INTERNAL_EVT
 });
@@ -6489,7 +6495,7 @@ class BasePDFPageView extends RenderableView {
     this.#showCanvas = isLastShow => {
       if (updateOnFirstShow) {
         let tempCanvas = this.#tempCanvas;
-        if (!isLastShow && this.minDurationToUpdateCanvas > 0) {
+        if (!isLastShow && this.minDurationToUpdateCanvas > 0 && !this.renderTask?.isWorkerRendering) {
           if (Date.now() - this.#startTime < this.minDurationToUpdateCanvas) {
             return;
           }
@@ -6531,7 +6537,9 @@ class BasePDFPageView extends RenderableView {
     };
   }
   #renderContinueCallback = cont => {
-    this.#showCanvas?.(false);
+    if (!this.renderTask?.isWorkerRendering) {
+      this.#showCanvas?.(false);
+    }
     if (this.renderingQueue && !this.renderingQueue.isHighestPriority(this)) {
       this.renderingState = RenderingStates.PAUSED;
       this.resume = () => {
@@ -6563,6 +6571,7 @@ class BasePDFPageView extends RenderableView {
   async _drawCanvas(options, onCancel, onFinish) {
     const renderTask = this.renderTask = this.pdfPage.render(options);
     renderTask.onContinue = this.#renderContinueCallback;
+    renderTask.onFrame = () => this.#showCanvas?.(false);
     renderTask.onError = error => {
       if (error instanceof RenderingCancelledException) {
         onCancel();
@@ -8511,7 +8520,8 @@ class PDFPageView extends BasePDFPageView {
       pageColors: this.pageColors,
       isEditing: this.#isEditing,
       recordOperations,
-      recordImages
+      recordImages,
+      partialFrames: true
     };
   }
   async draw() {
@@ -8809,7 +8819,7 @@ class PDFViewer {
   #savedPageViews = null;
   #deletedPageNumbers = null;
   constructor(options) {
-    const viewerVersion = "6.5.10";
+    const viewerVersion = "6.5.57";
     if (version !== viewerVersion) {
       throw new Error(`The API version "${version}" does not match the Viewer version "${viewerVersion}".`);
     }
@@ -11725,6 +11735,15 @@ const PDFViewerApplication = {
             outline,
             pdfDocument
           });
+        }, reason => {
+          if (pdfDocument !== this.pdfDocument) {
+            return;
+          }
+          console.error("getOutline", reason);
+          this.pdfOutlineViewer.render({
+            outline: null,
+            pdfDocument
+          });
         });
       }
       if (this.pdfAttachmentViewer) {
@@ -11734,6 +11753,14 @@ const PDFViewerApplication = {
           }
           this.pdfAttachmentViewer.render({
             attachments
+          });
+        }, reason => {
+          if (pdfDocument !== this.pdfDocument) {
+            return;
+          }
+          console.error("getAttachments", reason);
+          this.pdfAttachmentViewer.render({
+            attachments: null
           });
         });
       }

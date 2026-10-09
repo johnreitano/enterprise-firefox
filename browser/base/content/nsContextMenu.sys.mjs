@@ -2682,7 +2682,11 @@ export class nsContextMenu {
   }
 
   createAITab() {
-    lazy.AIWindow.createAITab(this.window, [this.browser.currentURI.spec]);
+    lazy.AIWindow.createAITab(
+      this.window,
+      [this.browser.currentURI.spec],
+      "tab_list"
+    );
   }
 
   /**

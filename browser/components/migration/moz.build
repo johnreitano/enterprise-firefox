@@ -49,6 +49,10 @@ if CONFIG["OS_ARCH"] == "WINNT":
         "MSMigrationUtils.sys.mjs",
     ]
 
+    SOURCE_HEADERS += [
+        "nsWindowsMigrationUtils.h",
+    ]
+
 if CONFIG["MOZ_WIDGET_TOOLKIT"] == "cocoa":
     EXPORTS += [
         "nsKeychainMigrationUtils.h",

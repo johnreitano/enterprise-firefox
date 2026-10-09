@@ -16,6 +16,12 @@ names and values are the short, lower-case form, with underscores.
 A task's `kind` attribute gives the name of the kind that generated it, e.g.,
 `build` or `spidermonkey`.
 
+## task-from
+
+The path, relative to the topsrcdir, of the yml file the task was defined
+in: either one of the kind's `tasks-from` files, or the kind's own
+`kind.yml` if the task was defined inline there.
+
 ## run_on_repo_type
 
 The types of repositories where this task should be in the target task set. Typically

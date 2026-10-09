@@ -185,6 +185,9 @@ if not CONFIG["JS_CODEGEN_NONE"]:
         "testJitRValueAlloc.cpp",
         "testsJit.cpp",
     ]
+    SOURCE_HEADERS += [
+        "testsJit.h",
+    ]
 
 if CONFIG["NIGHTLY_BUILD"]:
     # The Error interceptor only exists on Nightly.
@@ -219,3 +222,8 @@ if CONFIG["MOZ_LTO_FAT"]:
 
 DEFINES["topsrcdir"] = "%s/js/src" % TOPSRCDIR
 OBJDIR_PP_FILES.js.src["jsapi-tests"] += ["jsapi-tests-gdb.py.in"]
+
+SOURCE_HEADERS += [
+    "testJitMinimalFunc.h",
+    "tests.h",
+]

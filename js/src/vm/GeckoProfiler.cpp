@@ -66,6 +66,15 @@ void GeckoProfilerRuntime::setTerminatingFlowMarker(
     void (*fn)(mozilla::MarkerCategory, const char*, uint64_t)) {
   terminatingFlowMarker_ = fn;
 }
+bool GeckoProfilerRuntime::insertScriptSource(ScriptSource* scriptSource) {
+  MOZ_ASSERT(scriptSource);
+  auto guard = scriptSources_.writeLock();
+  if (!enabled_) {
+    return true;
+  }
+
+  return guard->put(scriptSource);
+}
 
 // Get a pointer to the top-most profiling frame, given the exit frame pointer.
 static jit::JitFrameLayout* GetTopProfilingJitFrame(jit::JitActivation* act) {

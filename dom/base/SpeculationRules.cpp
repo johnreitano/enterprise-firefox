@@ -5,6 +5,7 @@
 #include "mozilla/dom/SpeculationRules.h"
 
 #include "mozilla/CycleCollectedJSContext.h"
+#include "mozilla/PresShell.h"
 #include "mozilla/StaticPrefs_dom.h"
 #include "mozilla/dom/Document.h"
 #include "mozilla/dom/Element.h"
@@ -22,6 +23,8 @@
 #include "nsITimer.h"
 #include "nsIURI.h"
 #include "nsNetUtil.h"
+#include "nsPresContext.h"
+#include "nsRefreshObservers.h"
 #include "nsTArray.h"
 #include "nsTHashMap.h"
 
@@ -157,6 +160,12 @@ void SpeculationRules::InnerConsiderLoads() {
     return;
   }
 
+  // In order to find matching links, we need the link frames to have been
+  // constructed. If there are frames pending, wait until the next refresh.
+  if (WaitForPendingFrames()) {
+    return;
+  }
+
   // https://html.spec.whatwg.org/#find-matching-links
   // The result doesn't depend on any particular rule set, so it's computed
   // once here and shared across every rule set's ConsiderLoads call below.
@@ -186,6 +195,40 @@ void SpeculationRules::InnerConsiderLoads() {
   // fired now; the less eager ones wait in mCandidateGroups until the user
   // shows interest in a link matching them.
   EnactCandidates(nullptr, Eagerness::Immediate);
+}
+
+bool SpeculationRules::WaitForPendingFrames() {
+  if (mPendingFramesObserver) {
+    return true;
+  }
+
+  PresShell* presShell = mDocument->GetPresShell();
+  if (!presShell || !presShell->NeedFlush(FlushType::Frames, false)) {
+    return false;
+  }
+  nsPresContext* presContext = presShell->GetPresContext();
+  if (!presContext) {
+    return false;
+  }
+
+  // If there are no document rules, no links will be matched against, so
+  // don't bother waiting.
+  if (std::none_of(
+          mRuleSetsFromScript.begin(), mRuleSetsFromScript.end(),
+          [](auto& entry) { return entry.GetData()->HasDocumentRules(); })) {
+    return false;
+  }
+
+  mPendingFramesObserver = MakeRefPtr<ManagedPostRefreshObserver>(
+      presContext, [self = RefPtr{this}](bool aWasCanceled) {
+        self->mPendingFramesObserver = nullptr;
+        if (!aWasCanceled) {
+          self->InnerConsiderLoads();
+        }
+        return ManagedPostRefreshObserver::Unregister::Yes;
+      });
+  presContext->RegisterManagedPostRefreshObserver(mPendingFramesObserver);
+  return true;
 }
 
 void SpeculationRules::EnactCandidates(nsIURI* aURL, Eagerness aTriggerLevel) {

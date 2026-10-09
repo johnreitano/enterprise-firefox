@@ -645,7 +645,8 @@ child:
     async DecodeImage(nsIURI aURI,
                       ImageIntSize aSize,
                       bool aStretch,
-                      ColorScheme aColorScheme)
+                      ColorScheme aColorScheme,
+                      nsIPrincipal aPrincipal)
         returns (nsresult rv, IPCImage? image);
 
 #if defined(XP_WIN)

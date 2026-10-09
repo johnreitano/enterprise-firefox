@@ -56,7 +56,7 @@
   line-height: 1.5;
 }
 
-@container aitab-page (width >= 900px) {
+@media (width > 900px) {
   .aitab-timeline {
     grid-template-columns: max-content max-content 1fr;
   }
