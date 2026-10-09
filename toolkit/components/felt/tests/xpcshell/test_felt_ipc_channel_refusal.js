@@ -7,8 +7,14 @@
 // so the spawned browser must be terminated rather than left starting with a
 // released endpoint name that another process could claim.
 
+const { AppConstants } = ChromeUtils.importESModule(
+  "resource://gre/modules/AppConstants.sys.mjs"
+);
 const { openIpcChannelOrTerminate } = ChromeUtils.importESModule(
   "chrome://felt/content/FeltProcessParent.sys.mjs"
+);
+const { Subprocess } = ChromeUtils.importESModule(
+  "resource://gre/modules/Subprocess.sys.mjs"
 );
 
 function fakeProc() {
@@ -19,6 +25,16 @@ function fakeProc() {
       return Promise.resolve({ exitCode: -9 });
     },
   };
+}
+
+function browserBinary() {
+  const file = Services.dirsvc.get("GreBinD", Ci.nsIFile);
+  file.append(
+    AppConstants.platform == "win"
+      ? AppConstants.MOZ_APP_NAME + ".exe"
+      : AppConstants.MOZ_APP_NAME
+  );
+  return file.path;
 }
 
 add_task(async function test_refused_peer_terminates_the_browser() {
@@ -43,3 +59,38 @@ add_task(async function test_accepted_peer_leaves_the_browser_running() {
   Assert.ok(opened, "the channel was opened");
   Assert.deepEqual(proc.killedWith, [], "the browser is not killed");
 });
+
+// The real browser binary connects to the endpoint, but felt expects this
+// process's pid, so ipcChannel() must refuse the browser and the browser must
+// be terminated. ipcChannel() blocks until the browser connects. On Windows a
+// launcher process may run the browser as a child that outlives the spawned
+// process, so this case is skipped there.
+add_task(
+  { skip_if: () => AppConstants.platform == "win" },
+  async function test_ipc_channel_refuses_and_terminates_the_real_browser() {
+    const endpoint = Services.felt.oneShotIpcServer();
+    const profileDir = await IOUtils.createUniqueDirectory(
+      PathUtils.tempDir,
+      "felt-refusal-profile"
+    );
+    const proc = await Subprocess.call({
+      command: browserBinary(),
+      arguments: ["--foreground", "-profile", profileDir, "-felt", endpoint],
+      environment: { MOZ_BYPASS_FELT: "", MOZ_FELT_UI: "" },
+      environmentAppend: true,
+    });
+    registerCleanupFunction(async () => {
+      await proc.kill();
+      await IOUtils.remove(profileDir, { recursive: true });
+    });
+
+    await Assert.rejects(
+      openIpcChannelOrTerminate(proc, () =>
+        Services.felt.ipcChannel(Services.appinfo.processID, 1)
+      ),
+      e => e.result == Cr.NS_ERROR_PORT_ACCESS_NOT_ALLOWED,
+      "ipcChannel() refuses a peer that is not the expected process"
+    );
+    Assert.notStrictEqual(proc.exitCode, null, "the browser has exited");
+  }
+);
