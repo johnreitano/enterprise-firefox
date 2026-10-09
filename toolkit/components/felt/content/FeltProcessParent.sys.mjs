@@ -85,6 +85,9 @@ export async function openIpcChannelOrTerminate(proc, openChannel) {
   try {
     openChannel();
   } catch (e) {
+    lazy.log.error(
+      `Terminating process ${proc.pid}: opening the IPC channel to it failed (${e.name})`
+    );
     await proc.kill(0);
     throw e;
   }
