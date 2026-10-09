@@ -18,7 +18,7 @@ use xpcom::interfaces::{
 };
 use xpcom::{xpcom_method, RefPtr};
 
-use log::{error, trace, warn};
+use log::{error, trace};
 
 use crate::message::{FeltMessage, FELT_IPC_VERSION};
 use crate::utils;
@@ -450,10 +450,10 @@ impl FeltXPCOM {
         let authorized = peer_is_authorized(peer_pid, expected_pid);
         if !authorized {
             match peer_pid {
-                None => warn!(
+                None => error!(
                     "FeltXPCOM:IpcChannel() refused IPC peer: transport reported no peer pid (no attestation)"
                 ),
-                Some(pid) => warn!(
+                Some(pid) => error!(
                     "FeltXPCOM:IpcChannel() refused IPC peer: pid {} does not match expected {}",
                     pid, expected_pid
                 ),
