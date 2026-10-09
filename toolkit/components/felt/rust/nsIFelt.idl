@@ -42,6 +42,11 @@ interface nsIFelt : nsISupports {
    * child the launcher process creates and announces to felt. On platforms
    * whose transport attests a peer pid, an unrelated same-user process that
    * races to connect has a different pid and is refused.
+   *
+   * @throws NS_ERROR_PORT_ACCESS_NOT_ALLOWED if the connecting peer is refused.
+   * @throws NS_ERROR_FAILURE if no endpoint from oneShotIpcServer() is
+   *         pending, the peer fails the accept, or the handshake cannot be
+   *         sent.
    */
   [must_use]
   void ipcChannel(in unsigned long pid, in unsigned long browserGeneration);
